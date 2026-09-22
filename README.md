@@ -24,7 +24,7 @@ Sound is procedural and starts muted on every page load. If sound was previously
 
 ## Quality settings
 
-Quality changes terrain tessellation, vegetation density, stream radius, pixel ratio, and shadows. Medium is the default for modern integrated laptop graphics at 1080p. A low afternoon sun casts long soft shadows from terrain and trees near the eagle. Low reduces pixel ratio and disables shadows. High extends the visible terrain ring and increases vegetation.
+Quality changes terrain tessellation, vegetation density, stream radius, pixel ratio, and shadows. Medium is the default for modern integrated laptop graphics at 1080p. A low afternoon sun casts long soft shadows from terrain and trees; the shadow area follows the view out to the full haze distance, so it has no visible edge. Low reduces pixel ratio and disables shadows. High extends the visible terrain ring and increases vegetation.
 
 ## Diagnostics and validation
 

@@ -76,13 +76,8 @@ const SUN_OFFSET = new THREE.Vector3(-420, 190, -300);
 const sun = new THREE.DirectionalLight(0xffe1ab, 3.6);
 sun.position.copy(SUN_OFFSET);
 sun.castShadow = settings.quality !== 'low';
-sun.shadow.mapSize.set(1024, 1024);
-sun.shadow.camera.left = -300;
-sun.shadow.camera.right = 300;
-sun.shadow.camera.top = 300;
-sun.shadow.camera.bottom = -300;
-sun.shadow.camera.near = 40;
-sun.shadow.camera.far = 1100;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1;
 sun.shadow.bias = -0.0005;
 sun.shadow.normalBias = 0.8;
 scene.add(sun, sun.target);
@@ -116,6 +111,7 @@ let pointerX = 0;
 let pointerY = 0;
 const cameraPosition = new THREE.Vector3(navigator.state.x, navigator.state.y + 70, navigator.state.z - settings.cameraDistance);
 const lookAt = new THREE.Vector3();
+const shadowCenter = new THREE.Vector3();
 
 renderer.domElement.addEventListener('pointerdown', (event) => {
   dragging = true;
@@ -235,6 +231,10 @@ function updateFog(): void {
   fog.near = fog.far * 0.5;
   camera.far = Math.max(fog.far, 820) + 400;
   camera.updateProjectionMatrix();
+  sun.shadow.camera.left = sun.shadow.camera.bottom = -fog.far;
+  sun.shadow.camera.right = sun.shadow.camera.top = fog.far;
+  sun.shadow.camera.far = (fog.far + 300) * 2;
+  sun.shadow.camera.updateProjectionMatrix();
 }
 updateFog();
 
@@ -282,8 +282,9 @@ function frame(now: number): void {
 
   sky.position.set(state.x, state.y - 40, state.z);
   sunDisc.position.copy(SUN_OFFSET).setLength(700).add(eagle.group.position);
-  sun.target.position.set(state.x, world.sample(state.x, state.z).height, state.z);
-  sun.position.copy(sun.target.position).add(SUN_OFFSET);
+  camera.getWorldDirection(shadowCenter).setY(0).setLength(fog.far * 0.5).add(camera.position);
+  sun.target.position.set(shadowCenter.x, world.sample(shadowCenter.x, shadowCenter.z).height, shadowCenter.z);
+  sun.position.copy(SUN_OFFSET).setLength(fog.far + 300).add(sun.target.position);
   sun.target.updateMatrixWorld();
 
   renderer.render(scene, camera);
