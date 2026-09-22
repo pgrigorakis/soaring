@@ -4,9 +4,11 @@ test('renders, streams, and exposes usable controls', async ({ page }) => {
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/?diagnostics=1&speed=8');
+  await page.goto('/');
   await expect(page.locator('canvas')).toBeVisible();
+  await page.keyboard.press('d');
   await expect(page.locator('#diagnostics')).toBeVisible();
+  await page.evaluate(() => window.__SOARING__.setTimeScale(8));
   await page.waitForFunction(() => window.__SOARING__?.snapshot().chunks > 8);
   const before = await page.evaluate(() => window.__SOARING__.snapshot());
   await page.waitForTimeout(1500);

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import './style.css';
 import { Soundscape } from './audio';
 import { EagleNavigator, EagleView } from './eagle';
-import { QUALITY, QualityName, TerrainStream } from './terrain';
+import { CHUNK_SIZE, QUALITY, QualityName, TerrainStream } from './terrain';
 import { WorldModel } from './world';
 
 type StoredSettings = { volume: number; muted: boolean; quality: QualityName; cameraDistance: number };
@@ -52,9 +52,10 @@ soundscape.setVolume(settings.volume);
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('Missing application root');
 
+const HORIZON_COLOR = 0xd8d4b3;
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xa9c2c7);
-const fog = new THREE.Fog(0xa9c2c7, 430, 920);
+scene.background = new THREE.Color(HORIZON_COLOR);
+const fog = new THREE.Fog(HORIZON_COLOR, 360, 720);
 scene.fog = fog;
 
 const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.5, 1700);
@@ -71,17 +72,19 @@ app.append(renderer.domElement);
 
 const hemisphere = new THREE.HemisphereLight(0xd9e6e1, 0x596448, 2.25);
 scene.add(hemisphere);
+const SUN_OFFSET = new THREE.Vector3(-420, 190, -300);
 const sun = new THREE.DirectionalLight(0xffe1ab, 3.6);
-sun.position.set(-380, 520, -270);
+sun.position.copy(SUN_OFFSET);
 sun.castShadow = settings.quality !== 'low';
 sun.shadow.mapSize.set(1024, 1024);
-sun.shadow.camera.left = -260;
-sun.shadow.camera.right = 260;
-sun.shadow.camera.top = 260;
-sun.shadow.camera.bottom = -260;
+sun.shadow.camera.left = -300;
+sun.shadow.camera.right = 300;
+sun.shadow.camera.top = 300;
+sun.shadow.camera.bottom = -300;
 sun.shadow.camera.near = 40;
 sun.shadow.camera.far = 1100;
 sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.8;
 scene.add(sun, sun.target);
 
 const skyGeometry = new THREE.SphereGeometry(820, 20, 12);
@@ -91,19 +94,20 @@ const skyMaterial = new THREE.ShaderMaterial({
   fog: false,
   uniforms: {
     topColor: { value: new THREE.Color(0x6f9fb2) },
-    horizonColor: { value: new THREE.Color(0xd8d4b3) },
+    horizonColor: { value: new THREE.Color(HORIZON_COLOR) },
   },
   vertexShader: 'varying float vHeight; void main(){ vHeight = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: 'uniform vec3 topColor; uniform vec3 horizonColor; varying float vHeight; void main(){ float h = smoothstep(-0.12, 0.74, vHeight); gl_FragColor = vec4(mix(horizonColor, topColor, h), 1.0); }',
+  fragmentShader: 'uniform vec3 topColor; uniform vec3 horizonColor; varying float vHeight; void main(){ float h = smoothstep(-0.12, 0.74, vHeight); gl_FragColor = vec4(mix(horizonColor, topColor, h), 1.0); \n#include <colorspace_fragment>\n}',
 });
 const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+sky.renderOrder = -1;
 scene.add(sky);
 const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(18, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffe5a8, fog: false }));
 scene.add(sunDisc);
 
 scene.add(eagle.group);
 const terrain = new TerrainStream(scene, world, settings.quality);
-terrain.update(navigator.state.x, navigator.state.z);
+terrain.update(navigator.state.x, navigator.state.z, Infinity);
 
 let orbitYaw = 0;
 let orbitPitch = 0;
@@ -227,17 +231,14 @@ function saveSettings(): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 function updateFog(): void {
-  const radius = QUALITY[settings.quality].radius;
-  fog.near = radius === 3 ? 590 : 420;
-  fog.far = radius === 3 ? 1230 : 870;
-  camera.far = fog.far + 380;
+  fog.far = QUALITY[settings.quality].radius * CHUNK_SIZE;
+  fog.near = fog.far * 0.5;
+  camera.far = Math.max(fog.far, 820) + 400;
   camera.updateProjectionMatrix();
 }
 updateFog();
 
-let diagnosticsVisible = new URLSearchParams(location.search).get('diagnostics') === '1';
-diagnostics.classList.toggle('visible', diagnosticsVisible);
-diagnostics.setAttribute('aria-hidden', String(!diagnosticsVisible));
+let diagnosticsVisible = false;
 window.addEventListener('keydown', (event) => {
   if (event.key.toLowerCase() !== 'd' || event.repeat) return;
   diagnosticsVisible = !diagnosticsVisible;
@@ -245,17 +246,18 @@ window.addEventListener('keydown', (event) => {
   diagnostics.setAttribute('aria-hidden', String(!diagnosticsVisible));
 });
 
-let timeScale = Math.max(1, Math.min(12, Number(new URLSearchParams(location.search).get('speed')) || 1));
+let timeScale = 1;
 let lastTime = performance.now();
 let fpsSmoothed = 60;
 let diagnosticsElapsed = 0;
-let lastBehavior = navigator.state.behavior;
 
 function frame(now: number): void {
   const rawDelta = Math.min(0.1, (now - lastTime) / 1000);
   lastTime = now;
   const delta = rawDelta * timeScale;
-  const state = navigator.update(delta);
+  const substeps = Math.ceil(delta / 0.1);
+  let state = navigator.state;
+  for (let step = 0; step < substeps; step += 1) state = navigator.update(delta / substeps);
   eagle.update(state, delta);
   terrain.update(state.x, state.z);
   soundscape.update(state.behavior);
@@ -273,14 +275,15 @@ function frame(now: number): void {
     .addScaledVector(side, Math.sin(orbitYaw) * distance)
     .add(new THREE.Vector3(0, distance * (0.31 + orbitPitch), 0));
   cameraPosition.lerp(desired, 1 - Math.exp(-rawDelta * 2.1));
+  cameraPosition.y = Math.max(cameraPosition.y, world.sample(cameraPosition.x, cameraPosition.z).height + 14);
   camera.position.copy(cameraPosition);
   lookAt.set(state.x + Math.sin(state.heading) * 38, state.y - 9 - orbitPitch * 24, state.z + Math.cos(state.heading) * 38);
   camera.lookAt(lookAt);
 
   sky.position.set(state.x, state.y - 40, state.z);
-  sunDisc.position.set(state.x - 540, state.y + 470, state.z - 610);
-  sun.position.set(state.x - 380, state.y + 520, state.z - 270);
+  sunDisc.position.copy(SUN_OFFSET).setLength(700).add(eagle.group.position);
   sun.target.position.set(state.x, world.sample(state.x, state.z).height, state.z);
+  sun.position.copy(sun.target.position).add(SUN_OFFSET);
   sun.target.updateMatrixWorld();
 
   renderer.render(scene, camera);
@@ -288,7 +291,9 @@ function frame(now: number): void {
   diagnosticsElapsed += rawDelta;
   if (diagnosticsVisible && diagnosticsElapsed > 0.22) {
     diagnosticsElapsed = 0;
-    const nearby = world.nearbyThermals(state.x, state.z, 1).slice(0, 4).map((thermal) => `${thermal.x.toFixed(0)},${thermal.z.toFixed(0)}`).join(' · ');
+    const nearby = world.nearbyThermals(state.x, state.z, 1)
+      .sort((a, b) => Math.hypot(a.x - state.x, a.z - state.z) - Math.hypot(b.x - state.x, b.z - state.z))
+      .slice(0, 4).map((thermal) => `${thermal.x.toFixed(0)},${thermal.z.toFixed(0)}`).join(' · ');
     diagnostics.textContent = [
       `FPS          ${fpsSmoothed.toFixed(0)}`,
       `chunks       ${terrain.chunkCount}`,
@@ -302,7 +307,6 @@ function frame(now: number): void {
       `time scale   ${timeScale.toFixed(1)}×`,
     ].join('\n');
   }
-  if (lastBehavior !== state.behavior) lastBehavior = state.behavior;
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -331,5 +335,5 @@ window.__SOARING__ = {
     position: [navigator.state.x, navigator.state.y, navigator.state.z],
     geometries: renderer.info.memory.geometries,
   }),
-  setTimeScale: (scale: number) => { timeScale = Math.max(1, Math.min(20, scale)); },
+  setTimeScale: (scale: number) => { timeScale = Math.max(1, Math.min(12, scale)); },
 };

@@ -140,10 +140,18 @@ export class EagleNavigator {
 
   private chooseScenicTarget(): void {
     this.scenicIndex += 1;
-    const variation = (hash2(this.scenicIndex, Math.floor(this.state.x / 400), this.world.seed + 419) - 0.5) * 1.35;
-    const distance = 720 + hash2(this.scenicIndex, Math.floor(this.state.z / 400), this.world.seed + 421) * 680;
-    const heading = this.state.heading + variation;
-    this.target = { x: this.state.x + Math.sin(heading) * distance, z: this.state.z + Math.cos(heading) * distance };
+    let bestScore = -Infinity;
+    for (let candidate = 0; candidate < 6; candidate += 1) {
+      const variation = (hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.x / 400), this.world.seed + 419) - 0.5) * 1.35;
+      const distance = 720 + hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.z / 400), this.world.seed + 421) * 680;
+      const heading = this.state.heading + variation;
+      const x = this.state.x + Math.sin(heading) * distance;
+      const z = this.state.z + Math.cos(heading) * distance;
+      const score = this.world.interest(x, z);
+      if (score <= bestScore) continue;
+      bestScore = score;
+      this.target = { x, z };
+    }
   }
 }
 

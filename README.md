@@ -24,19 +24,13 @@ Sound is procedural and starts muted on every page load. If sound was previously
 
 ## Quality settings
 
-Quality changes terrain tessellation, vegetation density, stream radius, pixel ratio, and shadows. Medium is the default for modern integrated laptop graphics at 1080p. Low reduces pixel ratio and disables shadows. High extends the visible terrain ring and increases vegetation.
+Quality changes terrain tessellation, vegetation density, stream radius, pixel ratio, and shadows. Medium is the default for modern integrated laptop graphics at 1080p. A low afternoon sun casts long soft shadows from terrain and trees near the eagle. Low reduces pixel ratio and disables shadows. High extends the visible terrain ring and increases vegetation.
 
 ## Diagnostics and validation
 
 The hidden panel reports smoothed frame rate, loaded chunks, draw calls, GPU geometry count, eagle behavior, terrain clearance, position, selected thermal, nearby thermal locations, and simulation speed.
 
-For an accelerated resource/stability check, use:
-
-```text
-http://127.0.0.1:4173/?diagnostics=1&speed=8
-```
-
-The speed parameter is capped at 12×. `window.__SOARING__.snapshot()` exposes a small smoke-test snapshot, and `window.__SOARING__.setTimeScale(n)` changes acceleration. This supports practical traversal and resource checks without waiting one literal hour.
+For an accelerated resource/stability check, run `window.__SOARING__.setTimeScale(n)` in the browser console. The scale is capped at 12×, and each frame runs bounded 0.1 s simulation substeps so the reported scale is the real one. `window.__SOARING__.snapshot()` exposes a small smoke-test snapshot. This supports practical traversal and resource checks without waiting one literal hour.
 
 ```sh
 npm test             # deterministic generation and long-flight navigation
@@ -48,10 +42,10 @@ The product reliability target is one uninterrupted hour without intervention or
 
 ## Architecture
 
-- `src/world.ts` is the pure seed-based world model. Global-coordinate layered noise creates gradual hills, mountain regions, valleys, lake basins, and a sparse connected river network. It also owns deterministic thermal and scenic-start placement.
-- `src/terrain.ts` turns the world model into recyclable Three.js chunks. Shared materials and instanced vegetation keep GPU use bounded; distant chunk geometry is disposed.
+- `src/world.ts` is the pure seed-based world model. Global-coordinate layered noise creates gradual hills, mountain regions, valleys, lake basins, and a sparse connected river network whose valley width and depth scale with the surrounding land. It also scores terrain interest (relief, water, rock, forest edges), which drives scenic starts and the eagle's scenic targets, and owns deterministic thermal placement.
+- `src/terrain.ts` turns the world model into recyclable Three.js chunks. Missing chunks are queued nearest first and built two per frame to avoid stalls. Shared materials and instanced vegetation keep GPU use bounded; distant chunk geometry is disposed. Fog ends at the guaranteed loaded distance, so the terrain edge is never visible.
 - `src/eagle.ts` separates the explicit navigation state machine from the visual model. The eagle alternates scenic glides and panoramic flight, seeks deterministic thermals, circles to climb, and maintains terrain clearance.
 - `src/main.ts` owns rendering, camera input, lighting/haze, persistence, controls, diagnostics, and lifecycle wiring.
-- `src/audio.ts` creates wind and sparse adaptive tones with the Web Audio API. It uses no downloaded media.
+- `src/audio.ts` creates wind and sparse adaptive music: short pentatonic phrases separated by long rests, with register, pacing, and contour following the eagle's behavior with the Web Audio API. It uses no downloaded media.
 
 The world is deterministic for a seed, but the generated audio noise is not part of world simulation. There are no remote runtime assets.

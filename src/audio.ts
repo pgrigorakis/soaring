@@ -1,11 +1,19 @@
 import type { EagleBehavior } from './eagle';
 
+const PENTATONIC = [0, 2, 4, 7, 9, 12, 14, 16];
+const MOODS: Record<EagleBehavior, { root: number; spacing: number; rest: number; rising: boolean }> = {
+  'circling thermal': { root: 293.66, spacing: 0.9, rest: 9, rising: true },
+  'seeking thermal': { root: 246.94, spacing: 1.3, rest: 15, rising: false },
+  'scenic glide': { root: 220, spacing: 1.6, rest: 20, rising: false },
+  'panoramic cruise': { root: 196, spacing: 2.2, rest: 26, rising: false },
+};
+
 export class Soundscape {
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
   private music: GainNode | null = null;
-  private drone: OscillatorNode[] = [];
   private wind: AudioBufferSourceNode | null = null;
+  private nextPhrase = 0;
   private volume = 0.55;
   private muted = true;
 
@@ -28,11 +36,31 @@ export class Soundscape {
   }
 
   update(behavior: EagleBehavior): void {
-    if (!this.context || !this.music) return;
-    const target = behavior === 'circling thermal' ? 0.06 : behavior === 'panoramic cruise' ? 0.035 : 0.022;
-    this.music.gain.setTargetAtTime(target, this.context.currentTime, 3.5);
-    const base = behavior === 'circling thermal' ? 123.47 : 110;
-    this.drone.forEach((oscillator, index) => oscillator.frequency.setTargetAtTime(base * [1, 1.5, 2.25][index]!, this.context!.currentTime, 4));
+    if (!this.context || !this.music || this.muted) return;
+    const now = this.context.currentTime;
+    if (now < this.nextPhrase) return;
+    const mood = MOODS[behavior];
+    const notes = 2 + Math.floor(Math.random() * 3);
+    let degree = Math.floor(Math.random() * 4);
+    for (let note = 0; note < notes; note += 1) {
+      this.playNote(mood.root * 2 ** (PENTATONIC[degree]! / 12), now + note * mood.spacing, mood.spacing * 2.2);
+      const step = mood.rising ? 1 : Math.random() < 0.5 ? -1 : 1;
+      degree = Math.max(0, Math.min(PENTATONIC.length - 1, degree + step));
+    }
+    this.nextPhrase = now + notes * mood.spacing + mood.rest * (1 + Math.random() * 0.8);
+  }
+
+  private playNote(frequency: number, start: number, length: number): void {
+    const oscillator = this.context!.createOscillator();
+    const envelope = this.context!.createGain();
+    oscillator.type = 'triangle';
+    oscillator.frequency.value = frequency;
+    envelope.gain.setValueAtTime(0.0001, start);
+    envelope.gain.exponentialRampToValueAtTime(0.5, start + 0.35);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, start + length);
+    oscillator.connect(envelope).connect(this.music!);
+    oscillator.start(start);
+    oscillator.stop(start + length + 0.05);
   }
 
   private ensureAudio(): void {
@@ -45,7 +73,7 @@ export class Soundscape {
     windFilter.type = 'lowpass';
     windFilter.frequency.value = 680;
     windGain.gain.value = 0.075;
-    this.music.gain.value = 0.02;
+    this.music.gain.value = 0.09;
     this.master.connect(this.context.destination);
     windGain.connect(this.master);
     this.music.connect(this.master);
@@ -64,16 +92,7 @@ export class Soundscape {
     this.wind.connect(windFilter).connect(windGain);
     this.wind.start();
 
-    [110, 165, 247.5].forEach((frequency, index) => {
-      const oscillator = this.context!.createOscillator();
-      const gain = this.context!.createGain();
-      oscillator.type = index === 0 ? 'sine' : 'triangle';
-      oscillator.frequency.value = frequency;
-      gain.gain.value = index === 0 ? 0.55 : 0.18;
-      oscillator.connect(gain).connect(this.music!);
-      oscillator.start();
-      this.drone.push(oscillator);
-    });
+    this.nextPhrase = this.context.currentTime + 4;
     this.applyVolume();
   }
 

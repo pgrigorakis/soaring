@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { hash2, WorldModel } from './world';
+import { hash2, type LandscapeSample, WorldModel } from './world';
 
 export type QualityName = 'low' | 'medium' | 'high';
 export const QUALITY: Record<QualityName, { radius: number; segments: number; trees: number; rocks: number; pixelRatio: number }> = {
@@ -8,7 +8,7 @@ export const QUALITY: Record<QualityName, { radius: number; segments: number; tr
   high: { radius: 3, segments: 40, trees: 52, rocks: 10, pixelRatio: 1.75 },
 };
 
-const CHUNK_SIZE = 360;
+export const CHUNK_SIZE = 360;
 
 type Chunk = { group: THREE.Group; dispose: () => void };
 
@@ -19,6 +19,7 @@ export class TerrainStream {
   private quality: QualityName;
   private centerX = Number.NaN;
   private centerZ = Number.NaN;
+  private pending: { x: number; z: number; key: string }[] = [];
 
   private readonly terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0 });
   private readonly waterMaterial = new THREE.MeshStandardMaterial({
@@ -59,25 +60,30 @@ export class TerrainStream {
     this.centerZ = Number.NaN;
   }
 
-  update(x: number, z: number): void {
+  update(x: number, z: number, buildBudget = 2): void {
     const centerX = Math.floor(x / CHUNK_SIZE);
     const centerZ = Math.floor(z / CHUNK_SIZE);
-    if (centerX === this.centerX && centerZ === this.centerZ) return;
+    if (centerX !== this.centerX || centerZ !== this.centerZ) this.recenter(centerX, centerZ);
+    for (let built = 0; built < buildBudget && this.pending.length > 0; built += 1) {
+      const next = this.pending.shift()!;
+      this.chunks.set(next.key, this.createChunk(next.x, next.z));
+    }
+  }
+
+  private recenter(centerX: number, centerZ: number): void {
     this.centerX = centerX;
     this.centerZ = centerZ;
-
     const needed = new Set<string>();
     const radius = QUALITY[this.quality].radius;
+    this.pending = [];
     for (let dz = -radius; dz <= radius; dz += 1) {
       for (let dx = -radius; dx <= radius; dx += 1) {
-        if (dx * dx + dz * dz > (radius + 0.5) ** 2) continue;
-        const chunkX = centerX + dx;
-        const chunkZ = centerZ + dz;
-        const key = `${chunkX},${chunkZ}`;
+        const key = `${centerX + dx},${centerZ + dz}`;
         needed.add(key);
-        if (!this.chunks.has(key)) this.chunks.set(key, this.createChunk(chunkX, chunkZ));
+        if (!this.chunks.has(key)) this.pending.push({ x: centerX + dx, z: centerZ + dz, key });
       }
     }
+    this.pending.sort((a, b) => Math.hypot(a.x - centerX, a.z - centerZ) - Math.hypot(b.x - centerX, b.z - centerZ));
 
     for (const [key, chunk] of this.chunks) {
       if (needed.has(key)) continue;
@@ -93,6 +99,7 @@ export class TerrainStream {
       chunk.dispose();
     }
     this.chunks.clear();
+    this.pending = [];
   }
 
   dispose(): void {
@@ -122,17 +129,28 @@ export class TerrainStream {
     const indices: number[] = [];
     const color = new THREE.Color();
     const normal = new THREE.Vector3();
+    const row = segments + 3;
+    const samples: LandscapeSample[] = [];
+    for (let zIndex = -1; zIndex <= segments + 1; zIndex += 1) {
+      for (let xIndex = -1; xIndex <= segments + 1; xIndex += 1) {
+        samples.push(this.world.sample(originX + xIndex * step, originZ + zIndex * step));
+      }
+    }
+    const sampleAt = (xIndex: number, zIndex: number) => samples[(zIndex + 1) * row + xIndex + 1]!;
+    const heightAt = (xIndex: number, zIndex: number) => sampleAt(xIndex, zIndex).height;
+    const water: boolean[] = [];
 
     for (let zIndex = 0; zIndex <= segments; zIndex += 1) {
       for (let xIndex = 0; xIndex <= segments; xIndex += 1) {
         const x = originX + xIndex * step;
         const z = originZ + zIndex * step;
-        const sample = this.world.sample(x, z);
+        const sample = sampleAt(xIndex, zIndex);
+        water.push(sample.water);
         positions.push(x, sample.height, z);
         normal.set(
-          this.world.sample(x - 4, z).height - this.world.sample(x + 4, z).height,
-          8,
-          this.world.sample(x, z - 4).height - this.world.sample(x, z + 4).height,
+          heightAt(xIndex - 1, zIndex) - heightAt(xIndex + 1, zIndex),
+          step * 2,
+          heightAt(xIndex, zIndex - 1) - heightAt(xIndex, zIndex + 1),
         ).normalize();
         normals.push(normal.x, normal.y, normal.z);
         if (sample.water) color.set(0x586957);
@@ -160,9 +178,10 @@ export class TerrainStream {
     geometry.computeBoundingSphere();
     const terrain = new THREE.Mesh(geometry, this.terrainMaterial);
     terrain.receiveShadow = true;
+    terrain.castShadow = true;
     group.add(terrain);
 
-    const waterGeometry = this.createWaterGeometry(originX, originZ, segments);
+    const waterGeometry = this.createWaterGeometry(originX, originZ, segments, water);
     if (waterGeometry) group.add(new THREE.Mesh(waterGeometry, this.waterMaterial));
 
     const treeObjects = this.createTrees(chunkX, chunkZ, config.trees);
@@ -182,34 +201,23 @@ export class TerrainStream {
     };
   }
 
-  private createWaterGeometry(originX: number, originZ: number, terrainSegments: number): THREE.BufferGeometry | null {
-    const coarseStep = CHUNK_SIZE / terrainSegments;
-    let hasWater = false;
-    for (let iz = 0; iz < terrainSegments && !hasWater; iz += 1) {
-      for (let ix = 0; ix < terrainSegments; ix += 1) {
-        if (this.world.sample(originX + (ix + 0.5) * coarseStep, originZ + (iz + 0.5) * coarseStep).water) {
-          hasWater = true;
-          break;
-        }
-      }
-    }
-    if (!hasWater) return null;
-
-    const segments = terrainSegments * 4;
+  private createWaterGeometry(originX: number, originZ: number, segments: number, water: boolean[]): THREE.BufferGeometry | null {
     const step = CHUNK_SIZE / segments;
+    const y = this.world.waterLevel + 0.15;
     const positions: number[] = [];
     const indices: number[] = [];
     for (let iz = 0; iz < segments; iz += 1) {
       for (let ix = 0; ix < segments; ix += 1) {
+        const a = iz * (segments + 1) + ix;
+        if (!water[a] && !water[a + 1] && !water[a + segments + 1] && !water[a + segments + 2]) continue;
         const x = originX + ix * step;
         const z = originZ + iz * step;
-        if (!this.world.sample(x + step * 0.5, z + step * 0.5).water) continue;
         const base = positions.length / 3;
-        const y = this.world.waterLevel + 0.15;
         positions.push(x, y, z, x + step, y, z, x, y, z + step, x + step, y, z + step);
         indices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
       }
     }
+    if (positions.length === 0) return null;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setIndex(indices);
@@ -255,8 +263,8 @@ export class TerrainStream {
       }
       trunks.instanceMatrix.needsUpdate = true;
       crowns.instanceMatrix.needsUpdate = true;
-      trunks.castShadow = false;
-      crowns.castShadow = false;
+      trunks.castShadow = true;
+      crowns.castShadow = true;
       meshes.push(trunks, crowns);
     }
     return meshes;

@@ -83,22 +83,23 @@ export class WorldModel {
     const horizontalDistance = Math.abs(z - horizontalCenter);
     const riverDistance = Math.min(verticalDistance, horizontalDistance * 1.12);
     const river = riverDistance < 14;
-    const riverValley = (1 - smootherstep(20, 115, riverDistance)) * 30;
 
     const lakeNoise = fbm(x / 540, z / 540, this.seed + 83, 4);
     const lakeGate = fbm(x / 1700, z / 1700, this.seed + 97, 3);
     const lakeShape = smootherstep(0.57, 0.72, lakeNoise) * smootherstep(-0.15, 0.25, lakeGate);
     const lake = lakeShape > 0.58;
 
-    let height = 18 + broad * 35 + rolling * 22 + detail * 4 + mountains - riverValley - lakeShape * 48;
-    if (river) height = Math.min(height, this.waterLevel - 2.7 + riverDistance * 0.06);
+    const land = 18 + broad * 35 + rolling * 22 + detail * 4 + mountains - lakeShape * 48;
+    const riverBed = this.waterLevel - 2.7 + riverDistance * 0.06;
+    const valleyDepth = Math.max(0, land - riverBed);
+    let height = land - valleyDepth * (1 - smootherstep(14, 60 + valleyDepth * 2.4, riverDistance));
     if (lake) height = Math.min(height, this.waterLevel - 3.5 - lakeShape * 3);
 
     const moisture = clamp01(0.58 + fbm(x / 650, z / 650, this.seed + 121, 4) * 0.42 + (lake || river ? 0.3 : 0));
     const forest = clamp01((moisture - 0.33) * 1.65 - mountainRegion * 0.45 + fbm(x / 260, z / 260, this.seed + 139, 3) * 0.28);
     const rock = clamp01(mountainRegion * 0.75 + smootherstep(74, 148, height) + Math.abs(detail) * 0.2);
 
-    return { height, moisture, forest, rock, water: lake || river, river };
+    return { height, moisture, forest, rock, water: lake || river || height < this.waterLevel, river };
   }
 
   thermalAtCell(cellX: number, cellZ: number): Thermal {
@@ -121,15 +122,35 @@ export class WorldModel {
     return thermals;
   }
 
+  interest(x: number, z: number): number {
+    const center = this.sample(x, z);
+    let low = center.height;
+    let high = center.height;
+    let water = center.water;
+    for (const [dx, dz] of [[170, 0], [-170, 0], [0, 170], [0, -170]] as const) {
+      const around = this.sample(x + dx, z + dz);
+      low = Math.min(low, around.height);
+      high = Math.max(high, around.height);
+      water ||= around.water;
+    }
+    return Math.min(1, (high - low) / 120) + (water ? 0.8 : 0) + center.rock * 0.35 + Math.min(center.forest, 1 - center.forest) * 0.5;
+  }
+
   scenicStart(visit: number): { x: number; z: number; heading: number } {
     const ring = 3 + (visit % 9);
-    const angle = hash2(visit, ring, this.seed + 251) * Math.PI * 2;
-    const radius = ring * 920 + hash2(ring, visit, this.seed + 257) * 700;
-    return {
-      x: Math.cos(angle) * radius,
-      z: Math.sin(angle) * radius,
-      heading: angle + Math.PI * (0.72 + hash2(visit, visit, this.seed + 263) * 0.56),
-    };
+    let best = { x: 0, z: 0, heading: 0 };
+    let bestScore = -Infinity;
+    for (let candidate = 0; candidate < 8; candidate += 1) {
+      const angle = hash2(visit * 8 + candidate, ring, this.seed + 251) * Math.PI * 2;
+      const radius = ring * 920 + hash2(ring, visit * 8 + candidate, this.seed + 257) * 700;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      const score = this.interest(x, z);
+      if (score <= bestScore) continue;
+      bestScore = score;
+      best = { x, z, heading: angle + Math.PI * (0.72 + hash2(visit, candidate, this.seed + 263) * 0.56) };
+    }
+    return best;
   }
 }
 
