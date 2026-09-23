@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import { hash2, type LandscapeSample, WorldModel } from './world';
 
 export type QualityName = 'low' | 'medium' | 'high';
-export const QUALITY: Record<QualityName, { radius: number; segments: number; trees: number; rocks: number; pixelRatio: number }> = {
-  low: { radius: 2, segments: 22, trees: 18, rocks: 4, pixelRatio: 1 },
-  medium: { radius: 2, segments: 32, trees: 34, rocks: 7, pixelRatio: 1.35 },
-  high: { radius: 3, segments: 40, trees: 52, rocks: 10, pixelRatio: 1.75 },
+export const QUALITY: Record<QualityName, { radius: number; segments: number; treeSpacing: number; rocks: number; pixelRatio: number }> = {
+  low: { radius: 2, segments: 22, treeSpacing: 68, rocks: 4, pixelRatio: 1 },
+  medium: { radius: 2, segments: 32, treeSpacing: 44, rocks: 7, pixelRatio: 1.35 },
+  high: { radius: 3, segments: 40, treeSpacing: 29, rocks: 10, pixelRatio: 1.75 },
 };
 
 export const CHUNK_SIZE = 360;
@@ -39,7 +39,11 @@ export class TerrainStream {
   ];
   private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x77776d, roughness: 1, flatShading: true });
   private readonly trunkGeometry = new THREE.CylinderGeometry(0.8, 1.35, 9, 5);
-  private readonly crownGeometry = new THREE.IcosahedronGeometry(5.4, 1);
+  private readonly crownGeometries = [
+    new THREE.ConeGeometry(5.5, 12, 7), // layered conifer
+    new THREE.IcosahedronGeometry(6.8, 1), // spreading deciduous crown
+    new THREE.IcosahedronGeometry(3.7, 1), // tall, narrow tree
+  ];
   private readonly rockGeometry = new THREE.DodecahedronGeometry(4.5, 0);
 
   constructor(scene: THREE.Scene, world: WorldModel, quality: QualityName) {
@@ -110,7 +114,7 @@ export class TerrainStream {
     this.foliageMaterials.forEach((material) => material.dispose());
     this.rockMaterial.dispose();
     this.trunkGeometry.dispose();
-    this.crownGeometry.dispose();
+    this.crownGeometries.forEach((geometry) => geometry.dispose());
     this.rockGeometry.dispose();
   }
 
@@ -184,7 +188,7 @@ export class TerrainStream {
     const waterGeometry = this.createWaterGeometry(originX, originZ, segments, water);
     if (waterGeometry) group.add(new THREE.Mesh(waterGeometry, this.waterMaterial));
 
-    const treeObjects = this.createTrees(chunkX, chunkZ, config.trees);
+    const treeObjects = this.createTrees(originX, originZ, config.treeSpacing);
     treeObjects.forEach((object) => group.add(object));
     const rocks = this.createRocks(chunkX, chunkZ, config.rocks);
     if (rocks) group.add(rocks);
@@ -225,47 +229,49 @@ export class TerrainStream {
     return geometry;
   }
 
-  private createTrees(chunkX: number, chunkZ: number, attempts: number): THREE.InstancedMesh[] {
-    const counts = [0, 0, 0];
-    const candidates: { x: number; y: number; z: number; scale: number; kind: number; turn: number }[] = [];
-    for (let index = 0; index < attempts * 2; index += 1) {
-      const x = (chunkX + hash2(chunkX * 97 + index, chunkZ, this.world.seed + 337)) * CHUNK_SIZE;
-      const z = (chunkZ + hash2(chunkX, chunkZ * 89 + index, this.world.seed + 347)) * CHUNK_SIZE;
-      const sample = this.world.sample(x, z);
-      const acceptance = hash2(chunkX + index, chunkZ - index, this.world.seed + 349);
-      if (sample.water || sample.rock > 0.72 || acceptance > sample.forest * 1.18 || candidates.length >= attempts) continue;
-      const kind = Math.min(2, Math.floor(hash2(index, chunkX + chunkZ, this.world.seed + 353) * 3));
-      const scale = 0.72 + hash2(index, chunkZ, this.world.seed + 359) * 0.72;
-      candidates.push({ x, y: sample.height, z, scale, kind, turn: acceptance * Math.PI * 2 });
-      counts[kind] = (counts[kind] ?? 0) + 1;
-    }
-
+  private createTrees(originX: number, originZ: number, spacing: number): THREE.InstancedMesh[] {
+    const trees = this.world.treesInArea(originX, originZ, CHUNK_SIZE, spacing);
+    if (trees.length === 0) return [];
     const dummy = new THREE.Object3D();
-    const meshes: THREE.InstancedMesh[] = [];
-    for (let kind = 0; kind < 3; kind += 1) {
-      const count = counts[kind] ?? 0;
-      if (count === 0) continue;
-      const trunks = new THREE.InstancedMesh(this.trunkGeometry, this.trunkMaterial, count);
-      const crowns = new THREE.InstancedMesh(this.crownGeometry, this.foliageMaterials[kind]!, count);
-      let instance = 0;
-      for (const tree of candidates) {
-        if (tree.kind !== kind) continue;
-        dummy.position.set(tree.x, tree.y + 4.5 * tree.scale, tree.z);
+    const trunks = new THREE.InstancedMesh(this.trunkGeometry, this.trunkMaterial, trees.length);
+    trees.forEach((tree, index) => {
+      dummy.position.set(tree.x, tree.y + 4.5 * tree.scale, tree.z);
+      dummy.rotation.set(0, tree.turn, 0);
+      dummy.scale.setScalar(tree.scale);
+      dummy.updateMatrix();
+      trunks.setMatrixAt(index, dummy.matrix);
+    });
+    trunks.instanceMatrix.needsUpdate = true;
+    trunks.castShadow = true;
+    const meshes: THREE.InstancedMesh[] = [trunks];
+    for (let kind = 0; kind < this.crownGeometries.length; kind += 1) {
+      const ofKind = trees.filter((tree) => tree.kind === kind);
+      if (ofKind.length === 0) continue;
+      const crowns = new THREE.InstancedMesh(this.crownGeometries[kind]!, this.foliageMaterials[kind]!, ofKind.length);
+      const upper = kind === 0
+        ? new THREE.InstancedMesh(this.crownGeometries[0]!, this.foliageMaterials[0]!, ofKind.length)
+        : null;
+      ofKind.forEach((tree, index) => {
+        dummy.position.set(tree.x, tree.y + (kind === 0 ? 14 : kind === 1 ? 14 : 18) * tree.scale, tree.z);
         dummy.rotation.set(0, tree.turn, 0);
-        dummy.scale.set(tree.scale, tree.scale, tree.scale);
+        dummy.scale.set(tree.scale, tree.scale * (kind === 0 ? 1.4 : kind === 1 ? 0.83 : 2.6), tree.scale);
         dummy.updateMatrix();
-        trunks.setMatrixAt(instance, dummy.matrix);
-        dummy.position.y = tree.y + 11.5 * tree.scale;
-        dummy.scale.set(tree.scale * 1.15, tree.scale * (kind === 0 ? 1.42 : 1.08), tree.scale * 1.15);
-        dummy.updateMatrix();
-        crowns.setMatrixAt(instance, dummy.matrix);
-        instance += 1;
-      }
-      trunks.instanceMatrix.needsUpdate = true;
+        crowns.setMatrixAt(index, dummy.matrix);
+        if (upper) {
+          dummy.position.y = tree.y + 22 * tree.scale;
+          dummy.scale.setScalar(tree.scale * 0.85);
+          dummy.updateMatrix();
+          upper.setMatrixAt(index, dummy.matrix);
+        }
+      });
       crowns.instanceMatrix.needsUpdate = true;
-      trunks.castShadow = true;
       crowns.castShadow = true;
-      meshes.push(trunks, crowns);
+      meshes.push(crowns);
+      if (upper) {
+        upper.instanceMatrix.needsUpdate = true;
+        upper.castShadow = true;
+        meshes.push(upper);
+      }
     }
     return meshes;
   }

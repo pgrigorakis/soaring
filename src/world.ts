@@ -8,6 +8,7 @@ export type LandscapeSample = {
 };
 
 export type Thermal = { x: number; z: number; strength: number };
+export type Tree = { x: number; y: number; z: number; kind: number; scale: number; turn: number };
 
 const fract = (value: number) => value - Math.floor(value);
 const smooth = (value: number) => value * value * (3 - 2 * value);
@@ -96,10 +97,35 @@ export class WorldModel {
     if (lake) height = Math.min(height, this.waterLevel - 3.5 - lakeShape * 3);
 
     const moisture = clamp01(0.58 + fbm(x / 650, z / 650, this.seed + 121, 4) * 0.42 + (lake || river ? 0.3 : 0));
-    const forest = clamp01((moisture - 0.33) * 1.65 - mountainRegion * 0.45 + fbm(x / 260, z / 260, this.seed + 139, 3) * 0.28);
+    // Independent broad clearings and smaller grove-scale variations cross chunk edges.
+    const woodland = fbm(x / 1450, z / 1450, this.seed + 139, 4) * 0.86
+      + fbm(x / 290, z / 290, this.seed + 149, 3) * 0.25
+      + (moisture - 0.5) * 0.18;
+    const forest = smootherstep(-0.16, 0.17, woodland) * (1 - mountainRegion * 0.45);
     const rock = clamp01(mountainRegion * 0.75 + smootherstep(74, 148, height) + Math.abs(detail) * 0.2);
 
     return { height, moisture, forest, rock, water: lake || river || height < this.waterLevel, river };
+  }
+
+  /** World-space grid keeps positions and density independent of chunk partitioning. */
+  treesInArea(minX: number, minZ: number, size: number, spacing: number): Tree[] {
+    const trees: Tree[] = [];
+    for (let cz = Math.floor(minZ / spacing); cz <= Math.floor((minZ + size) / spacing); cz += 1) {
+      for (let cx = Math.floor(minX / spacing); cx <= Math.floor((minX + size) / spacing); cx += 1) {
+        const x = (cx + 0.15 + hash2(cx, cz, this.seed + 337) * 0.7) * spacing;
+        const z = (cz + 0.15 + hash2(cx, cz, this.seed + 347) * 0.7) * spacing;
+        if (x < minX || x >= minX + size || z < minZ || z >= minZ + size) continue;
+        const sample = this.sample(x, z);
+        if (sample.water || sample.rock > 0.72 || hash2(cx, cz, this.seed + 349) > 0.018 + sample.forest * 0.78) continue;
+        trees.push({
+          x, y: sample.height, z,
+          kind: Math.floor(hash2(cx, cz, this.seed + 353) * 3),
+          scale: 0.72 + hash2(cx, cz, this.seed + 359) * 0.72,
+          turn: hash2(cx, cz, this.seed + 361) * Math.PI * 2,
+        });
+      }
+    }
+    return trees;
   }
 
   thermalAtCell(cellX: number, cellZ: number): Thermal {
