@@ -12,10 +12,13 @@ function expectLoadedWithin(scene: THREE.Scene, terrain: TerrainStream, x: numbe
   }
 }
 
-function treeCrowns(group: THREE.Object3D): number {
+function instances(group: THREE.Object3D, geometry: abstract new (...args: never[]) => THREE.BufferGeometry): number {
   return group.children.reduce((sum, child) =>
-    sum + (child instanceof THREE.InstancedMesh && child.geometry instanceof THREE.IcosahedronGeometry ? child.count : 0), 0);
+    sum + (child instanceof THREE.InstancedMesh && child.geometry instanceof geometry ? child.count : 0), 0);
 }
+const treeCrowns = (group: THREE.Object3D) => instances(group, THREE.IcosahedronGeometry);
+const treeTrunks = (group: THREE.Object3D) => group.children.reduce((sum, child) =>
+  sum + (child instanceof THREE.InstancedMesh && child.geometry.type === 'CylinderGeometry' ? child.count : 0), 0);
 
 describe('terrain streaming', () => {
   it('builds at most two tiles per frame, nearest first, and covers the reach', () => {
@@ -71,13 +74,13 @@ describe('terrain streaming', () => {
       .find((group) => treeCrowns(group) > 0)!;
     expect(far).toBeDefined();
     const farTrees = treeCrowns(far);
+    expect(treeTrunks(far)).toBe(farTrees);
     far.traverse((object) => { if (object instanceof THREE.Mesh && !object.material.transparent) expect(object.castShadow).toBe(true); });
     const name = far.name;
     terrain.update(CHUNK_SIZE * 1.5, CHUNK_SIZE * 0.5, Infinity);
     const detailed = scene.getObjectByName(name)!;
     expect(detailed).not.toBe(far);
-    const trunks = detailed.children.find((child) => child instanceof THREE.InstancedMesh && child.geometry instanceof THREE.CylinderGeometry) as THREE.InstancedMesh;
-    expect(trunks.count).toBe(farTrees);
+    expect(treeTrunks(detailed)).toBe(farTrees);
     terrain.dispose();
   });
 

@@ -110,9 +110,14 @@ scene.add(sunDisc);
 scene.add(eagle.group);
 // Fog uses view depth, not distance. A point at horizontal distance d can have a depth as small
 // as d · cos(half-diagonal FOV), so terrain loads out to visibility / cos(half-diagonal FOV).
-function terrainReach(): number {
+// Reach stops growing past 16:9; wider windows get a shorter haze instead of more tiles.
+const MAX_REACH_ASPECT = 16 / 9;
+function depthPerDistance(aspect: number): number {
   const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-  return settings.terrainVisibility * Math.hypot(1, tanHalfFov * Math.hypot(1, camera.aspect));
+  return 1 / Math.hypot(1, tanHalfFov * Math.hypot(1, aspect));
+}
+function terrainReach(): number {
+  return settings.terrainVisibility / depthPerDistance(Math.min(camera.aspect, MAX_REACH_ASPECT));
 }
 const terrain = new TerrainStream(scene, world, terrainReach());
 const thermalMarker = new ThermalMarker(scene, world);
@@ -247,7 +252,7 @@ function saveSettings(): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 function updateFog(): void {
-  const coveredDepth = terrain.coveredDistance(cameraPosition.x, cameraPosition.z) * settings.terrainVisibility / terrainReach();
+  const coveredDepth = terrain.coveredDistance(cameraPosition.x, cameraPosition.z) * depthPerDistance(camera.aspect);
   fog.far = Math.min(settings.terrainVisibility, coveredDepth);
   fog.near = fog.far * 0.5;
 }

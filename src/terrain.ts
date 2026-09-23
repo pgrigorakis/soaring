@@ -45,7 +45,7 @@ export class TerrainStream {
     new THREE.IcosahedronGeometry(3.7, 1), // tall, narrow tree
   ];
   private readonly rockGeometry = new THREE.DodecahedronGeometry(4.5, 0);
-  // Distant trees keep the near placement and color with one draw call per tile.
+  // Distant trees keep the near placement, trunks, and colors with two draw calls per tile.
   private readonly farCrownGeometry = new THREE.IcosahedronGeometry(5.4, 0);
   private readonly farFoliageMaterial = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });
 
@@ -333,19 +333,26 @@ export class TerrainStream {
   private createFarTrees(originX: number, originZ: number): THREE.InstancedMesh[] {
     const trees = this.world.treesInArea(originX, originZ, CHUNK_SIZE, TREE_SPACING);
     if (trees.length === 0) return [];
+    const trunks = new THREE.InstancedMesh(this.trunkGeometry, this.trunkMaterial, trees.length);
     const crowns = new THREE.InstancedMesh(this.farCrownGeometry, this.farFoliageMaterial, trees.length);
     const dummy = new THREE.Object3D();
     trees.forEach((tree, index) => {
-      dummy.position.set(tree.x, tree.y + (tree.kind === 2 ? 18 : 14) * tree.scale, tree.z);
+      dummy.position.set(tree.x, tree.y + 4.5 * tree.scale, tree.z);
       dummy.rotation.set(0, tree.turn, 0);
+      dummy.scale.setScalar(tree.scale);
+      dummy.updateMatrix();
+      trunks.setMatrixAt(index, dummy.matrix);
+      dummy.position.y = tree.y + (tree.kind === 2 ? 18 : 14) * tree.scale;
       dummy.scale.set(tree.scale * (tree.kind === 2 ? 0.68 : 1.2), tree.scale * (tree.kind === 0 ? 1.55 : tree.kind === 1 ? 1.05 : 1.8), tree.scale * (tree.kind === 2 ? 0.68 : 1.2));
       dummy.updateMatrix();
       crowns.setMatrixAt(index, dummy.matrix);
       crowns.setColorAt(index, this.foliageMaterials[tree.kind]!.color);
     });
+    trunks.instanceMatrix.needsUpdate = true;
     crowns.instanceMatrix.needsUpdate = true;
+    trunks.castShadow = true;
     crowns.castShadow = true;
-    return [crowns];
+    return [trunks, crowns];
   }
 
   private createRocks(chunkX: number, chunkZ: number, attempts: number): THREE.InstancedMesh | null {
