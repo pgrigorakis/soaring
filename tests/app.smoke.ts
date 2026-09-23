@@ -61,6 +61,28 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
   expect(errors).toEqual([]);
 });
 
+test('persists safe local-terrain height bounds across reloads', async ({ page }) => {
+  const errors = captureErrors(page);
+  await page.goto('/?smoke');
+  await page.locator('#settings-toggle').click();
+  await page.locator('#min-height').evaluate((input: HTMLInputElement) => {
+    input.value = '90';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.locator('#max-height').evaluate((input: HTMLInputElement) => {
+    input.value = '145';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(page.locator('#min-height-value')).toHaveText('90 m');
+  await expect(page.locator('#max-height-value')).toHaveText('145 m');
+  await page.reload();
+  await expect(page.locator('#min-height')).toHaveValue('90');
+  await expect(page.locator('#max-height')).toHaveValue('145');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1') ?? '{}'));
+  expect([saved.minFlightHeight, saved.maxFlightHeight]).toEqual([90, 145]);
+  expect(errors).toEqual([]);
+});
+
 test('visibility and camera distance persist independently; old settings migrate', async ({ page }) => {
   const errors = captureErrors(page);
   await page.addInitScript(() => {

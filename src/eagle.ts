@@ -15,6 +15,20 @@ export type EagleState = {
 const wrapAngle = (angle: number): number => Math.atan2(Math.sin(angle), Math.cos(angle));
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
+export type FlightHeightRange = { min: number; max: number };
+export const FLIGHT_HEIGHT_LIMITS = { min: 50, max: 240, gap: 20 } as const;
+export const DEFAULT_FLIGHT_HEIGHT: FlightHeightRange = { min: 65, max: 210 };
+
+export function normalizeFlightHeight(min: number, max: number): FlightHeightRange {
+  const safeMin = clamp(Number.isFinite(min) ? min : DEFAULT_FLIGHT_HEIGHT.min,
+    FLIGHT_HEIGHT_LIMITS.min, FLIGHT_HEIGHT_LIMITS.max - FLIGHT_HEIGHT_LIMITS.gap);
+  return {
+    min: safeMin,
+    max: clamp(Number.isFinite(max) ? max : DEFAULT_FLIGHT_HEIGHT.max,
+      safeMin + FLIGHT_HEIGHT_LIMITS.gap, FLIGHT_HEIGHT_LIMITS.max),
+  };
+}
+
 export class EagleNavigator {
   readonly state: EagleState;
   private readonly world: WorldModel;
@@ -24,16 +38,24 @@ export class EagleNavigator {
   private thermal: Thermal | null = null;
   private scenicIndex = 0;
   private speed = 32;
+  private heightRange: FlightHeightRange;
 
-  constructor(world: WorldModel, start: { x: number; z: number; heading: number }) {
+  constructor(world: WorldModel, start: { x: number; z: number; heading: number }, heightRange = DEFAULT_FLIGHT_HEIGHT) {
     this.world = world;
+    this.heightRange = normalizeFlightHeight(heightRange.min, heightRange.max);
     const ground = world.sample(start.x, start.z).height;
-    this.state = { x: start.x, y: ground + 105, z: start.z, heading: start.heading, bank: 0, behavior: 'scenic glide' };
+    this.state = { x: start.x, y: ground + clamp(105, this.heightRange.min, this.heightRange.max), z: start.z, heading: start.heading, bank: 0, behavior: 'scenic glide' };
     this.chooseScenicTarget();
   }
 
   get activeThermal(): Thermal | null {
     return this.thermal;
+  }
+
+  setFlightHeightRange(range: FlightHeightRange): void {
+    this.heightRange = normalizeFlightHeight(range.min, range.max);
+    const ground = this.world.sample(this.state.x, this.state.z).height;
+    this.state.y = ground + clamp(this.state.y - ground, this.heightRange.min, this.heightRange.max);
   }
 
   update(deltaSeconds: number): EagleState {
@@ -53,13 +75,13 @@ export class EagleNavigator {
         if (distance < 70) this.enter('circling thermal');
         else if (this.behaviorTime > 42) this.enterScenic();
       } else if (this.behaviorTime > (this.state.behavior === 'panoramic cruise' ? 22 : 34)) {
-        if (altitude < 92 || hash2(Math.floor(this.totalTime / 20), this.scenicIndex, this.world.seed + 401) > 0.64) this.seekThermal();
+        if (altitude < this.heightRange.min + (this.heightRange.max - this.heightRange.min) * 0.2 || hash2(Math.floor(this.totalTime / 20), this.scenicIndex, this.world.seed + 401) > 0.64) this.seekThermal();
         else this.enter(this.state.behavior === 'scenic glide' ? 'panoramic cruise' : 'scenic glide');
       }
       this.flyTowardTarget(dt, ground);
     }
     const currentGround = this.world.sample(this.state.x, this.state.z).height;
-    this.state.y = Math.max(this.state.y, currentGround + 42);
+    this.state.y = currentGround + clamp(this.state.y - currentGround, this.heightRange.min, this.heightRange.max);
     return this.state;
   }
 
@@ -74,13 +96,13 @@ export class EagleNavigator {
     this.state.z += Math.cos(this.state.heading) * this.speed * dt;
 
     const lookAhead = this.world.sample(this.state.x + Math.sin(this.state.heading) * 105, this.state.z + Math.cos(this.state.heading) * 105).height;
-    const desiredClearance = this.state.behavior === 'panoramic cruise' ? 155 : 86;
-    const targetY = Math.max(ground, lookAhead) + desiredClearance + Math.sin(this.totalTime * 0.13) * 10;
+    const span = this.heightRange.max - this.heightRange.min;
+    const desiredClearance = this.heightRange.min + span * (this.state.behavior === 'panoramic cruise' ? 0.63 : 0.28);
+    const targetY = Math.max(ground, lookAhead) + desiredClearance + Math.sin(this.totalTime * 0.13) * Math.min(10, span * 0.08);
     this.state.y += clamp(targetY - this.state.y, -7, 13) * dt * 0.34;
 
-    if (Math.hypot(this.target.x - this.state.x, this.target.z - this.state.z) < 150) {
-      if (this.state.behavior === 'seeking thermal') this.seekThermal();
-      else this.chooseScenicTarget();
+    if (this.state.behavior !== 'seeking thermal' && Math.hypot(this.target.x - this.state.x, this.target.z - this.state.z) < 150) {
+      this.chooseScenicTarget();
     }
   }
 
@@ -98,8 +120,7 @@ export class EagleNavigator {
     this.state.heading = wrapAngle(-angle);
     this.state.bank += (-0.42 - this.state.bank) * Math.min(1, dt * 2);
     this.state.y += this.thermal.strength * dt * 3.1;
-    this.state.y = Math.max(this.state.y, ground + 55);
-    if (this.behaviorTime > 19 || this.state.y - ground > 205) {
+    if (this.behaviorTime > 19 || this.state.y - ground >= this.heightRange.max) {
       this.thermal = null;
       this.enter('panoramic cruise');
       this.chooseScenicTarget();
@@ -310,7 +331,7 @@ export class EagleView {
     this.group.rotation.order = 'YXZ';
     this.group.rotation.y = state.heading;
     this.group.rotation.z = state.bank;
-    const flap = state.behavior === 'circling thermal' ? Math.sin(this.time * 3.2) * 0.08 : Math.sin(this.time * 1.15) * 0.025;
+    const flap = state.behavior === 'seeking thermal' ? Math.sin(this.time * 8) * 0.28 : Math.sin(this.time * 1.15) * 0.025;
     this.leftWing.rotation.z = -flap;
     this.rightWing.rotation.z = flap;
   }
