@@ -86,7 +86,8 @@ test('visibility and camera distance persist independently; old settings migrate
   await expect(settingsToggle).toHaveAccessibleName('Close settings');
   await expect(page.locator('#quality')).toHaveCount(0);
   await expect(page.locator('#distance')).toHaveValue('220');
-  await expect(page.locator('#volume')).toHaveValue('0.4');
+  await expect(page.locator('#ambience')).toHaveValue('0.4');
+  await expect(page.locator('#music')).toHaveValue('0.4');
   await expect(page.locator('#visibility')).toHaveValue('1080');
   await page.locator('#visibility').fill('3600');
   await expect(page.locator('#distance')).toHaveValue('220');
@@ -102,5 +103,49 @@ test('visibility and camera distance persist independently; old settings migrate
   expect(snapshot.cameraDistance).toBe(160);
   expect(snapshot.visibleDistance).toBeLessThanOrEqual(3600);
   expect(snapshot.chunks + snapshot.pending).toBeLessThan(700);
+  expect(errors).toEqual([]);
+});
+
+
+test('migrates prior volume, saves independent controls, and preserves mute on reload', async ({ page }) => {
+  const errors = captureErrors(page);
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('soaring.settings.v1')) localStorage.setItem('soaring.settings.v1', JSON.stringify({ volume: 0.37, muted: true }));
+  });
+  await page.goto('/?smoke');
+  await page.locator('#settings-toggle').click();
+  await expect(page.locator('#ambience')).toHaveValue('0.37');
+  await expect(page.locator('#music')).toHaveValue('0.37');
+  await page.locator('#ambience').fill('0.2');
+  await page.locator('#music').fill('0.8');
+  await expect(page.locator('#ambience-value')).toHaveText('20%');
+  await expect(page.locator('#music-value')).toHaveText('80%');
+  await page.locator('#mute').click();
+  await expect(page.locator('#mute')).toHaveText('On');
+  const settings = await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1')!));
+  expect(settings).toMatchObject({ ambienceVolume: 0.2, musicVolume: 0.8, muted: false });
+  await page.reload();
+  await expect(page.locator('#mute')).toHaveText('Muted');
+  await page.locator('#settings-toggle').click();
+  await expect(page.locator('#ambience')).toHaveValue('0.2');
+  await expect(page.locator('#music')).toHaveValue('0.8');
+  await expect(page.locator('#mute')).toHaveText('On');
+  await page.locator('#mute').click();
+  await expect(page.locator('#mute')).toHaveText('Muted');
+  await page.reload();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1')!).muted)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('a blocked browser audio context keeps the mute control usable without page errors', async ({ page }) => {
+  const errors = captureErrors(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'AudioContext', { value: class { constructor() { throw new Error('Audio unavailable'); } } });
+  });
+  await page.goto('/?smoke');
+  await page.locator('#settings-toggle').click();
+  await page.locator('#mute').click();
+  await expect(page.locator('#mute')).toHaveText('Muted');
+  await expect(page.locator('.audio-note')).toContainText('Audio could not start');
   expect(errors).toEqual([]);
 });
