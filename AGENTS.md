@@ -4,6 +4,7 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 
 - Use `npm run check` for unit/type/build validation and `npm run test:smoke` for the real-browser smoke test.
 - See `README.md` for architecture boundaries, diagnostics, controls, and quality behavior.
+- Pages CI uses software WebGL: the heavy smoke path in `tests/app.smoke.ts` boots the supported low quality preset so streaming + camera-drag stay inside the 30s budget.
 
 ## Maintaining this file
 
