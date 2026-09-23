@@ -27,11 +27,10 @@ canvas.dragging { cursor: grabbing; }
   align-items: flex-start;
   gap: 10px;
   opacity: 0;
-  transform: translateY(-5px);
-  transition: opacity 900ms ease, transform 900ms ease;
+  transition: opacity 900ms ease;
   pointer-events: none;
 }
-.controls.visible, .controls:hover, .controls:focus-within { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.controls.visible, .controls:hover, .controls:focus-within { opacity: 1; pointer-events: auto; }
 
 .settings-toggle {
   width: 38px;

@@ -25,8 +25,11 @@ test('renders, streams, and exposes usable controls', async ({ page }) => {
   await page.mouse.move(box.x + box.width * 0.72, box.y + box.height * 0.42, { steps: 6 });
   await page.mouse.up();
 
-  await expect(page.locator('#controls')).not.toHaveClass(/visible/, { timeout: 5000 });
+  const controls = page.locator('#controls');
+  await expect(controls).toHaveClass(/visible/);
+  await expect(controls).not.toHaveClass(/visible/, { timeout: 5000 });
   await page.locator('#settings-toggle').click();
+  await expect(controls).toHaveClass(/visible/);
   await expect(page.locator('#settings-panel')).toBeVisible();
   await page.locator('#quality').selectOption('low');
   await expect(page.locator('#quality')).toHaveValue('low');
