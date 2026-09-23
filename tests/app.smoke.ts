@@ -8,15 +8,15 @@ function captureErrors(page: Page): string[] {
 }
 
 /** Boot with a supported quality preset via the app's real settings key. */
-async function seedQuality(page: Page, quality: 'low' | 'medium' | 'high'): Promise<void> {
-  await page.addInitScript((value) => {
-    localStorage.setItem('soaring.settings.v1', JSON.stringify({
-      volume: 0.52,
+async function seedQuality(page: Page, quality: 'low' | 'medium' | 'high', volume = 0.52): Promise<void> {
+  await page.addInitScript(({ quality, volume }) => {
+    if (!localStorage.getItem('soaring.settings.v1')) localStorage.setItem('soaring.settings.v1', JSON.stringify({
+      volume,
       muted: true,
-      quality: value,
+      quality,
       cameraDistance: 178,
     }));
-  }, quality);
+  }, { quality, volume });
 }
 
 test('renders, streams, and supports camera controls', async ({ page }) => {
@@ -68,5 +68,48 @@ test('keeps settings usable after ambient controls fade', async ({ page }) => {
   await expect(settingsToggle).toHaveAccessibleName('Close settings');
   await page.locator('#quality').selectOption('low');
   await expect(page.locator('#quality')).toHaveValue('low');
+  expect(errors).toEqual([]);
+});
+
+test('migrates prior volume, saves independent controls, and preserves mute on reload', async ({ page }) => {
+  const errors = captureErrors(page);
+  await seedQuality(page, 'low', 0.37);
+  await page.goto('/');
+  await page.locator('#settings-toggle').click();
+  await expect(page.locator('#ambience')).toHaveValue('0.37');
+  await expect(page.locator('#music')).toHaveValue('0.37');
+  await page.locator('#ambience').fill('0.2');
+  await page.locator('#music').fill('0.8');
+  await expect(page.locator('#ambience-value')).toHaveText('20%');
+  await expect(page.locator('#music-value')).toHaveText('80%');
+  await page.locator('#mute').click();
+  await expect(page.locator('#mute')).toHaveText('On');
+  await page.waitForTimeout(3000); // Let the browser schedule more than one musical bar.
+  const settings = await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1')!));
+  expect(settings).toMatchObject({ ambienceVolume: 0.2, musicVolume: 0.8, muted: false });
+  await page.reload();
+  await expect(page.locator('#mute')).toHaveText('Muted');
+  await page.locator('#settings-toggle').click();
+  await expect(page.locator('#ambience')).toHaveValue('0.2');
+  await expect(page.locator('#music')).toHaveValue('0.8');
+  await expect(page.locator('#mute')).toHaveText('On');
+  await page.locator('#mute').click();
+  await expect(page.locator('#mute')).toHaveText('Muted');
+  await page.reload();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1')!).muted)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('a blocked browser audio context keeps the mute control usable without page errors', async ({ page }) => {
+  const errors = captureErrors(page);
+  await seedQuality(page, 'low');
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'AudioContext', { value: class { constructor() { throw new Error('Audio unavailable'); } } });
+  });
+  await page.goto('/');
+  await page.locator('#settings-toggle').click();
+  await page.locator('#mute').click();
+  await expect(page.locator('#mute')).toHaveText('Muted');
+  await expect(page.locator('.audio-note')).toContainText('Audio could not start');
   expect(errors).toEqual([]);
 });

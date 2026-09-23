@@ -5,20 +5,26 @@ import { EagleNavigator, EagleView } from './eagle';
 import { CHUNK_SIZE, QUALITY, QualityName, TerrainStream } from './terrain';
 import { WorldModel } from './world';
 
-type StoredSettings = { volume: number; muted: boolean; quality: QualityName; cameraDistance: number };
+type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; quality: QualityName; cameraDistance: number };
 const SETTINGS_KEY = 'soaring.settings.v1';
 const SEED_KEY = 'soaring.world-seed.v1';
 const VISIT_KEY = 'soaring.scenic-visit.v1';
-const defaultSettings: StoredSettings = { volume: 0.52, muted: true, quality: 'medium', cameraDistance: 178 };
+const defaultSettings: StoredSettings = { ambienceVolume: 0.52, musicVolume: 0.52, muted: true, quality: 'medium', cameraDistance: 178 };
+
+function level(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
+}
 
 function loadSettings(): StoredSettings {
   try {
-    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<StoredSettings>;
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<StoredSettings> & { volume?: number };
     return {
-      volume: Math.max(0, Math.min(1, saved.volume ?? defaultSettings.volume)),
+      ambienceVolume: level(saved.ambienceVolume, level(saved.volume, defaultSettings.ambienceVolume)),
+      musicVolume: level(saved.musicVolume, level(saved.volume, defaultSettings.musicVolume)),
       muted: typeof saved.muted === 'boolean' ? saved.muted : defaultSettings.muted,
       quality: saved.quality && saved.quality in QUALITY ? saved.quality : defaultSettings.quality,
-      cameraDistance: Math.max(110, Math.min(270, saved.cameraDistance ?? defaultSettings.cameraDistance)),
+      cameraDistance: typeof saved.cameraDistance === 'number' && Number.isFinite(saved.cameraDistance)
+        ? Math.max(110, Math.min(270, saved.cameraDistance)) : defaultSettings.cameraDistance,
     };
   } catch {
     return { ...defaultSettings };
@@ -47,7 +53,8 @@ const start = world.scenicStart(nextVisit());
 const navigator = new EagleNavigator(world, start);
 const eagle = new EagleView();
 const soundscape = new Soundscape();
-soundscape.setVolume(settings.volume);
+soundscape.setAmbienceVolume(settings.ambienceVolume);
+soundscape.setMusicVolume(settings.musicVolume);
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('Missing application root');
@@ -142,11 +149,12 @@ app.insertAdjacentHTML('beforeend', `
     <section class="settings-panel" id="settings-panel" aria-label="Settings">
       <h1>Soaring</h1>
       <label class="setting">Sound <button class="mute-button" id="mute" type="button">Muted</button></label>
-      <label class="setting">Volume <output id="volume-value">${Math.round(settings.volume * 100)}%</output><input id="volume" type="range" min="0" max="1" step="0.01" value="${settings.volume}"></label>
+      <label class="setting">Ambience <output id="ambience-value">${Math.round(settings.ambienceVolume * 100)}%</output><input id="ambience" type="range" min="0" max="1" step="0.01" value="${settings.ambienceVolume}"></label>
+      <label class="setting">Music <output id="music-value">${Math.round(settings.musicVolume * 100)}%</output><input id="music" type="range" min="0" max="1" step="0.01" value="${settings.musicVolume}"></label>
       <label class="setting">Graphics <select id="quality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
       <label class="setting">Camera distance <output id="distance-value">${Math.round(settings.cameraDistance)} m</output><input id="distance" type="range" min="110" max="270" step="1" value="${settings.cameraDistance}"></label>
       <label class="setting"><button class="new-world" id="new-world" type="button">Generate a new world</button></label>
-      <p class="audio-note">Sound starts muted. It is generated in your browser; no media is downloaded.</p>
+      <p class="audio-note" role="status">Sound starts muted. It is generated in your browser; no media is downloaded.</p>
     </section>
   </div>
   <button class="settings-toggle" id="settings-toggle" type="button" aria-label="Open settings" aria-controls="settings-panel" aria-expanded="false">⚙</button>
@@ -157,8 +165,11 @@ const controls = document.querySelector<HTMLElement>('#controls')!;
 const panel = document.querySelector<HTMLElement>('#settings-panel')!;
 const toggle = document.querySelector<HTMLButtonElement>('#settings-toggle')!;
 const muteButton = document.querySelector<HTMLButtonElement>('#mute')!;
-const volumeInput = document.querySelector<HTMLInputElement>('#volume')!;
-const volumeValue = document.querySelector<HTMLOutputElement>('#volume-value')!;
+const ambienceInput = document.querySelector<HTMLInputElement>('#ambience')!;
+const ambienceValue = document.querySelector<HTMLOutputElement>('#ambience-value')!;
+const musicInput = document.querySelector<HTMLInputElement>('#music')!;
+const musicValue = document.querySelector<HTMLOutputElement>('#music-value')!;
+const audioNote = document.querySelector<HTMLElement>('.audio-note')!;
 const qualityInput = document.querySelector<HTMLSelectElement>('#quality')!;
 const distanceInput = document.querySelector<HTMLInputElement>('#distance')!;
 const distanceValue = document.querySelector<HTMLOutputElement>('#distance-value')!;
@@ -184,23 +195,31 @@ toggle.addEventListener('click', () => {
   toggle.setAttribute('aria-label', open ? 'Close settings' : 'Open settings');
   showControls();
 });
-window.addEventListener('pointerdown', async () => {
-  if (!settings.muted) {
-    await soundscape.setMuted(false);
-    muteButton.textContent = 'On';
+window.addEventListener('pointerdown', async (event) => {
+  if (!settings.muted && event.target !== muteButton) {
+    const started = await soundscape.setMuted(false);
+    muteButton.textContent = soundscape.isMuted ? 'Muted' : 'On';
+    if (!started) audioNote.textContent = 'Audio could not start in this browser. Try enabling sound again.';
   }
 }, { once: true });
 muteButton.addEventListener('click', async () => {
-  settings.muted = !soundscape.isMuted;
-  await soundscape.setMuted(settings.muted);
-  muteButton.textContent = soundscape.isMuted ? 'Muted' : 'On';
+  const started = await soundscape.setMuted(!soundscape.isMuted);
+  settings.muted = soundscape.isMuted;
+  muteButton.textContent = settings.muted ? 'Muted' : 'On';
+  audioNote.textContent = started ? 'Sound is generated in your browser; no media is downloaded.' : 'Audio could not start in this browser. Try enabling sound again.';
   saveSettings();
   showControls();
 });
-volumeInput.addEventListener('input', () => {
-  settings.volume = Number(volumeInput.value);
-  volumeValue.value = `${Math.round(settings.volume * 100)}%`;
-  soundscape.setVolume(settings.volume);
+ambienceInput.addEventListener('input', () => {
+  settings.ambienceVolume = Number(ambienceInput.value);
+  ambienceValue.value = `${Math.round(settings.ambienceVolume * 100)}%`;
+  soundscape.setAmbienceVolume(settings.ambienceVolume);
+  saveSettings();
+});
+musicInput.addEventListener('input', () => {
+  settings.musicVolume = Number(musicInput.value);
+  musicValue.value = `${Math.round(settings.musicVolume * 100)}%`;
+  soundscape.setMusicVolume(settings.musicVolume);
   saveSettings();
 });
 qualityInput.addEventListener('change', () => {
