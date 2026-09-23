@@ -1,0 +1,115 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #f8f4e9;
+  background: #8faeb8;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { user-select: none; }
+canvas { display: block; width: 100%; height: 100%; cursor: grab; outline: none; }
+canvas.dragging { cursor: grabbing; }
+
+#veil {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 236, 193, 0.11), transparent 36%, rgba(42, 70, 76, 0.08));
+}
+
+.controls {
+  position: fixed;
+  right: 22px;
+  top: 20px;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(-5px);
+  transition: opacity 900ms ease, transform 900ms ease;
+  pointer-events: none;
+}
+.controls.visible, .controls:focus-within { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+.settings-toggle {
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255,255,255,.28);
+  border-radius: 50%;
+  background: rgba(28, 42, 39, .55);
+  color: #fff;
+  font-size: 18px;
+  box-shadow: 0 8px 30px rgba(11, 23, 24, .18);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+}
+
+.settings-panel {
+  width: 245px;
+  padding: 17px 18px 16px;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 15px;
+  background: rgba(25, 39, 36, .72);
+  box-shadow: 0 14px 45px rgba(10, 23, 23, .28);
+  backdrop-filter: blur(18px) saturate(115%);
+  display: none;
+}
+.settings-panel.open { display: block; }
+.settings-panel h1 { margin: 0 0 13px; font-family: Georgia, serif; font-size: 19px; font-weight: 500; letter-spacing: .025em; }
+.setting { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; margin: 11px 0; font-size: 12px; letter-spacing: .035em; }
+.setting input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: #d7b66b; }
+.setting select, .setting button {
+  color: #f7f3e7;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 7px;
+  background: rgba(255,255,255,.08);
+  padding: 5px 7px;
+  font: inherit;
+}
+.setting select option { color: #1d2927; }
+.mute-button { cursor: pointer; min-width: 67px; }
+.new-world {
+  width: 100%; margin-top: 9px; padding: 8px !important; cursor: pointer;
+  letter-spacing: .04em;
+}
+.audio-note { margin: 9px 0 0; color: rgba(255,255,255,.58); font-size: 10px; line-height: 1.4; }
+
+.diagnostics {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  z-index: 4;
+  display: none;
+  min-width: 260px;
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 7px;
+  color: #cbe8ce;
+  background: rgba(5, 12, 10, .8);
+  font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+.diagnostics.visible { display: block; }
+
+.intro {
+  position: fixed;
+  left: 50%; bottom: 38px;
+  z-index: 3;
+  transform: translateX(-50%);
+  color: rgba(255,255,255,.85);
+  text-shadow: 0 1px 8px rgba(20,30,27,.45);
+  font: 12px/1.4 Georgia, serif;
+  letter-spacing: .09em;
+  opacity: 1;
+  transition: opacity 2.4s ease;
+  pointer-events: none;
+}
+.intro.hidden { opacity: 0; }
+
+@media (max-width: 700px) {
+  .controls { right: 12px; top: 12px; }
+  .settings-panel { width: min(245px, calc(100vw - 70px)); }
+}
