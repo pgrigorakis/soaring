@@ -16,7 +16,7 @@ export class TerrainStream {
   private readonly scene: THREE.Scene;
   private readonly world: WorldModel;
   private readonly chunks = new Map<string, Chunk>();
-  private visibility: number;
+  private reach: number;
   private centerX = Number.NaN;
   private centerZ = Number.NaN;
   private pending: Pending[] = [];
@@ -45,32 +45,32 @@ export class TerrainStream {
     new THREE.IcosahedronGeometry(3.7, 1), // tall, narrow tree
   ];
   private readonly rockGeometry = new THREE.DodecahedronGeometry(4.5, 0);
+  // Distant trees keep the near placement and color with one draw call per tile.
+  private readonly farCrownGeometry = new THREE.IcosahedronGeometry(5.4, 0);
+  private readonly farFoliageMaterial = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });
 
-  constructor(scene: THREE.Scene, world: WorldModel, visibility = MIN_VISIBILITY) {
+  // Reach is the horizontal distance from the camera's tile that must be loaded.
+  constructor(scene: THREE.Scene, world: WorldModel, reach = MIN_VISIBILITY) {
     this.scene = scene;
     this.world = world;
-    this.visibility = visibility;
+    this.reach = reach;
   }
 
   get chunkCount(): number {
     return this.chunks.size;
   }
 
-  setVisibility(visibility: number): void {
-    if (visibility === this.visibility) return;
-    this.visibility = visibility;
+  setReach(reach: number): void {
+    if (reach === this.reach) return;
+    this.reach = reach;
     if (Number.isFinite(this.centerX)) this.recenter(this.centerX, this.centerZ);
   }
 
-  // The nearest missing tile or outside edge limits haze, including while a new ring streams in.
+  // The nearest missing tile limits haze, including while a new ring streams in. Tiles outside
+  // the loaded disk are at least `reach` away from any point of the camera's tile.
   // Camera coordinates (not eagle coordinates) are used so orbit and distance cannot reveal an edge.
   coveredDistance(x: number, z: number): number {
-    const radius = this.radius;
-    const left = (this.centerX - radius) * CHUNK_SIZE;
-    const right = (this.centerX + radius + 1) * CHUNK_SIZE;
-    const bottom = (this.centerZ - radius) * CHUNK_SIZE;
-    const top = (this.centerZ + radius + 1) * CHUNK_SIZE;
-    let distance = Math.min(x - left, right - x, z - bottom, top - z);
+    let distance = Infinity;
     for (const tile of this.pending) {
       if (this.chunks.has(tile.key)) continue; // A coarse tile remains visible while it is upgraded.
       const minX = tile.x * CHUNK_SIZE;
@@ -80,11 +80,10 @@ export class TerrainStream {
         Math.max(minZ - z, 0, z - minZ - CHUNK_SIZE),
       ));
     }
-    return Math.max(0, Math.min(this.visibility, distance - 12));
+    return Math.max(0, Math.min(this.reach, distance - 12));
   }
 
   get pendingCount(): number { return this.pending.length; }
-  get radius(): number { return Math.ceil(this.visibility / CHUNK_SIZE) + 1; }
 
   update(x: number, z: number, buildBudget = 2): void {
     const centerX = Math.floor(x / CHUNK_SIZE);
@@ -103,10 +102,12 @@ export class TerrainStream {
     this.centerX = centerX;
     this.centerZ = centerZ;
     const needed = new Set<string>();
-    const radius = this.radius;
+    const radius = Math.ceil(this.reach / CHUNK_SIZE);
     this.pending = [];
     for (let dz = -radius; dz <= radius; dz += 1) {
       for (let dx = -radius; dx <= radius; dx += 1) {
+        const gap = Math.hypot(Math.max(Math.abs(dx) - 1, 0), Math.max(Math.abs(dz) - 1, 0)) * CHUNK_SIZE;
+        if (gap >= this.reach) continue;
         const key = `${centerX + dx},${centerZ + dz}`;
         needed.add(key);
         const detailed = Math.max(Math.abs(dx), Math.abs(dz)) <= NEAR_RADIUS;
@@ -142,6 +143,8 @@ export class TerrainStream {
     this.trunkGeometry.dispose();
     this.crownGeometries.forEach((geometry) => geometry.dispose());
     this.rockGeometry.dispose();
+    this.farCrownGeometry.dispose();
+    this.farFoliageMaterial.dispose();
   }
 
   private createChunk(chunkX: number, chunkZ: number, detailed: boolean): Chunk {
@@ -231,14 +234,14 @@ export class TerrainStream {
     geometry.setIndex(indices);
     geometry.computeBoundingSphere();
     const terrain = new THREE.Mesh(geometry, this.terrainMaterial);
-    terrain.receiveShadow = detailed;
-    terrain.castShadow = detailed;
+    terrain.receiveShadow = true;
+    terrain.castShadow = true;
     group.add(terrain);
 
     const waterGeometry = this.createWaterGeometry(originX, originZ, segments, water);
     if (waterGeometry) group.add(new THREE.Mesh(waterGeometry, this.waterMaterial));
 
-    const treeObjects = detailed ? this.createTrees(originX, originZ, TREE_SPACING) : [];
+    const treeObjects = detailed ? this.createTrees(originX, originZ, TREE_SPACING) : this.createFarTrees(originX, originZ);
     treeObjects.forEach((object) => group.add(object));
     const rocks = this.createRocks(chunkX, chunkZ, config.rocks);
     if (rocks) group.add(rocks);
@@ -325,6 +328,24 @@ export class TerrainStream {
       }
     }
     return meshes;
+  }
+
+  private createFarTrees(originX: number, originZ: number): THREE.InstancedMesh[] {
+    const trees = this.world.treesInArea(originX, originZ, CHUNK_SIZE, TREE_SPACING);
+    if (trees.length === 0) return [];
+    const crowns = new THREE.InstancedMesh(this.farCrownGeometry, this.farFoliageMaterial, trees.length);
+    const dummy = new THREE.Object3D();
+    trees.forEach((tree, index) => {
+      dummy.position.set(tree.x, tree.y + (tree.kind === 2 ? 18 : 14) * tree.scale, tree.z);
+      dummy.rotation.set(0, tree.turn, 0);
+      dummy.scale.set(tree.scale * (tree.kind === 2 ? 0.68 : 1.2), tree.scale * (tree.kind === 0 ? 1.55 : tree.kind === 1 ? 1.05 : 1.8), tree.scale * (tree.kind === 2 ? 0.68 : 1.2));
+      dummy.updateMatrix();
+      crowns.setMatrixAt(index, dummy.matrix);
+      crowns.setColorAt(index, this.foliageMaterials[tree.kind]!.color);
+    });
+    crowns.instanceMatrix.needsUpdate = true;
+    crowns.castShadow = true;
+    return [crowns];
   }
 
   private createRocks(chunkX: number, chunkZ: number, attempts: number): THREE.InstancedMesh | null {

@@ -16,15 +16,15 @@ const clamp = (value: unknown, fallback: number, min: number, max: number): numb
 
 function loadSettings(): StoredSettings {
   try {
-    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<StoredSettings>;
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<StoredSettings> & { quality?: unknown };
     return {
       volume: clamp(saved.volume, defaultSettings.volume, 0, 1),
       muted: typeof saved.muted === 'boolean' ? saved.muted : defaultSettings.muted,
       cameraDistance: clamp(saved.cameraDistance, defaultSettings.cameraDistance, 110, 270),
       showThermal: typeof saved.showThermal === 'boolean' ? saved.showThermal : defaultSettings.showThermal,
       // Old saves had a quality preset, not a visibility preference. Keep the old
-      // camera and sound preferences; start visibility at the former default distance.
-      terrainVisibility: clamp(saved.terrainVisibility, defaultSettings.terrainVisibility, MIN_VISIBILITY, MAX_VISIBILITY),
+      // camera and sound preferences and the view distance of the old High preset.
+      terrainVisibility: clamp(saved.terrainVisibility, saved.quality === 'high' ? 1080 : defaultSettings.terrainVisibility, MIN_VISIBILITY, MAX_VISIBILITY),
     };
   } catch {
     return { ...defaultSettings };
@@ -84,7 +84,6 @@ const SUN_OFFSET = new THREE.Vector3(-420, 190, -300);
 const sun = new THREE.DirectionalLight(0xffe1ab, 3.6);
 sun.position.copy(SUN_OFFSET);
 sun.castShadow = !smokeMode;
-sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.near = 1;
 sun.shadow.bias = -0.0005;
 sun.shadow.normalBias = 0.8;
@@ -109,7 +108,13 @@ const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(18, 12, 8), new THREE.Me
 scene.add(sunDisc);
 
 scene.add(eagle.group);
-const terrain = new TerrainStream(scene, world, settings.terrainVisibility);
+// Fog uses view depth, not distance. A point at horizontal distance d can have a depth as small
+// as d · cos(half-diagonal FOV), so terrain loads out to visibility / cos(half-diagonal FOV).
+function terrainReach(): number {
+  const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  return settings.terrainVisibility * Math.hypot(1, tanHalfFov * Math.hypot(1, camera.aspect));
+}
+const terrain = new TerrainStream(scene, world, terrainReach());
 const thermalMarker = new ThermalMarker(scene, world);
 terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, 49);
 
@@ -217,7 +222,8 @@ volumeInput.addEventListener('input', () => {
 visibilityInput.addEventListener('input', () => {
   settings.terrainVisibility = Number(visibilityInput.value);
   visibilityValue.value = `${Math.round(settings.terrainVisibility)} m`;
-  terrain.setVisibility(settings.terrainVisibility);
+  terrain.setReach(terrainReach());
+  updateShadowArea();
   saveSettings();
 });
 showThermalInput.addEventListener('change', () => {
@@ -241,15 +247,26 @@ function saveSettings(): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 function updateFog(): void {
-  fog.far = terrain.coveredDistance(cameraPosition.x, cameraPosition.z);
+  const coveredDepth = terrain.coveredDistance(cameraPosition.x, cameraPosition.z) * settings.terrainVisibility / terrainReach();
+  fog.far = Math.min(settings.terrainVisibility, coveredDepth);
   fog.near = fog.far * 0.5;
 }
-// The shadow map covers nearby detailed terrain only. Far-field terrain is
-// unshadowed to keep texel density and shadow rendering bounded at max range.
-sun.shadow.camera.left = sun.shadow.camera.bottom = -1800;
-sun.shadow.camera.right = sun.shadow.camera.top = 1800;
-sun.shadow.camera.far = 4000;
-sun.shadow.camera.updateProjectionMatrix();
+// The shadow area follows the view out to the haze distance, so it has no visible edge.
+// Longer distances use a larger map to keep texels at or below about 1.8 m.
+function updateShadowArea(): void {
+  const extent = settings.terrainVisibility;
+  const size = Math.min(extent > 1800 ? 4096 : 2048, renderer.capabilities.maxTextureSize);
+  if (sun.shadow.mapSize.x !== size) {
+    sun.shadow.map?.dispose();
+    sun.shadow.map = null;
+    sun.shadow.mapSize.set(size, size);
+  }
+  sun.shadow.camera.left = sun.shadow.camera.bottom = -extent;
+  sun.shadow.camera.right = sun.shadow.camera.top = extent;
+  sun.shadow.camera.far = (extent + 300) * 2;
+  sun.shadow.camera.updateProjectionMatrix();
+}
+updateShadowArea();
 
 let diagnosticsVisible = false;
 window.addEventListener('keydown', (event) => {
@@ -297,9 +314,9 @@ function frame(now: number): void {
 
   sky.position.set(state.x, state.y - 40, state.z);
   sunDisc.position.copy(SUN_OFFSET).setLength(700).add(eagle.group.position);
-  camera.getWorldDirection(shadowCenter).setY(0).setLength(350).add(camera.position);
+  camera.getWorldDirection(shadowCenter).setY(0).setLength(settings.terrainVisibility * 0.5).add(camera.position);
   sun.target.position.set(shadowCenter.x, world.sample(shadowCenter.x, shadowCenter.z).height, shadowCenter.z);
-  sun.position.copy(SUN_OFFSET).setLength(1800).add(sun.target.position);
+  sun.position.copy(SUN_OFFSET).setLength(settings.terrainVisibility + 300).add(sun.target.position);
   sun.target.updateMatrixWorld();
 
   renderer.render(scene, camera);
@@ -332,6 +349,7 @@ window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  terrain.setReach(terrainReach());
 });
 
 window.addEventListener('beforeunload', () => {
