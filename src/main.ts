@@ -1,26 +1,31 @@
 import * as THREE from 'three';
 import './style.css';
 import { Soundscape } from './audio';
-import { EagleNavigator, EagleView } from './eagle';
+import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS, normalizeFlightHeight } from './eagle';
 import { CHUNK_SIZE, QUALITY, QualityName, TerrainStream } from './terrain';
 import { ThermalMarker } from './thermal-marker';
 import { WorldModel } from './world';
 
-type StoredSettings = { volume: number; muted: boolean; quality: QualityName; cameraDistance: number; showThermal: boolean };
+type StoredSettings = { volume: number; muted: boolean; quality: QualityName; cameraDistance: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
 const SETTINGS_KEY = 'soaring.settings.v1';
 const SEED_KEY = 'soaring.world-seed.v1';
 const VISIT_KEY = 'soaring.scenic-visit.v1';
-const defaultSettings: StoredSettings = { volume: 0.52, muted: true, quality: 'medium', cameraDistance: 178, showThermal: true };
+const defaultSettings: StoredSettings = { volume: 0.52, muted: true, quality: 'medium', cameraDistance: 178,
+  showThermal: true, minFlightHeight: DEFAULT_FLIGHT_HEIGHT.min, maxFlightHeight: DEFAULT_FLIGHT_HEIGHT.max };
 
 function loadSettings(): StoredSettings {
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<StoredSettings>;
+    const height = normalizeFlightHeight(saved.minFlightHeight ?? defaultSettings.minFlightHeight,
+      saved.maxFlightHeight ?? defaultSettings.maxFlightHeight);
     return {
       volume: Math.max(0, Math.min(1, saved.volume ?? defaultSettings.volume)),
       muted: typeof saved.muted === 'boolean' ? saved.muted : defaultSettings.muted,
       quality: saved.quality && saved.quality in QUALITY ? saved.quality : defaultSettings.quality,
       cameraDistance: Math.max(110, Math.min(270, saved.cameraDistance ?? defaultSettings.cameraDistance)),
       showThermal: typeof saved.showThermal === 'boolean' ? saved.showThermal : defaultSettings.showThermal,
+      minFlightHeight: height.min,
+      maxFlightHeight: height.max,
     };
   } catch {
     return { ...defaultSettings };
@@ -46,7 +51,7 @@ function nextVisit(): number {
 const settings = loadSettings();
 const world = new WorldModel(loadSeed());
 const start = world.scenicStart(nextVisit());
-const navigator = new EagleNavigator(world, start);
+const navigator = new EagleNavigator(world, start, { min: settings.minFlightHeight, max: settings.maxFlightHeight });
 const eagle = new EagleView();
 const soundscape = new Soundscape();
 soundscape.setVolume(settings.volume);
@@ -148,6 +153,9 @@ app.insertAdjacentHTML('beforeend', `
       <label class="setting">Volume <output id="volume-value">${Math.round(settings.volume * 100)}%</output><input id="volume" type="range" min="0" max="1" step="0.01" value="${settings.volume}"></label>
       <label class="setting">Graphics <select id="quality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
       <label class="setting">Show thermal <input id="show-thermal" type="checkbox" ${settings.showThermal ? 'checked' : ''}></label>
+      <label class="setting">Minimum flight height <output id="min-height-value">${settings.minFlightHeight} m</output><input id="min-height" type="range" min="${FLIGHT_HEIGHT_LIMITS.min}" max="${FLIGHT_HEIGHT_LIMITS.max - FLIGHT_HEIGHT_LIMITS.gap}" step="1" value="${settings.minFlightHeight}"></label>
+      <label class="setting">Maximum flight height <output id="max-height-value">${settings.maxFlightHeight} m</output><input id="max-height" type="range" min="${FLIGHT_HEIGHT_LIMITS.min + FLIGHT_HEIGHT_LIMITS.gap}" max="${FLIGHT_HEIGHT_LIMITS.max}" step="1" value="${settings.maxFlightHeight}"></label>
+      <p class="height-note">Height above local terrain · ${FLIGHT_HEIGHT_LIMITS.gap} m minimum range</p>
       <label class="setting">Camera distance <output id="distance-value">${Math.round(settings.cameraDistance)} m</output><input id="distance" type="range" min="110" max="270" step="1" value="${settings.cameraDistance}"></label>
       <label class="setting"><button class="new-world" id="new-world" type="button">Generate a new world</button></label>
       <p class="audio-note">Sound starts muted. It is generated in your browser; no media is downloaded.</p>
@@ -167,6 +175,10 @@ const qualityInput = document.querySelector<HTMLSelectElement>('#quality')!;
 const showThermalInput = document.querySelector<HTMLInputElement>('#show-thermal')!;
 const distanceInput = document.querySelector<HTMLInputElement>('#distance')!;
 const distanceValue = document.querySelector<HTMLOutputElement>('#distance-value')!;
+const minHeightInput = document.querySelector<HTMLInputElement>('#min-height')!;
+const maxHeightInput = document.querySelector<HTMLInputElement>('#max-height')!;
+const minHeightValue = document.querySelector<HTMLOutputElement>('#min-height-value')!;
+const maxHeightValue = document.querySelector<HTMLOutputElement>('#max-height-value')!;
 const diagnostics = document.querySelector<HTMLElement>('#diagnostics')!;
 qualityInput.value = settings.quality;
 
@@ -227,6 +239,26 @@ distanceInput.addEventListener('input', () => {
   distanceValue.value = `${Math.round(settings.cameraDistance)} m`;
   saveSettings();
 });
+minHeightInput.addEventListener('input', () => {
+  settings.minFlightHeight = Math.min(Number(minHeightInput.value), settings.maxFlightHeight - FLIGHT_HEIGHT_LIMITS.gap);
+  updateFlightHeight();
+});
+maxHeightInput.addEventListener('input', () => {
+  settings.maxFlightHeight = Math.max(Number(maxHeightInput.value), settings.minFlightHeight + FLIGHT_HEIGHT_LIMITS.gap);
+  updateFlightHeight();
+});
+function updateFlightHeight(): void {
+  minHeightInput.value = String(settings.minFlightHeight);
+  maxHeightInput.value = String(settings.maxFlightHeight);
+  minHeightInput.max = String(settings.maxFlightHeight - FLIGHT_HEIGHT_LIMITS.gap);
+  maxHeightInput.min = String(settings.minFlightHeight + FLIGHT_HEIGHT_LIMITS.gap);
+  minHeightValue.value = `${settings.minFlightHeight} m`;
+  maxHeightValue.value = `${settings.maxFlightHeight} m`;
+  navigator.setFlightHeightRange({ min: settings.minFlightHeight, max: settings.maxFlightHeight });
+  saveSettings();
+}
+minHeightInput.max = String(settings.maxFlightHeight - FLIGHT_HEIGHT_LIMITS.gap);
+maxHeightInput.min = String(settings.minFlightHeight + FLIGHT_HEIGHT_LIMITS.gap);
 document.querySelector('#new-world')?.addEventListener('click', () => {
   const values = new Uint32Array(1);
   crypto.getRandomValues(values);
