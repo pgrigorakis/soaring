@@ -10,12 +10,14 @@ function captureErrors(page: Page): string[] {
 /** Boot with a supported quality preset via the app's real settings key. */
 async function seedQuality(page: Page, quality: 'low' | 'medium' | 'high'): Promise<void> {
   await page.addInitScript((value) => {
-    localStorage.setItem('soaring.settings.v1', JSON.stringify({
-      volume: 0.52,
-      muted: true,
-      quality: value,
-      cameraDistance: 178,
-    }));
+    if (!localStorage.getItem('soaring.settings.v1')) {
+      localStorage.setItem('soaring.settings.v1', JSON.stringify({
+        volume: 0.52,
+        muted: true,
+        quality: value,
+        cameraDistance: 178,
+      }));
+    }
   }, quality);
 }
 
@@ -44,6 +46,33 @@ test('renders, streams, and supports camera controls', async ({ page }) => {
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.72, box.y + box.height * 0.42, { steps: 6 });
   await page.mouse.up();
+  expect(errors).toEqual([]);
+});
+
+test('tracks the active thermal and persists the visibility setting', async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = captureErrors(page);
+  await seedQuality(page, 'low');
+  await page.goto('/');
+  await expect(page.locator('canvas')).toBeVisible();
+  const setting = page.getByRole('checkbox', { name: 'Show thermal' });
+  await page.locator('#settings-toggle').click();
+  await expect(setting).toBeChecked();
+  await page.evaluate(() => window.__SOARING__.setTimeScale(12));
+  await page.waitForFunction(() => window.__SOARING__.snapshot().activeThermal !== null, undefined, { timeout: 25_000 });
+  const active = await page.evaluate(() => window.__SOARING__.snapshot());
+  expect(active.marker).toEqual(active.activeThermal);
+  await setting.uncheck();
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).marker).toBeNull();
+  await page.reload();
+  await page.locator('#settings-toggle').click();
+  await expect(setting).not.toBeChecked();
+  await page.evaluate(() => window.__SOARING__.setTimeScale(12));
+  await page.waitForFunction(() => window.__SOARING__.snapshot().activeThermal !== null, undefined, { timeout: 25_000 });
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).marker).toBeNull();
+  await setting.check();
+  const enabled = await page.evaluate(() => window.__SOARING__.snapshot());
+  expect(enabled.marker).toEqual(enabled.activeThermal);
   expect(errors).toEqual([]);
 });
 
