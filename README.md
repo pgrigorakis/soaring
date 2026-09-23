@@ -52,6 +52,6 @@ The product reliability target is one uninterrupted hour without intervention or
 - `src/terrain.ts` turns the world model into recyclable Three.js chunks. Missing chunks are queued nearest first and built two per frame to avoid stalls. Shared materials and instanced vegetation keep GPU use bounded; distant chunk geometry is disposed. Fog ends at the guaranteed loaded distance, so the terrain edge is never visible.
 - `src/eagle.ts` separates the explicit navigation state machine from the visual model. The eagle alternates scenic glides and panoramic flight, seeks deterministic thermals, circles to climb, and maintains terrain clearance.
 - `src/main.ts` owns rendering, camera input, lighting/haze, persistence, controls, diagnostics, and lifecycle wiring.
-- `src/audio.ts` creates wind, soft wing flaps, and a continuous original musical bed with the Web Audio API. Ambience and music use separate level buses under the shared mute. It uses no downloaded media.
+- `src/audio.ts` creates wind, soft wing flaps, and a continuous original musical bed that wanders between four D-major phrases with the Web Audio API. Ambience and music use separate level buses under the shared mute. It uses no downloaded media.
 
 The world is deterministic for a seed, but the generated audio noise is not part of world simulation. There are no remote runtime assets.

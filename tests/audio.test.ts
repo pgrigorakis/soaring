@@ -117,3 +117,25 @@ test('audio startup errors leave the sound muted and a later gesture can retry',
   context.rejectResume = false;
   expect(await sound.setMuted(false)).toBe(true);
 });
+
+test('the musical bed stays in D major but does not settle into a fixed loop', async () => {
+  vi.stubGlobal('AudioContext', BrowserAudio);
+  const sound = new Soundscape();
+  await sound.setMuted(false);
+  const context = BrowserAudio.instances[0]!;
+  const bars: string[] = [];
+  for (let bar = 0; bar < 96; bar += 1) {
+    const before = context.sources.length;
+    context.currentTime = 1 + bar * 2.52;
+    sound.update(bar % 3 ? 'scenic glide' : 'circling thermal');
+    const notes = context.sources.slice(before).filter((source) => !source.buffer)
+      .map((source) => Math.round(69 + 12 * Math.log2(source.frequency.value / 440)));
+    expect(notes.length).toBeGreaterThan(0);
+    for (const note of notes) expect([1, 2, 4, 6, 7, 9, 11]).toContain(note % 12);
+    bars.push(notes.join());
+  }
+  // The earlier fixed bed repeated every 16 bars.
+  const cycle = (period: number) => bars.every((notes, index) => index < period || notes === bars[index - period]);
+  expect([8, 16, 32, 48].some(cycle)).toBe(false);
+  expect(new Set(bars).size).toBeGreaterThan(32);
+});

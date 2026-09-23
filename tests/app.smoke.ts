@@ -84,7 +84,6 @@ test('migrates prior volume, saves independent controls, and preserves mute on r
   await expect(page.locator('#music-value')).toHaveText('80%');
   await page.locator('#mute').click();
   await expect(page.locator('#mute')).toHaveText('On');
-  await page.waitForTimeout(3000); // Let the browser schedule more than one musical bar.
   const settings = await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1')!));
   expect(settings).toMatchObject({ ambienceVolume: 0.2, musicVolume: 0.8, muted: false });
   await page.reload();

@@ -23,8 +23,7 @@ function loadSettings(): StoredSettings {
       musicVolume: level(saved.musicVolume, level(saved.volume, defaultSettings.musicVolume)),
       muted: typeof saved.muted === 'boolean' ? saved.muted : defaultSettings.muted,
       quality: saved.quality && saved.quality in QUALITY ? saved.quality : defaultSettings.quality,
-      cameraDistance: typeof saved.cameraDistance === 'number' && Number.isFinite(saved.cameraDistance)
-        ? Math.max(110, Math.min(270, saved.cameraDistance)) : defaultSettings.cameraDistance,
+      cameraDistance: Math.max(110, Math.min(270, saved.cameraDistance ?? defaultSettings.cameraDistance)),
     };
   } catch {
     return { ...defaultSettings };

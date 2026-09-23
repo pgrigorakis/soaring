@@ -1,17 +1,17 @@
 import type { EagleBehavior } from './eagle';
 
-// Eight bars of an original, repeating D-major progression. The second pass
-// changes the arpeggio order, so the bed stays connected without a long rest.
-const HARMONY = [
-  { bass: 50, chord: [0, 4, 7] },   // D
-  { bass: 49, chord: [0, 3, 8] },   // A/C#
-  { bass: 47, chord: [0, 3, 7] },   // Bm
-  { bass: 43, chord: [0, 4, 7] },   // G
-  { bass: 40, chord: [0, 3, 7] },   // Em
-  { bass: 43, chord: [0, 4, 7] },   // G
-  { bass: 45, chord: [0, 4, 7] },   // A
-  { bass: 50, chord: [0, 4, 7] },   // D
+// Four original eight-bar D-major phrases. Phrases, arpeggio shapes, and
+// answer notes are picked at random, so the bed stays coherent without looping.
+const MAJOR = [0, 4, 7];
+const MINOR = [0, 3, 7];
+const FIRST_INVERSION = [0, 3, 8];
+const PHRASES = [
+  [[50, MAJOR], [49, FIRST_INVERSION], [47, MINOR], [43, MAJOR], [40, MINOR], [43, MAJOR], [45, MAJOR], [50, MAJOR]],
+  [[43, MAJOR], [42, FIRST_INVERSION], [40, MINOR], [45, MAJOR], [47, MINOR], [43, MAJOR], [45, MAJOR], [50, MAJOR]],
+  [[47, MINOR], [43, MAJOR], [50, MAJOR], [45, MAJOR], [47, MINOR], [40, MINOR], [45, MAJOR], [50, MAJOR]],
+  [[43, MAJOR], [45, MAJOR], [42, MINOR], [47, MINOR], [40, MINOR], [45, MAJOR], [43, MAJOR], [50, MAJOR]],
 ] as const;
+const ARPEGGIOS = [[0, 1, 2, 1, 2, 1], [0, 2, 1, 2, 1, 0], [2, 1, 0, 1, 2, 3], [0, 1, 2, 3, 2, 1]] as const;
 const BEAT = 0.42;
 const BAR = BEAT * 6;
 
@@ -27,6 +27,7 @@ export class Soundscape {
   private wind: AudioBufferSourceNode | null = null;
   private nextBar = 0;
   private bar = 0;
+  private phrase = 0;
   private nextFlap = 0;
   private ambienceVolume = 0.52;
   private musicVolume = 0.52;
@@ -80,19 +81,23 @@ export class Soundscape {
   }
 
   private playBar(start: number, behavior: EagleBehavior): void {
-    const harmony = HARMONY[this.bar % HARMONY.length]!;
-    const notes = harmony.chord.map((interval) => harmony.bass + 12 + interval);
-    this.playTone(frequency(harmony.bass), start, BAR * 0.93, 0.28, 'sine', 0.18);
-    for (const note of notes) {
+    const step = this.bar % 8;
+    if (step === 0 && this.bar > 0) this.phrase = (this.phrase + 1 + Math.floor(Math.random() * (PHRASES.length - 1))) % PHRASES.length;
+    const [bass, chord] = PHRASES[this.phrase]![step]!;
+    const notes = [...chord, 12].map((interval) => bass + 12 + interval);
+    this.playTone(frequency(bass), start, BAR * 0.93, 0.28, 'sine', 0.18);
+    for (const note of notes.slice(0, 3)) {
       this.playTone(frequency(note), start, BAR * 0.97, 0.095, 'triangle', 0.65);
     }
-    const order = Math.floor(this.bar / HARMONY.length) % 2 ? [0, 2, 1, 2, 1, 0] : [0, 1, 2, 1, 2, 1];
-    for (let step = 0; step < order.length; step += 1) {
-      this.playTone(frequency(notes[order[step]!]! + 12), start + step * BEAT, BEAT * 1.65, 0.13, 'sine', 0.045);
+    // Rising thermals lift the arpeggio; a panoramic cruise thins it out.
+    const lift = behavior === 'circling thermal' ? 24 : 12;
+    const order = ARPEGGIOS[Math.floor(Math.random() * ARPEGGIOS.length)]!;
+    for (let beat = 0; beat < order.length; beat += behavior === 'panoramic cruise' ? 2 : 1) {
+      this.playTone(frequency(notes[order[beat]!]! + lift), start + beat * BEAT, BEAT * 1.65, 0.13, 'sine', 0.045);
     }
-    // A small answer every other bar lends shape without an exposed looping tune.
     if (this.bar % 2 === 1 && behavior !== 'panoramic cruise') {
-      this.playTone(frequency(notes[2]! + 12), start + BEAT * 3, BEAT * 2.3, 0.11, 'triangle', 0.12);
+      const answer = notes[1 + Math.floor(Math.random() * 3)]!;
+      this.playTone(frequency(answer + 12), start + BEAT * 3, BEAT * 2.3, 0.11, 'triangle', 0.12);
     }
   }
 
