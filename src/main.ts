@@ -250,15 +250,11 @@ maxHeightInput.addEventListener('input', () => {
 function updateFlightHeight(): void {
   minHeightInput.value = String(settings.minFlightHeight);
   maxHeightInput.value = String(settings.maxFlightHeight);
-  minHeightInput.max = String(settings.maxFlightHeight - FLIGHT_HEIGHT_LIMITS.gap);
-  maxHeightInput.min = String(settings.minFlightHeight + FLIGHT_HEIGHT_LIMITS.gap);
   minHeightValue.value = `${settings.minFlightHeight} m`;
   maxHeightValue.value = `${settings.maxFlightHeight} m`;
   navigator.setFlightHeightRange({ min: settings.minFlightHeight, max: settings.maxFlightHeight });
   saveSettings();
 }
-minHeightInput.max = String(settings.maxFlightHeight - FLIGHT_HEIGHT_LIMITS.gap);
-maxHeightInput.min = String(settings.minFlightHeight + FLIGHT_HEIGHT_LIMITS.gap);
 document.querySelector('#new-world')?.addEventListener('click', () => {
   const values = new Uint32Array(1);
   crypto.getRandomValues(values);
