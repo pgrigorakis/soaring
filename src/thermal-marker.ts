@@ -13,22 +13,26 @@ export class ThermalMarker {
   constructor(private readonly scene: THREE.Scene, private readonly world: WorldModel) {
     const geometry = new THREE.CylinderGeometry(62, 62, HEIGHT, 48, 1, true);
     const material = new THREE.ShaderMaterial({
-      uniforms: { time: this.time },
+      uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), time: this.time },
+      fog: true,
       transparent: true,
       depthWrite: false,
       depthTest: true,
       side: THREE.DoubleSide,
       vertexShader: `
+        #include <fog_pars_vertex>
         varying vec2 vUv;
         varying float vFacing;
         void main() {
           vUv = uv;
-          vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
-          vFacing = dot(normalize(normalMatrix * normal), normalize(-viewPosition.xyz));
-          gl_Position = projectionMatrix * viewPosition;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          vFacing = dot(normalize(normalMatrix * normal), normalize(-mvPosition.xyz));
+          gl_Position = projectionMatrix * mvPosition;
+          #include <fog_vertex>
         }
       `,
       fragmentShader: `
+        #include <fog_pars_fragment>
         uniform float time;
         varying vec2 vUv;
         varying float vFacing;
@@ -40,6 +44,10 @@ export class ThermalMarker {
           gl_FragColor = vec4(mix(vec3(1.0, 0.12, 0.0), vec3(1.0, 0.3, 0.015), shimmer), alpha);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
+          #include <fog_fragment>
+          #ifdef USE_FOG
+            gl_FragColor.a *= 1.0 - fogFactor;
+          #endif
         }
       `,
     });
