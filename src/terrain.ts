@@ -1,25 +1,25 @@
 import * as THREE from 'three';
 import { hash2, type LandscapeSample, WorldModel } from './world';
 
-export type QualityName = 'low' | 'medium' | 'high';
-export const QUALITY: Record<QualityName, { radius: number; segments: number; treeSpacing: number; rocks: number; pixelRatio: number }> = {
-  low: { radius: 2, segments: 22, treeSpacing: 68, rocks: 4, pixelRatio: 1 },
-  medium: { radius: 2, segments: 32, treeSpacing: 44, rocks: 7, pixelRatio: 1.35 },
-  high: { radius: 3, segments: 40, treeSpacing: 29, rocks: 10, pixelRatio: 1.75 },
-};
-
 export const CHUNK_SIZE = 360;
+export const MIN_VISIBILITY = 720;
+export const MAX_VISIBILITY = 3600;
+const NEAR_RADIUS = 3;
+const DETAIL = { segments: 40, rocks: 10 };
+const DISTANT = { segments: 20, rocks: 0 };
+const TREE_SPACING = 29;
 
-type Chunk = { group: THREE.Group; dispose: () => void };
+type Chunk = { group: THREE.Group; detailed: boolean; dispose: () => void };
+type Pending = { x: number; z: number; key: string; detailed: boolean };
 
 export class TerrainStream {
   private readonly scene: THREE.Scene;
   private readonly world: WorldModel;
   private readonly chunks = new Map<string, Chunk>();
-  private quality: QualityName;
+  private visibility: number;
   private centerX = Number.NaN;
   private centerZ = Number.NaN;
-  private pending: { x: number; z: number; key: string }[] = [];
+  private pending: Pending[] = [];
 
   private readonly terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0 });
   private readonly waterMaterial = new THREE.MeshStandardMaterial({
@@ -46,23 +46,45 @@ export class TerrainStream {
   ];
   private readonly rockGeometry = new THREE.DodecahedronGeometry(4.5, 0);
 
-  constructor(scene: THREE.Scene, world: WorldModel, quality: QualityName) {
+  constructor(scene: THREE.Scene, world: WorldModel, visibility = MIN_VISIBILITY) {
     this.scene = scene;
     this.world = world;
-    this.quality = quality;
+    this.visibility = visibility;
   }
 
   get chunkCount(): number {
     return this.chunks.size;
   }
 
-  setQuality(quality: QualityName): void {
-    if (quality === this.quality) return;
-    this.quality = quality;
-    this.clear();
-    this.centerX = Number.NaN;
-    this.centerZ = Number.NaN;
+  setVisibility(visibility: number): void {
+    if (visibility === this.visibility) return;
+    this.visibility = visibility;
+    if (Number.isFinite(this.centerX)) this.recenter(this.centerX, this.centerZ);
   }
+
+  // The nearest missing tile or outside edge limits haze, including while a new ring streams in.
+  // Camera coordinates (not eagle coordinates) are used so orbit and distance cannot reveal an edge.
+  coveredDistance(x: number, z: number): number {
+    const radius = this.radius;
+    const left = (this.centerX - radius) * CHUNK_SIZE;
+    const right = (this.centerX + radius + 1) * CHUNK_SIZE;
+    const bottom = (this.centerZ - radius) * CHUNK_SIZE;
+    const top = (this.centerZ + radius + 1) * CHUNK_SIZE;
+    let distance = Math.min(x - left, right - x, z - bottom, top - z);
+    for (const tile of this.pending) {
+      if (this.chunks.has(tile.key)) continue; // A coarse tile remains visible while it is upgraded.
+      const minX = tile.x * CHUNK_SIZE;
+      const minZ = tile.z * CHUNK_SIZE;
+      distance = Math.min(distance, Math.hypot(
+        Math.max(minX - x, 0, x - minX - CHUNK_SIZE),
+        Math.max(minZ - z, 0, z - minZ - CHUNK_SIZE),
+      ));
+    }
+    return Math.max(0, Math.min(this.visibility, distance - 12));
+  }
+
+  get pendingCount(): number { return this.pending.length; }
+  get radius(): number { return Math.ceil(this.visibility / CHUNK_SIZE) + 1; }
 
   update(x: number, z: number, buildBudget = 2): void {
     const centerX = Math.floor(x / CHUNK_SIZE);
@@ -70,7 +92,10 @@ export class TerrainStream {
     if (centerX !== this.centerX || centerZ !== this.centerZ) this.recenter(centerX, centerZ);
     for (let built = 0; built < buildBudget && this.pending.length > 0; built += 1) {
       const next = this.pending.shift()!;
-      this.chunks.set(next.key, this.createChunk(next.x, next.z));
+      const old = this.chunks.get(next.key);
+      const chunk = this.createChunk(next.x, next.z, next.detailed);
+      if (old) { this.scene.remove(old.group); old.dispose(); }
+      this.chunks.set(next.key, chunk);
     }
   }
 
@@ -78,13 +103,14 @@ export class TerrainStream {
     this.centerX = centerX;
     this.centerZ = centerZ;
     const needed = new Set<string>();
-    const radius = QUALITY[this.quality].radius;
+    const radius = this.radius;
     this.pending = [];
     for (let dz = -radius; dz <= radius; dz += 1) {
       for (let dx = -radius; dx <= radius; dx += 1) {
         const key = `${centerX + dx},${centerZ + dz}`;
         needed.add(key);
-        if (!this.chunks.has(key)) this.pending.push({ x: centerX + dx, z: centerZ + dz, key });
+        const detailed = Math.max(Math.abs(dx), Math.abs(dz)) <= NEAR_RADIUS;
+        if (this.chunks.get(key)?.detailed !== detailed) this.pending.push({ x: centerX + dx, z: centerZ + dz, key, detailed });
       }
     }
     this.pending.sort((a, b) => Math.hypot(a.x - centerX, a.z - centerZ) - Math.hypot(b.x - centerX, b.z - centerZ));
@@ -118,10 +144,10 @@ export class TerrainStream {
     this.rockGeometry.dispose();
   }
 
-  private createChunk(chunkX: number, chunkZ: number): Chunk {
+  private createChunk(chunkX: number, chunkZ: number, detailed: boolean): Chunk {
     const group = new THREE.Group();
     group.name = `land ${chunkX},${chunkZ}`;
-    const config = QUALITY[this.quality];
+    const config = detailed ? DETAIL : DISTANT;
     const segments = config.segments;
     const step = CHUNK_SIZE / segments;
     const originX = chunkX * CHUNK_SIZE;
@@ -175,20 +201,44 @@ export class TerrainStream {
         indices.push(a, c, b, b, c, d);
       }
     }
+    if (!detailed) {
+      // High-detail neighbors have more edge vertices. A downward skirt hides
+      // interpolation cracks without multiplying the far-field mesh density.
+      const edge = (vertices: number[], outward: boolean) => {
+        for (let i = 0; i < vertices.length; i += 1) {
+          const top = vertices[i]!;
+          const base = top * 3;
+          const bottom = positions.length / 3;
+          positions.push(positions[base]!, Math.min(positions[base + 1]! - 90, this.world.waterLevel - 60), positions[base + 2]!);
+          normals.push(normals[base]!, normals[base + 1]!, normals[base + 2]!);
+          colors.push(colors[base]!, colors[base + 1]!, colors[base + 2]!);
+          if (i > 0) {
+            const prev = vertices[i - 1]!;
+            const prevBottom = bottom - 1;
+            if (outward) indices.push(prev, top, prevBottom, top, bottom, prevBottom);
+            else indices.push(prev, prevBottom, top, top, prevBottom, bottom);
+          }
+        }
+      };
+      edge(Array.from({ length: segments + 1 }, (_, i) => i), true);
+      edge(Array.from({ length: segments + 1 }, (_, i) => segments * (segments + 1) + i), false);
+      edge(Array.from({ length: segments + 1 }, (_, i) => i * (segments + 1)), false);
+      edge(Array.from({ length: segments + 1 }, (_, i) => i * (segments + 1) + segments), true);
+    }
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometry.setIndex(indices);
     geometry.computeBoundingSphere();
     const terrain = new THREE.Mesh(geometry, this.terrainMaterial);
-    terrain.receiveShadow = true;
-    terrain.castShadow = true;
+    terrain.receiveShadow = detailed;
+    terrain.castShadow = detailed;
     group.add(terrain);
 
     const waterGeometry = this.createWaterGeometry(originX, originZ, segments, water);
     if (waterGeometry) group.add(new THREE.Mesh(waterGeometry, this.waterMaterial));
 
-    const treeObjects = this.createTrees(originX, originZ, config.treeSpacing);
+    const treeObjects = detailed ? this.createTrees(originX, originZ, TREE_SPACING) : [];
     treeObjects.forEach((object) => group.add(object));
     const rocks = this.createRocks(chunkX, chunkZ, config.rocks);
     if (rocks) group.add(rocks);
@@ -196,6 +246,7 @@ export class TerrainStream {
     this.scene.add(group);
     return {
       group,
+      detailed,
       dispose: () => {
         geometry.dispose();
         waterGeometry?.dispose();

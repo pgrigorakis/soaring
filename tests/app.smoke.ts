@@ -7,37 +7,23 @@ function captureErrors(page: Page): string[] {
   return errors;
 }
 
-/** Boot with a supported quality preset via the app's real settings key. */
-async function seedQuality(page: Page, quality: 'low' | 'medium' | 'high'): Promise<void> {
-  await page.addInitScript((value) => {
-    if (!localStorage.getItem('soaring.settings.v1')) {
-      localStorage.setItem('soaring.settings.v1', JSON.stringify({
-        volume: 0.52,
-        muted: true,
-        quality: value,
-        cameraDistance: 178,
-      }));
-    }
-  }, quality);
-}
-
-test('renders, streams, and supports camera controls', async ({ page }) => {
+test('renders high-detail terrain, streams, and supports camera controls', async ({ page }) => {
   const errors = captureErrors(page);
-  // CI runners use software WebGL; low is the supported preset that keeps the
-  // main thread free enough for streaming + camera-drag within the test budget.
-  await seedQuality(page, 'low');
-  await page.goto('/');
+  // Development-only smoke mode reduces software-WebGL pixel work and disables shadows.
+  await page.goto('/?smoke');
   await expect(page.locator('canvas')).toBeVisible();
   await page.keyboard.press('d');
   await expect(page.locator('#diagnostics')).toBeVisible();
   await page.evaluate(() => window.__SOARING__.setTimeScale(8));
-  await page.waitForFunction(() => window.__SOARING__?.snapshot().chunks > 8);
+  await page.waitForFunction(() => window.__SOARING__?.snapshot().chunks >= 49);
   const before = await page.evaluate(() => window.__SOARING__.snapshot());
   await page.waitForTimeout(1500);
   const after = await page.evaluate(() => window.__SOARING__.snapshot());
   expect(Math.hypot(after.position[0]! - before.position[0]!, after.position[2]! - before.position[2]!)).toBeGreaterThan(8);
-  expect(after.chunks).toBeLessThanOrEqual(40);
-  expect(after.geometries).toBeLessThan(120);
+  expect(after.chunks).toBeLessThanOrEqual(49);
+  expect(after.geometries).toBeLessThan(200);
+  expect(after.requestedDistance).toBe(720);
+  expect(after.visibleDistance).toBeLessThanOrEqual(after.requestedDistance);
 
   const canvas = page.locator('canvas');
   const box = await canvas.boundingBox();
@@ -52,8 +38,7 @@ test('renders, streams, and supports camera controls', async ({ page }) => {
 test('tracks the active thermal and persists the visibility setting', async ({ page }) => {
   test.setTimeout(90_000);
   const errors = captureErrors(page);
-  await seedQuality(page, 'low');
-  await page.goto('/');
+  await page.goto('/?smoke');
   await expect(page.locator('canvas')).toBeVisible();
   const setting = page.getByRole('checkbox', { name: 'Show thermal' });
   await page.locator('#settings-toggle').click();
@@ -76,15 +61,19 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
   expect(errors).toEqual([]);
 });
 
-test('keeps settings usable after ambient controls fade', async ({ page }) => {
+test('visibility and camera distance persist independently; old settings migrate', async ({ page }) => {
   const errors = captureErrors(page);
-  await page.goto('/');
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('soaring.settings.v1')) localStorage.setItem('soaring.settings.v1', JSON.stringify({
+      volume: 0.4, muted: false, quality: 'low', cameraDistance: 220,
+    }));
+  });
+  await page.goto('/?smoke');
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Canvas has no layout box');
   await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.5);
-
   const controls = page.locator('#controls');
   await expect(controls).toHaveClass(/visible/);
   await expect(controls).not.toHaveClass(/visible/, { timeout: 5000 });
@@ -95,7 +84,22 @@ test('keeps settings usable after ambient controls fade', async ({ page }) => {
   await expect(page.locator('#settings-panel')).toBeVisible();
   await expect(settingsToggle).toHaveAttribute('aria-expanded', 'true');
   await expect(settingsToggle).toHaveAccessibleName('Close settings');
-  await page.locator('#quality').selectOption('low');
-  await expect(page.locator('#quality')).toHaveValue('low');
+  await expect(page.locator('#quality')).toHaveCount(0);
+  await expect(page.locator('#distance')).toHaveValue('220');
+  await expect(page.locator('#volume')).toHaveValue('0.4');
+  await expect(page.locator('#visibility')).toHaveValue('720');
+  await page.locator('#visibility').fill('3600');
+  await expect(page.locator('#distance')).toHaveValue('220');
+  await page.locator('#distance').fill('160');
+  await page.reload();
+  await expect(page.locator('#visibility')).toHaveValue('3600');
+  await expect(page.locator('#distance')).toHaveValue('160');
+  await page.waitForFunction(() => window.__SOARING__.snapshot().pending === 0);
+  const snapshot = await page.evaluate(() => window.__SOARING__.snapshot());
+  expect(snapshot.requestedDistance).toBe(3600);
+  expect(snapshot.cameraDistance).toBe(160);
+  expect(snapshot.visibleDistance).toBe(3600);
+  expect(snapshot.chunks).toBe(529);
+  expect(snapshot.geometries).toBeLessThan(700);
   expect(errors).toEqual([]);
 });

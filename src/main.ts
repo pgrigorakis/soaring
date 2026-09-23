@@ -2,25 +2,29 @@ import * as THREE from 'three';
 import './style.css';
 import { Soundscape } from './audio';
 import { EagleNavigator, EagleView } from './eagle';
-import { CHUNK_SIZE, QUALITY, QualityName, TerrainStream } from './terrain';
+import { MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
 import { ThermalMarker } from './thermal-marker';
 import { WorldModel } from './world';
 
-type StoredSettings = { volume: number; muted: boolean; quality: QualityName; cameraDistance: number; showThermal: boolean };
+type StoredSettings = { volume: number; muted: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean };
 const SETTINGS_KEY = 'soaring.settings.v1';
 const SEED_KEY = 'soaring.world-seed.v1';
 const VISIT_KEY = 'soaring.scenic-visit.v1';
-const defaultSettings: StoredSettings = { volume: 0.52, muted: true, quality: 'medium', cameraDistance: 178, showThermal: true };
+const defaultSettings: StoredSettings = { volume: 0.52, muted: true, cameraDistance: 178, terrainVisibility: MIN_VISIBILITY, showThermal: true };
+const clamp = (value: unknown, fallback: number, min: number, max: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 
 function loadSettings(): StoredSettings {
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<StoredSettings>;
     return {
-      volume: Math.max(0, Math.min(1, saved.volume ?? defaultSettings.volume)),
+      volume: clamp(saved.volume, defaultSettings.volume, 0, 1),
       muted: typeof saved.muted === 'boolean' ? saved.muted : defaultSettings.muted,
-      quality: saved.quality && saved.quality in QUALITY ? saved.quality : defaultSettings.quality,
-      cameraDistance: Math.max(110, Math.min(270, saved.cameraDistance ?? defaultSettings.cameraDistance)),
+      cameraDistance: clamp(saved.cameraDistance, defaultSettings.cameraDistance, 110, 270),
       showThermal: typeof saved.showThermal === 'boolean' ? saved.showThermal : defaultSettings.showThermal,
+      // Old saves had a quality preset, not a visibility preference. Keep the old
+      // camera and sound preferences; start visibility at the former default distance.
+      terrainVisibility: clamp(saved.terrainVisibility, defaultSettings.terrainVisibility, MIN_VISIBILITY, MAX_VISIBILITY),
     };
   } catch {
     return { ...defaultSettings };
@@ -57,17 +61,19 @@ if (!app) throw new Error('Missing application root');
 const HORIZON_COLOR = 0xd8d4b3;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(HORIZON_COLOR);
-const fog = new THREE.Fog(HORIZON_COLOR, 360, 720);
+const fog = new THREE.Fog(HORIZON_COLOR, MIN_VISIBILITY * 0.5, MIN_VISIBILITY);
 scene.fog = fog;
 
-const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.5, 1700);
-const renderer = new THREE.WebGLRenderer({ antialias: settings.quality !== 'low', powerPreference: 'high-performance' });
+// Only the development smoke harness uses a smaller software-WebGL render budget.
+const smokeMode = import.meta.env.DEV && new URLSearchParams(location.search).has('smoke');
+const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.5, MAX_VISIBILITY + 500);
+const renderer = new THREE.WebGLRenderer({ antialias: !smokeMode, powerPreference: 'high-performance' });
 renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY[settings.quality].pixelRatio));
+renderer.setPixelRatio(smokeMode ? 0.75 : Math.min(devicePixelRatio, 1.75));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.08;
-renderer.shadowMap.enabled = settings.quality !== 'low';
+renderer.shadowMap.enabled = !smokeMode;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.domElement.setAttribute('aria-label', 'Autonomous golden eagle flying above a temperate wilderness');
 app.append(renderer.domElement);
@@ -77,7 +83,7 @@ scene.add(hemisphere);
 const SUN_OFFSET = new THREE.Vector3(-420, 190, -300);
 const sun = new THREE.DirectionalLight(0xffe1ab, 3.6);
 sun.position.copy(SUN_OFFSET);
-sun.castShadow = settings.quality !== 'low';
+sun.castShadow = !smokeMode;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.near = 1;
 sun.shadow.bias = -0.0005;
@@ -103,9 +109,9 @@ const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(18, 12, 8), new THREE.Me
 scene.add(sunDisc);
 
 scene.add(eagle.group);
-const terrain = new TerrainStream(scene, world, settings.quality);
+const terrain = new TerrainStream(scene, world, settings.terrainVisibility);
 const thermalMarker = new ThermalMarker(scene, world);
-terrain.update(navigator.state.x, navigator.state.z, Infinity);
+terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, 49);
 
 let orbitYaw = 0;
 let orbitPitch = 0;
@@ -146,7 +152,7 @@ app.insertAdjacentHTML('beforeend', `
       <h1>Soaring</h1>
       <label class="setting">Sound <button class="mute-button" id="mute" type="button">Muted</button></label>
       <label class="setting">Volume <output id="volume-value">${Math.round(settings.volume * 100)}%</output><input id="volume" type="range" min="0" max="1" step="0.01" value="${settings.volume}"></label>
-      <label class="setting">Graphics <select id="quality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+      <label class="setting">Terrain visibility <output id="visibility-value">${Math.round(settings.terrainVisibility)} m</output><input id="visibility" type="range" min="${MIN_VISIBILITY}" max="${MAX_VISIBILITY}" step="120" value="${settings.terrainVisibility}"></label>
       <label class="setting">Show thermal <input id="show-thermal" type="checkbox" ${settings.showThermal ? 'checked' : ''}></label>
       <label class="setting">Camera distance <output id="distance-value">${Math.round(settings.cameraDistance)} m</output><input id="distance" type="range" min="110" max="270" step="1" value="${settings.cameraDistance}"></label>
       <label class="setting"><button class="new-world" id="new-world" type="button">Generate a new world</button></label>
@@ -163,12 +169,12 @@ const toggle = document.querySelector<HTMLButtonElement>('#settings-toggle')!;
 const muteButton = document.querySelector<HTMLButtonElement>('#mute')!;
 const volumeInput = document.querySelector<HTMLInputElement>('#volume')!;
 const volumeValue = document.querySelector<HTMLOutputElement>('#volume-value')!;
-const qualityInput = document.querySelector<HTMLSelectElement>('#quality')!;
+const visibilityInput = document.querySelector<HTMLInputElement>('#visibility')!;
+const visibilityValue = document.querySelector<HTMLOutputElement>('#visibility-value')!;
 const showThermalInput = document.querySelector<HTMLInputElement>('#show-thermal')!;
 const distanceInput = document.querySelector<HTMLInputElement>('#distance')!;
 const distanceValue = document.querySelector<HTMLOutputElement>('#distance-value')!;
 const diagnostics = document.querySelector<HTMLElement>('#diagnostics')!;
-qualityInput.value = settings.quality;
 
 let controlsTimer = 0;
 function showControls(): void {
@@ -208,13 +214,10 @@ volumeInput.addEventListener('input', () => {
   soundscape.setVolume(settings.volume);
   saveSettings();
 });
-qualityInput.addEventListener('change', () => {
-  settings.quality = qualityInput.value as QualityName;
-  terrain.setQuality(settings.quality);
-  renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY[settings.quality].pixelRatio));
-  renderer.shadowMap.enabled = settings.quality !== 'low';
-  sun.castShadow = settings.quality !== 'low';
-  updateFog();
+visibilityInput.addEventListener('input', () => {
+  settings.terrainVisibility = Number(visibilityInput.value);
+  visibilityValue.value = `${Math.round(settings.terrainVisibility)} m`;
+  terrain.setVisibility(settings.terrainVisibility);
   saveSettings();
 });
 showThermalInput.addEventListener('change', () => {
@@ -238,16 +241,15 @@ function saveSettings(): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 function updateFog(): void {
-  fog.far = QUALITY[settings.quality].radius * CHUNK_SIZE;
+  fog.far = terrain.coveredDistance(cameraPosition.x, cameraPosition.z);
   fog.near = fog.far * 0.5;
-  camera.far = Math.max(fog.far, 820) + 400;
-  camera.updateProjectionMatrix();
-  sun.shadow.camera.left = sun.shadow.camera.bottom = -fog.far;
-  sun.shadow.camera.right = sun.shadow.camera.top = fog.far;
-  sun.shadow.camera.far = (fog.far + 300) * 2;
-  sun.shadow.camera.updateProjectionMatrix();
 }
-updateFog();
+// The shadow map covers nearby detailed terrain only. Far-field terrain is
+// unshadowed to keep texel density and shadow rendering bounded at max range.
+sun.shadow.camera.left = sun.shadow.camera.bottom = -1800;
+sun.shadow.camera.right = sun.shadow.camera.top = 1800;
+sun.shadow.camera.far = 4000;
+sun.shadow.camera.updateProjectionMatrix();
 
 let diagnosticsVisible = false;
 window.addEventListener('keydown', (event) => {
@@ -270,7 +272,6 @@ function frame(now: number): void {
   let state = navigator.state;
   for (let step = 0; step < substeps; step += 1) state = navigator.update(delta / substeps);
   eagle.update(state, delta);
-  terrain.update(state.x, state.z);
   thermalMarker.update(navigator.activeThermal, settings.showThermal, now / 1000);
   soundscape.update(state.behavior);
 
@@ -291,12 +292,14 @@ function frame(now: number): void {
   camera.position.copy(cameraPosition);
   lookAt.set(state.x + Math.sin(state.heading) * 38, state.y - 9 - orbitPitch * 24, state.z + Math.cos(state.heading) * 38);
   camera.lookAt(lookAt);
+  terrain.update(cameraPosition.x, cameraPosition.z);
+  updateFog();
 
   sky.position.set(state.x, state.y - 40, state.z);
   sunDisc.position.copy(SUN_OFFSET).setLength(700).add(eagle.group.position);
-  camera.getWorldDirection(shadowCenter).setY(0).setLength(fog.far * 0.5).add(camera.position);
+  camera.getWorldDirection(shadowCenter).setY(0).setLength(350).add(camera.position);
   sun.target.position.set(shadowCenter.x, world.sample(shadowCenter.x, shadowCenter.z).height, shadowCenter.z);
-  sun.position.copy(SUN_OFFSET).setLength(fog.far + 300).add(sun.target.position);
+  sun.position.copy(SUN_OFFSET).setLength(1800).add(sun.target.position);
   sun.target.updateMatrixWorld();
 
   renderer.render(scene, camera);
@@ -309,7 +312,8 @@ function frame(now: number): void {
       .slice(0, 4).map((thermal) => `${thermal.x.toFixed(0)},${thermal.z.toFixed(0)}`).join(' · ');
     diagnostics.textContent = [
       `FPS          ${fpsSmoothed.toFixed(0)}`,
-      `chunks       ${terrain.chunkCount}`,
+      `chunks       ${terrain.chunkCount} (${terrain.pendingCount} pending)`,
+      `visibility   ${fog.far.toFixed(0)} / ${settings.terrainVisibility.toFixed(0)} m`,
       `draw calls   ${renderer.info.render.calls}`,
       `geometries   ${renderer.info.memory.geometries}`,
       `behavior     ${state.behavior}`,
@@ -338,7 +342,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { seed: number; chunks: number; behavior: string; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null };
+      snapshot: () => { seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; behavior: string; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null };
       setTimeScale: (scale: number) => void;
     };
   }
@@ -347,6 +351,10 @@ window.__SOARING__ = {
   snapshot: () => ({
     seed: world.seed,
     chunks: terrain.chunkCount,
+    pending: terrain.pendingCount,
+    visibleDistance: fog.far,
+    requestedDistance: settings.terrainVisibility,
+    cameraDistance: settings.cameraDistance,
     behavior: navigator.state.behavior,
     position: [navigator.state.x, navigator.state.y, navigator.state.z],
     geometries: renderer.info.memory.geometries,
