@@ -148,8 +148,8 @@ app.insertAdjacentHTML('beforeend', `
       <label class="setting"><button class="new-world" id="new-world" type="button">Generate a new world</button></label>
       <p class="audio-note">Sound starts muted. It is generated in your browser; no media is downloaded.</p>
     </section>
-    <button class="settings-toggle" id="settings-toggle" type="button" aria-label="Open settings" aria-expanded="false">⚙</button>
   </div>
+  <button class="settings-toggle" id="settings-toggle" type="button" aria-label="Open settings" aria-controls="settings-panel" aria-expanded="false">⚙</button>
   <pre class="diagnostics" id="diagnostics" aria-hidden="true"></pre>
 `);
 
@@ -181,6 +181,7 @@ window.setTimeout(() => document.querySelector('#intro')?.classList.add('hidden'
 toggle.addEventListener('click', () => {
   const open = panel.classList.toggle('open');
   toggle.setAttribute('aria-expanded', String(open));
+  toggle.setAttribute('aria-label', open ? 'Close settings' : 'Open settings');
   showControls();
 });
 window.addEventListener('pointerdown', async () => {

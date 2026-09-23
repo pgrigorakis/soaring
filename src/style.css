@@ -20,20 +20,20 @@ canvas.dragging { cursor: grabbing; }
 
 .controls {
   position: fixed;
-  right: 22px;
+  right: 70px;
   top: 20px;
   z-index: 5;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
   opacity: 0;
-  transform: translateY(-5px);
-  transition: opacity 900ms ease, transform 900ms ease;
+  transition: opacity 900ms ease;
   pointer-events: none;
 }
-.controls.visible, .controls:focus-within { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.controls.visible, .controls:focus-within { opacity: 1; pointer-events: auto; }
 
 .settings-toggle {
+  position: fixed;
+  right: 22px;
+  top: 20px;
+  z-index: 6;
   width: 38px;
   height: 38px;
   border: 1px solid rgba(255,255,255,.28);
@@ -44,6 +44,7 @@ canvas.dragging { cursor: grabbing; }
   box-shadow: 0 8px 30px rgba(11, 23, 24, .18);
   backdrop-filter: blur(12px);
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .settings-panel {
@@ -110,6 +111,7 @@ canvas.dragging { cursor: grabbing; }
 .intro.hidden { opacity: 0; }
 
 @media (max-width: 700px) {
-  .controls { right: 12px; top: 12px; }
+  .controls { right: 60px; top: 12px; }
+  .settings-toggle { right: 12px; top: 12px; }
   .settings-panel { width: min(245px, calc(100vw - 70px)); }
 }
