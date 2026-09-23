@@ -165,9 +165,10 @@ class Plumage {
 
   polygon(points: FeatherPoint[], color: number): void {
     const rgb = new THREE.Color(color);
-    for (let i = 1; i < points.length - 1; i += 1) {
-      for (const point of [points[0]!, points[i]!, points[i + 1]!]) {
-        this.positions.push(...point);
+    const outline = points.map(([x, , z]) => new THREE.Vector2(x, z));
+    for (const triangle of THREE.ShapeUtils.triangulateShape(outline, [])) {
+      for (const index of triangle) {
+        this.positions.push(...points[index]!);
         this.colors.push(rgb.r, rgb.g, rgb.b);
       }
     }

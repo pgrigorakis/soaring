@@ -22,6 +22,11 @@ describe('procedural eagle', () => {
     expect(eagle.group.position.toArray()).toEqual([14, 70, -9]);
     expect(eagle.group.rotation.y).toBe(0.7);
     expect(eagle.group.rotation.z).toBe(-0.25);
-    expect(meshes.map((mesh) => mesh.geometry)).toEqual(geometries);
+    const flownGeometries: THREE.BufferGeometry[] = [];
+    eagle.group.traverse((object) => {
+      if (object instanceof THREE.Mesh) flownGeometries.push(object.geometry);
+    });
+    expect(flownGeometries).toHaveLength(geometries.length);
+    flownGeometries.forEach((geometry, index) => expect(geometry).toBe(geometries[index]));
   });
 });
