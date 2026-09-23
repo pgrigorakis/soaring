@@ -2,6 +2,8 @@
 
 A small ambient Three.js prototype. A modeled golden eagle flies itself over a deterministic, continuously streamed temperate wilderness. There are no objectives, scores, or online services.
 
+Play it at [pgrigorakis.github.io/soaring](https://pgrigorakis.github.io/soaring/).
+
 ## Run locally
 
 Requires Node.js 20 or newer and a current desktop Chrome, Edge, or Firefox.
@@ -39,6 +41,10 @@ npm run check        # unit tests and production type/build check
 ```
 
 The product reliability target is one uninterrupted hour without intervention or obvious repetition. The automated navigation test simulates one hour at 10 Hz. Browser validation is intentionally shorter and accelerated; it does not claim a literal one-hour browser soak.
+
+## Deployment
+
+`.github/workflows/deploy-pages.yml` validates pull requests without deploying them. A push to `main` runs the same unit, production build, and browser smoke checks, then deploys `dist` to GitHub Pages with the official Pages actions. The repository's Pages source must be set to GitHub Actions.
 
 ## Architecture
 
