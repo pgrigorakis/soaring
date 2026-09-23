@@ -3,13 +3,14 @@ import './style.css';
 import { Soundscape } from './audio';
 import { EagleNavigator, EagleView } from './eagle';
 import { CHUNK_SIZE, QUALITY, QualityName, TerrainStream } from './terrain';
+import { ThermalMarker } from './thermal-marker';
 import { WorldModel } from './world';
 
-type StoredSettings = { volume: number; muted: boolean; quality: QualityName; cameraDistance: number };
+type StoredSettings = { volume: number; muted: boolean; quality: QualityName; cameraDistance: number; showThermal: boolean };
 const SETTINGS_KEY = 'soaring.settings.v1';
 const SEED_KEY = 'soaring.world-seed.v1';
 const VISIT_KEY = 'soaring.scenic-visit.v1';
-const defaultSettings: StoredSettings = { volume: 0.52, muted: true, quality: 'medium', cameraDistance: 178 };
+const defaultSettings: StoredSettings = { volume: 0.52, muted: true, quality: 'medium', cameraDistance: 178, showThermal: true };
 
 function loadSettings(): StoredSettings {
   try {
@@ -19,6 +20,7 @@ function loadSettings(): StoredSettings {
       muted: typeof saved.muted === 'boolean' ? saved.muted : defaultSettings.muted,
       quality: saved.quality && saved.quality in QUALITY ? saved.quality : defaultSettings.quality,
       cameraDistance: Math.max(110, Math.min(270, saved.cameraDistance ?? defaultSettings.cameraDistance)),
+      showThermal: typeof saved.showThermal === 'boolean' ? saved.showThermal : defaultSettings.showThermal,
     };
   } catch {
     return { ...defaultSettings };
@@ -102,6 +104,7 @@ scene.add(sunDisc);
 
 scene.add(eagle.group);
 const terrain = new TerrainStream(scene, world, settings.quality);
+const thermalMarker = new ThermalMarker(scene, world);
 terrain.update(navigator.state.x, navigator.state.z, Infinity);
 
 let orbitYaw = 0;
@@ -144,6 +147,7 @@ app.insertAdjacentHTML('beforeend', `
       <label class="setting">Sound <button class="mute-button" id="mute" type="button">Muted</button></label>
       <label class="setting">Volume <output id="volume-value">${Math.round(settings.volume * 100)}%</output><input id="volume" type="range" min="0" max="1" step="0.01" value="${settings.volume}"></label>
       <label class="setting">Graphics <select id="quality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+      <label class="setting">Show thermal <input id="show-thermal" type="checkbox" ${settings.showThermal ? 'checked' : ''}></label>
       <label class="setting">Camera distance <output id="distance-value">${Math.round(settings.cameraDistance)} m</output><input id="distance" type="range" min="110" max="270" step="1" value="${settings.cameraDistance}"></label>
       <label class="setting"><button class="new-world" id="new-world" type="button">Generate a new world</button></label>
       <p class="audio-note">Sound starts muted. It is generated in your browser; no media is downloaded.</p>
@@ -160,6 +164,7 @@ const muteButton = document.querySelector<HTMLButtonElement>('#mute')!;
 const volumeInput = document.querySelector<HTMLInputElement>('#volume')!;
 const volumeValue = document.querySelector<HTMLOutputElement>('#volume-value')!;
 const qualityInput = document.querySelector<HTMLSelectElement>('#quality')!;
+const showThermalInput = document.querySelector<HTMLInputElement>('#show-thermal')!;
 const distanceInput = document.querySelector<HTMLInputElement>('#distance')!;
 const distanceValue = document.querySelector<HTMLOutputElement>('#distance-value')!;
 const diagnostics = document.querySelector<HTMLElement>('#diagnostics')!;
@@ -212,6 +217,11 @@ qualityInput.addEventListener('change', () => {
   updateFog();
   saveSettings();
 });
+showThermalInput.addEventListener('change', () => {
+  settings.showThermal = showThermalInput.checked;
+  thermalMarker.update(navigator.activeThermal, settings.showThermal, performance.now() / 1000);
+  saveSettings();
+});
 distanceInput.addEventListener('input', () => {
   settings.cameraDistance = Number(distanceInput.value);
   distanceValue.value = `${Math.round(settings.cameraDistance)} m`;
@@ -261,6 +271,7 @@ function frame(now: number): void {
   for (let step = 0; step < substeps; step += 1) state = navigator.update(delta / substeps);
   eagle.update(state, delta);
   terrain.update(state.x, state.z);
+  thermalMarker.update(navigator.activeThermal, settings.showThermal, now / 1000);
   soundscape.update(state.behavior);
 
   if (!dragging) {
@@ -319,12 +330,15 @@ window.addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-window.addEventListener('beforeunload', () => terrain.dispose());
+window.addEventListener('beforeunload', () => {
+  thermalMarker.dispose();
+  terrain.dispose();
+});
 
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { seed: number; chunks: number; behavior: string; position: number[]; geometries: number };
+      snapshot: () => { seed: number; chunks: number; behavior: string; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null };
       setTimeScale: (scale: number) => void;
     };
   }
@@ -336,6 +350,8 @@ window.__SOARING__ = {
     behavior: navigator.state.behavior,
     position: [navigator.state.x, navigator.state.y, navigator.state.z],
     geometries: renderer.info.memory.geometries,
+    activeThermal: navigator.activeThermal ? [navigator.activeThermal.x, navigator.activeThermal.z] : null,
+    marker: thermalMarker.mesh.visible ? [thermalMarker.mesh.position.x, thermalMarker.mesh.position.z] : null,
   }),
   setTimeScale: (scale: number) => { timeScale = Math.max(1, Math.min(12, scale)); },
 };

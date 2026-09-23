@@ -70,6 +70,7 @@ canvas.dragging { cursor: grabbing; }
   font: inherit;
 }
 .setting select option { color: #1d2927; }
+.setting input[type="checkbox"] { width: 18px; height: 18px; margin: 0; accent-color: #e9a44c; cursor: pointer; }
 .mute-button { cursor: pointer; min-width: 67px; }
 .new-world {
   width: 100%; margin-top: 9px; padding: 8px !important; cursor: pointer;

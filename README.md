@@ -19,7 +19,7 @@ Open `http://127.0.0.1:4173`. Production output is created with `npm run build`.
 
 - Drag on the landscape to orbit the camera. Release to let it return slowly to the trailing view.
 - Move the pointer to reveal the settings control.
-- Settings provide sound mute and volume, Low/Medium/High graphics, camera distance, and a new-world action.
+- Settings provide sound mute and volume, Low/Medium/High graphics, camera distance, a persistent Show thermal toggle, and a new-world action.
 - Press `D` to show or hide diagnostics.
 
 Sound is procedural and starts muted on every page load. If sound was previously enabled, it resumes only after the next pointer gesture; otherwise the mute preference remains. Settings and the world seed live in `localStorage`. A reload keeps the seed but increments a scenic-visit index, so it starts elsewhere in the same world.
@@ -51,6 +51,7 @@ The product reliability target is one uninterrupted hour without intervention or
 - `src/world.ts` is the pure seed-based world model. Global-coordinate layered noise creates gradual hills, mountain regions, valleys, lake basins, and a sparse connected river network whose valley width and depth scale with the surrounding land. It also scores terrain interest (relief, water, rock, forest edges), which drives scenic starts and the eagle's scenic targets, and owns deterministic thermal placement.
 - `src/terrain.ts` turns the world model into recyclable Three.js chunks. Missing chunks are queued nearest first and built two per frame to avoid stalls. Shared materials and instanced vegetation keep GPU use bounded; distant chunk geometry is disposed. Fog ends at the guaranteed loaded distance, so the terrain edge is never visible.
 - `src/eagle.ts` separates the explicit navigation state machine from the visual model. The eagle alternates scenic glides and panoramic flight, seeks deterministic thermals, circles to climb, and maintains terrain clearance.
+- `src/thermal-marker.ts` owns the reusable translucent marker for the eagle's active thermal.
 - `src/main.ts` owns rendering, camera input, lighting/haze, persistence, controls, diagnostics, and lifecycle wiring.
 - `src/audio.ts` creates wind and sparse adaptive music: short pentatonic phrases separated by long rests, with register, pacing, and contour following the eagle's behavior with the Web Audio API. It uses no downloaded media.
 
