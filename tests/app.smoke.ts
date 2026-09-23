@@ -1,9 +1,29 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-test('renders, streams, and exposes usable controls', async ({ page }) => {
+function captureErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('pageerror', (error) => errors.push(error.message));
+  return errors;
+}
+
+/** Boot with a supported quality preset via the app's real settings key. */
+async function seedQuality(page: Page, quality: 'low' | 'medium' | 'high'): Promise<void> {
+  await page.addInitScript((value) => {
+    localStorage.setItem('soaring.settings.v1', JSON.stringify({
+      volume: 0.52,
+      muted: true,
+      quality: value,
+      cameraDistance: 178,
+    }));
+  }, quality);
+}
+
+test('renders, streams, and supports camera controls', async ({ page }) => {
+  const errors = captureErrors(page);
+  // CI runners use software WebGL; low is the supported preset that keeps the
+  // main thread free enough for streaming + camera-drag within the test budget.
+  await seedQuality(page, 'low');
   await page.goto('/');
   await expect(page.locator('canvas')).toBeVisible();
   await page.keyboard.press('d');
@@ -24,6 +44,17 @@ test('renders, streams, and exposes usable controls', async ({ page }) => {
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.72, box.y + box.height * 0.42, { steps: 6 });
   await page.mouse.up();
+  expect(errors).toEqual([]);
+});
+
+test('keeps settings usable after ambient controls fade', async ({ page }) => {
+  const errors = captureErrors(page);
+  await page.goto('/');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('Canvas has no layout box');
+  await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.5);
 
   const controls = page.locator('#controls');
   await expect(controls).toHaveClass(/visible/);
