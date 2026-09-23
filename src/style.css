@@ -31,7 +31,7 @@ canvas.dragging { cursor: grabbing; }
   transition: opacity 900ms ease, transform 900ms ease;
   pointer-events: none;
 }
-.controls.visible, .controls:focus-within { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.controls.visible, .controls:hover, .controls:focus-within { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
 .settings-toggle {
   width: 38px;
@@ -44,6 +44,7 @@ canvas.dragging { cursor: grabbing; }
   box-shadow: 0 8px 30px rgba(11, 23, 24, .18);
   backdrop-filter: blur(12px);
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .settings-panel {
