@@ -7,8 +7,23 @@ function captureErrors(page: Page): string[] {
   return errors;
 }
 
+/** Boot with a supported quality preset via the app's real settings key. */
+async function seedQuality(page: Page, quality: 'low' | 'medium' | 'high'): Promise<void> {
+  await page.addInitScript((value) => {
+    localStorage.setItem('soaring.settings.v1', JSON.stringify({
+      volume: 0.52,
+      muted: true,
+      quality: value,
+      cameraDistance: 178,
+    }));
+  }, quality);
+}
+
 test('renders, streams, and supports camera controls', async ({ page }) => {
   const errors = captureErrors(page);
+  // CI runners use software WebGL; low is the supported preset that keeps the
+  // main thread free enough for streaming + camera-drag within the test budget.
+  await seedQuality(page, 'low');
   await page.goto('/');
   await expect(page.locator('canvas')).toBeVisible();
   await page.keyboard.press('d');
