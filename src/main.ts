@@ -131,7 +131,7 @@ function skyHorizonColor(): THREE.Color {
   renderer.readRenderTargetPixels(target, 0, 0, 1, 1, pixel);
   renderer.setRenderTarget(null);
   target.dispose();
-  return new THREE.Color().setRGB(pixel[0]! / 255, pixel[1]! / 255, pixel[2]! / 255, THREE.SRGBColorSpace);
+  return new THREE.Color().setRGB(pixel[0]! / 255, pixel[1]! / 255, pixel[2]! / 255, THREE.LinearSRGBColorSpace);
 }
 const fog = new THREE.Fog(skyHorizonColor(), MIN_VISIBILITY * 0.5, MIN_VISIBILITY);
 scene.fog = fog;
