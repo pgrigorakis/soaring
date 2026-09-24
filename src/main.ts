@@ -6,7 +6,7 @@ import { Soundscape } from './audio';
 import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS, normalizeFlightHeight } from './eagle';
 import { MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
 import { ThermalMarker } from './thermal-marker';
-import { WorldModel } from './world';
+import { SUN_OFFSET as SUN_VECTOR, WorldModel } from './world';
 
 type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
 const SETTINGS_KEY = 'soaring.settings.v1';
@@ -86,7 +86,7 @@ app.append(renderer.domElement);
 const hemisphere = new THREE.HemisphereLight(0xd9e6e1, 0x596448, 2.25);
 scene.add(hemisphere);
 // Fixed mid-afternoon sun; no time-of-day cycle. Shadows and the Sky/Lensflare below all share this direction.
-const SUN_OFFSET = new THREE.Vector3(-420, 190, -300);
+const SUN_OFFSET = new THREE.Vector3(SUN_VECTOR.x, SUN_VECTOR.y, SUN_VECTOR.z);
 const sunDirection = SUN_OFFSET.clone().normalize();
 const sun = new THREE.DirectionalLight(0xffe1ab, 3.6);
 sun.position.copy(SUN_OFFSET);
