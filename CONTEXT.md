@@ -1,0 +1,48 @@
+# Soaring
+
+Soaring is an autonomous ambient flight experience: an eagle explores a landscape and seeks thermals while the display provides a calm backdrop.
+
+## Language
+
+**Ambient flight experience**:
+A background experience in which the eagle flies autonomously; the viewer does not steer it.
+_Avoid_: Flight game, simulator (unless discussing a specific simulation feature)
+
+**Eagle**:
+The autonomous bird whose flight gives the experience its focus.
+_Avoid_: Player, avatar
+
+**Thermal**:
+A rising current of warm air that the eagle seeks and rides to gain height.
+_Avoid_: Updraft (when referring to the specific modeled flight feature)
+
+**Thermal-seeking**:
+The eagle's phase of flying toward a thermal.
+_Avoid_: Thermal-riding
+
+**Thermal-riding**:
+The eagle's phase of circling within a thermal, without flapping, to gain height. It ends when the eagle reaches maximum flight height or the thermal weakens.
+_Avoid_: Thermal-seeking
+
+**Flight height**:
+The eagle's height above the local terrain. The minimum is a soft floor: near it the eagle flaps to climb. The maximum caps climbing in a thermal.
+
+**Gliding**:
+Flight without flapping outside a thermal; the eagle trades height for distance and slowly sinks.
+_Avoid_: Soaring (unless in a thermal)
+
+**Flapping**:
+Short bursts of wing beats the eagle uses to climb outside a thermal. Never used while thermal-riding.
+
+**River**:
+Water that flows downhill from high ground. Tributaries join a larger river and never cross it.
+_Avoid_: Altitude (unless measured relative to a fixed sea-level datum)
+
+**Terrain visibility**:
+How far the landscape is visible around the eagle, independent of camera distance.
+_Avoid_: Camera distance, draw distance (when it could be confused with camera distance)
+Near the eagle, the landscape shows individual trees and shadows; far away, it shows simplified terrain only.
+
+**Ambience**:
+Environmental sounds such as wind and wing flaps, separate from music.
+_Avoid_: Music
