@@ -182,7 +182,6 @@ function terrainReach(): number {
   return settings.terrainVisibility / depthPerDistance(Math.min(camera.aspect, MAX_REACH_ASPECT));
 }
 const terrain = new TerrainStream(scene, world, terrainReach());
-terrain.setWaterLook(fog.color, sunDirection);
 const thermalMarker = new ThermalMarker(scene, world);
 terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, 49);
 
