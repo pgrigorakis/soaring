@@ -347,7 +347,7 @@ function frame(now: number): void {
   for (let step = 0; step < substeps; step += 1) state = navigator.update(delta / substeps);
   eagle.update(state, delta);
   thermalMarker.update(navigator.activeThermal, settings.showThermal, now / 1000);
-  soundscape.update(state.behavior);
+  soundscape.update(state.behavior, state.flapping);
 
   if (!dragging) {
     const returnRate = 1 - Math.exp(-rawDelta * 0.42);
@@ -390,7 +390,7 @@ function frame(now: number): void {
       `visibility   ${fog.far.toFixed(0)} / ${settings.terrainVisibility.toFixed(0)} m`,
       `draw calls   ${renderer.info.render.calls}`,
       `geometries   ${renderer.info.memory.geometries}`,
-      `behavior     ${state.behavior}`,
+      `behavior     ${state.behavior}${state.flapping ? ' (flapping)' : ''}`,
       `clearance    ${(state.y - world.sample(state.x, state.z).height).toFixed(0)} m`,
       `position     ${state.x.toFixed(0)}, ${state.z.toFixed(0)}`,
       `thermal      ${navigator.activeThermal ? `${navigator.activeThermal.x.toFixed(0)}, ${navigator.activeThermal.z.toFixed(0)}` : 'none selected'}`,

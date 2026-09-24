@@ -69,7 +69,7 @@ export class Soundscape {
     this.applyVolume();
   }
 
-  update(behavior: EagleBehavior): void {
+  update(behavior: EagleBehavior, flapping: boolean): void {
     if (!this.context || !this.music || this.muted) return;
     const now = this.context.currentTime;
     if (now >= this.nextBar - 0.08) {
@@ -78,7 +78,7 @@ export class Soundscape {
       this.nextBar = start + BAR;
       this.bar += 1;
     }
-    if (behavior !== 'seeking thermal') {
+    if (!flapping) {
       this.nextFlap = now;
     } else if (now >= this.nextFlap && this.wind?.buffer && this.ambience) {
       this.playFlap(now + 0.04);
@@ -95,13 +95,13 @@ export class Soundscape {
     for (const note of notes.slice(0, 3)) {
       this.playTone(frequency(note), start, BAR * 0.97, 0.095, 'triangle', 0.65);
     }
-    // Rising thermals lift the arpeggio; a panoramic cruise thins it out.
-    const lift = behavior === 'circling thermal' ? 24 : 12;
+    // Thermal-riding lifts the arpeggio an octave higher.
+    const lift = behavior === 'thermal-riding' ? 24 : 12;
     const order = ARPEGGIOS[Math.floor(Math.random() * ARPEGGIOS.length)]!;
-    for (let beat = 0; beat < order.length; beat += behavior === 'panoramic cruise' ? 2 : 1) {
-      this.playTone(frequency(notes[order[beat]!]! + lift), start + beat * BEAT, BEAT * 1.65, 0.13, 'sine', 0.045);
+    for (const beat of order) {
+      this.playTone(frequency(notes[beat]! + lift), start + beat * BEAT, BEAT * 1.65, 0.13, 'sine', 0.045);
     }
-    if (this.bar % 2 === 1 && behavior !== 'panoramic cruise') {
+    if (this.bar % 2 === 1) {
       const answer = notes[1 + Math.floor(Math.random() * 3)]!;
       this.playTone(frequency(answer + 12), start + BEAT * 3, BEAT * 2.3, 0.11, 'triangle', 0.12);
     }

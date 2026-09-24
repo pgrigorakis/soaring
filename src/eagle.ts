@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { hash2, Thermal, WorldModel } from './world';
 
-export type EagleBehavior = 'scenic glide' | 'seeking thermal' | 'circling thermal' | 'panoramic cruise';
+export type EagleBehavior = 'gliding' | 'thermal-seeking' | 'thermal-riding';
 
 export type EagleState = {
   x: number;
@@ -10,6 +10,7 @@ export type EagleState = {
   heading: number;
   bank: number;
   behavior: EagleBehavior;
+  flapping: boolean;
 };
 
 const wrapAngle = (angle: number): number => Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -18,6 +19,12 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 export type FlightHeightRange = { min: number; max: number };
 export const FLIGHT_HEIGHT_LIMITS = { min: 50, max: 240, gap: 20 } as const;
 export const DEFAULT_FLIGHT_HEIGHT: FlightHeightRange = { min: 65, max: 210 };
+
+export const GLIDE_SINK_RATE = 1; // m/s, per CONTEXT.md: Gliding
+export const FLAP_CLIMB_RATE = 4; // m/s while flapping
+const FLAP_BURST_SECONDS = 0.9; // a few wing beats, then glide again
+// ponytail: last-resort collision floor; normal flapping keeps clearance well above this.
+export const TERRAIN_SAFETY_MARGIN = 6;
 
 export function normalizeFlightHeight(min: number, max: number): FlightHeightRange {
   const safeMin = clamp(Number.isFinite(min) ? min : DEFAULT_FLIGHT_HEIGHT.min,
@@ -37,14 +44,14 @@ export class EagleNavigator {
   private target = { x: 0, z: 0 };
   private thermal: Thermal | null = null;
   private scenicIndex = 0;
-  private speed = 32;
+  private flapTimer = 0;
   private heightRange: FlightHeightRange;
 
   constructor(world: WorldModel, start: { x: number; z: number; heading: number }, heightRange = DEFAULT_FLIGHT_HEIGHT) {
     this.world = world;
     this.heightRange = normalizeFlightHeight(heightRange.min, heightRange.max);
     const ground = world.sample(start.x, start.z).height;
-    this.state = { x: start.x, y: ground + clamp(105, this.heightRange.min, this.heightRange.max), z: start.z, heading: start.heading, bank: 0, behavior: 'scenic glide' };
+    this.state = { x: start.x, y: ground + clamp(105, this.heightRange.min, this.heightRange.max), z: start.z, heading: start.heading, bank: 0, behavior: 'gliding', flapping: false };
     this.chooseScenicTarget();
   }
 
@@ -63,25 +70,32 @@ export class EagleNavigator {
     this.behaviorTime += dt;
     this.totalTime += dt;
     const ground = this.world.sample(this.state.x, this.state.z).height;
-    const altitude = this.state.y - ground;
 
-    if (this.state.behavior === 'circling thermal') {
-      this.updateCircle(dt, ground);
-    } else {
-      if (this.state.behavior === 'seeking thermal' && this.thermal) {
+    if (this.state.behavior !== 'thermal-riding') {
+      if (this.state.behavior === 'thermal-seeking' && this.thermal) {
         this.target.x = this.thermal.x;
         this.target.z = this.thermal.z;
         const distance = Math.hypot(this.state.x - this.thermal.x, this.state.z - this.thermal.z);
-        if (distance < 70) this.enter('circling thermal');
-        else if (this.behaviorTime > 42) this.enterScenic();
-      } else if (this.behaviorTime > (this.state.behavior === 'panoramic cruise' ? 22 : 34)) {
-        if (altitude < this.heightRange.min + (this.heightRange.max - this.heightRange.min) * 0.2 || hash2(Math.floor(this.totalTime / 20), this.scenicIndex, this.world.seed + 401) > 0.64) this.seekThermal();
-        else this.enter(this.state.behavior === 'scenic glide' ? 'panoramic cruise' : 'scenic glide');
+        if (distance < 70) this.enter('thermal-riding');
+        else if (this.behaviorTime > 42) this.enterGliding();
+      } else if (this.behaviorTime > 34) {
+        const altitude = this.state.y - ground;
+        const span = this.heightRange.max - this.heightRange.min;
+        if (altitude < this.heightRange.min + span * 0.2 || hash2(Math.floor(this.totalTime / 20), this.scenicIndex, this.world.seed + 401) > 0.64) this.seekThermal();
+        else this.behaviorTime = 0;
       }
+    }
+
+    // Re-check: the block above may have just switched behavior this frame.
+    if (this.state.behavior === 'thermal-riding') {
+      this.state.flapping = false;
+      this.updateCircle(dt, ground);
+    } else {
       this.flyTowardTarget(dt, ground);
     }
     const currentGround = this.world.sample(this.state.x, this.state.z).height;
-    this.state.y = currentGround + clamp(this.state.y - currentGround, this.heightRange.min, this.heightRange.max);
+    if (this.state.behavior === 'thermal-riding') this.state.y = Math.min(this.state.y, currentGround + this.heightRange.max);
+    this.state.y = Math.max(this.state.y, currentGround + TERRAIN_SAFETY_MARGIN);
     return this.state;
   }
 
@@ -91,24 +105,40 @@ export class EagleNavigator {
     const turnRate = clamp(headingError, -0.48, 0.48);
     this.state.heading = wrapAngle(this.state.heading + turnRate * dt);
     this.state.bank += (clamp(-headingError * 0.78, -0.48, 0.48) - this.state.bank) * Math.min(1, dt * 2.2);
-    this.speed += ((this.state.behavior === 'panoramic cruise' ? 38 : 31) - this.speed) * dt * 0.4;
-    this.state.x += Math.sin(this.state.heading) * this.speed * dt;
-    this.state.z += Math.cos(this.state.heading) * this.speed * dt;
+    const speed = 32;
+    this.state.x += Math.sin(this.state.heading) * speed * dt;
+    this.state.z += Math.cos(this.state.heading) * speed * dt;
 
     const lookAhead = this.world.sample(this.state.x + Math.sin(this.state.heading) * 105, this.state.z + Math.cos(this.state.heading) * 105).height;
-    const span = this.heightRange.max - this.heightRange.min;
-    const desiredClearance = this.heightRange.min + span * (this.state.behavior === 'panoramic cruise' ? 0.63 : 0.28);
-    const targetY = Math.max(ground, lookAhead) + desiredClearance + Math.sin(this.totalTime * 0.13) * Math.min(10, span * 0.08);
-    this.state.y += clamp(targetY - this.state.y, -7, 13) * dt * 0.34;
+    this.updateHeightEnergy(dt, ground, lookAhead);
 
-    if (this.state.behavior !== 'seeking thermal' && Math.hypot(this.target.x - this.state.x, this.target.z - this.state.z) < 150) {
+    if (this.state.behavior !== 'thermal-seeking' && Math.hypot(this.target.x - this.state.x, this.target.z - this.state.z) < 150) {
       this.chooseScenicTarget();
+    }
+  }
+
+  // Gliding sinks; a flap burst climbs when near the floor or terrain rises ahead.
+  private updateHeightEnergy(dt: number, ground: number, lookAheadGround: number): void {
+    const span = this.heightRange.max - this.heightRange.min;
+    const floorTrigger = this.heightRange.min + Math.max(10, span * 0.15);
+    const clearance = this.state.y - ground;
+    const aheadClearance = this.state.y - lookAheadGround;
+    if (!this.state.flapping && (clearance < floorTrigger || aheadClearance < floorTrigger)) {
+      this.state.flapping = true;
+      this.flapTimer = FLAP_BURST_SECONDS;
+    }
+    if (this.state.flapping) {
+      this.state.y += FLAP_CLIMB_RATE * dt;
+      this.flapTimer -= dt;
+      if (this.flapTimer <= 0) this.state.flapping = false;
+    } else {
+      this.state.y -= GLIDE_SINK_RATE * dt;
     }
   }
 
   private updateCircle(dt: number, ground: number): void {
     if (!this.thermal) {
-      this.enterScenic();
+      this.enterGliding();
       return;
     }
     const angle = Math.atan2(this.state.z - this.thermal.z, this.state.x - this.thermal.x) + dt * 0.34;
@@ -119,11 +149,12 @@ export class EagleNavigator {
     this.state.z += (desiredZ - this.state.z) * Math.min(1, dt * 2.3);
     this.state.heading = wrapAngle(-angle);
     this.state.bank += (-0.42 - this.state.bank) * Math.min(1, dt * 2);
-    this.state.y += this.thermal.strength * dt * 3.1;
-    if (this.behaviorTime > 19 || this.state.y - ground >= this.heightRange.max) {
+    this.state.y = Math.min(this.state.y + this.thermal.strength * dt * 3.1, ground + this.heightRange.max);
+    // Skip the max-height exit on the entry tick: gliding can arrive already at/above max over low ground,
+    // and this guarantees at least one visible thermal-riding tick before assessing it.
+    if (this.behaviorTime > 19 || (this.behaviorTime > 0 && this.state.y - ground >= this.heightRange.max)) {
       this.thermal = null;
-      this.enter('panoramic cruise');
-      this.chooseScenicTarget();
+      this.enterGliding();
     }
   }
 
@@ -141,16 +172,16 @@ export class EagleNavigator {
     });
     this.thermal = thermals[0] ?? null;
     if (!this.thermal) {
-      this.enterScenic();
+      this.enterGliding();
       return;
     }
     this.target = { x: this.thermal.x, z: this.thermal.z };
-    this.enter('seeking thermal');
+    this.enter('thermal-seeking');
   }
 
-  private enterScenic(): void {
+  private enterGliding(): void {
     this.thermal = null;
-    this.enter('scenic glide');
+    this.enter('gliding');
     this.chooseScenicTarget();
   }
 
@@ -331,7 +362,7 @@ export class EagleView {
     this.group.rotation.order = 'YXZ';
     this.group.rotation.y = state.heading;
     this.group.rotation.z = state.bank;
-    const flap = state.behavior === 'seeking thermal' ? Math.sin(this.time * 8) * 0.28 : Math.sin(this.time * 1.15) * 0.025;
+    const flap = state.flapping ? Math.sin(this.time * 8) * 0.28 : Math.sin(this.time * 1.15) * 0.025;
     this.leftWing.rotation.z = -flap;
     this.rightWing.rotation.z = flap;
   }
