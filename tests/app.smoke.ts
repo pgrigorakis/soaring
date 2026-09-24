@@ -107,6 +107,27 @@ test('visibility and camera distance persist independently; old settings migrate
 });
 
 
+test('settings stay scrollable within short desktop and mobile viewports', async ({ page }) => {
+  await page.goto('/?smoke');
+  await page.locator('#settings-toggle').click();
+  const panel = page.locator('#settings-panel');
+  expect(await panel.evaluate((element) => element.scrollHeight)).toBe(await panel.evaluate((element) => element.clientHeight));
+
+  for (const width of [800, 390]) {
+    await page.setViewportSize({ width, height: 430 });
+    const bounds = await panel.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(430);
+    expect(await panel.evaluate((element) => element.scrollHeight)).toBeGreaterThan(await panel.evaluate((element) => element.clientHeight));
+    await panel.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+    expect(await panel.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    const button = await page.locator('#new-world').boundingBox();
+    expect(button).not.toBeNull();
+    expect(button!.y).toBeGreaterThanOrEqual(0);
+    expect(button!.y + button!.height).toBeLessThanOrEqual(430);
+  }
+});
+
 test('migrates prior volume, saves independent controls, and preserves mute on reload', async ({ page }) => {
   const errors = captureErrors(page);
   await page.addInitScript(() => {
