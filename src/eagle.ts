@@ -25,6 +25,11 @@ export const FLAP_CLIMB_RATE = 4; // m/s while flapping
 const FLAP_BURST_SECONDS = 0.9; // a few wing beats, then glide again
 // ponytail: last-resort collision floor; normal flapping keeps clearance well above this.
 export const TERRAIN_SAFETY_MARGIN = 6;
+export const THERMAL_RADIUS_RANGE = { min: 30, max: 60 } as const;
+export const THERMAL_BANK_RANGE = { min: (20 * Math.PI) / 180, max: (35 * Math.PI) / 180 } as const;
+export const THERMAL_CLIMB_RANGE = { min: 1, max: 3 } as const;
+const THERMAL_CIRCLE_SPEED = 14; // m/s; with 30–60 m radius this yields a 20–35° bank
+const THERMAL_WEAK_LIFT = 0.18;
 
 export function normalizeFlightHeight(min: number, max: number): FlightHeightRange {
   const safeMin = clamp(Number.isFinite(min) ? min : DEFAULT_FLIGHT_HEIGHT.min,
@@ -46,6 +51,12 @@ export class EagleNavigator {
   private scenicIndex = 0;
   private flapTimer = 0;
   private heightRange: FlightHeightRange;
+  private circleAngle = 0;
+  private circleRadius = 45;
+  private targetRadius = 45;
+  private circleDrift = 0;
+  private rideLift = 1;
+  private thermalCore = { x: 0, z: 0 };
 
   constructor(world: WorldModel, start: { x: number; z: number; heading: number }, heightRange = DEFAULT_FLIGHT_HEIGHT) {
     this.world = world;
@@ -136,24 +147,56 @@ export class EagleNavigator {
     }
   }
 
+  private beginRide(): void {
+    if (!this.thermal) return;
+    this.thermalCore = { x: this.thermal.x, z: this.thermal.z };
+    this.circleAngle = Math.atan2(this.state.z - this.thermal.z, this.state.x - this.thermal.x);
+    const distance = Math.hypot(this.state.x - this.thermal.x, this.state.z - this.thermal.z);
+    this.circleRadius = clamp(distance, THERMAL_RADIUS_RANGE.min, THERMAL_RADIUS_RANGE.max);
+    this.targetRadius = THERMAL_RADIUS_RANGE.min + hash2(
+      Math.floor(this.thermal.x), Math.floor(this.thermal.z), this.world.seed + 503,
+    ) * (THERMAL_RADIUS_RANGE.max - THERMAL_RADIUS_RANGE.min);
+    this.circleDrift = 0;
+    this.rideLift = 1;
+  }
+
   private updateCircle(dt: number, ground: number): void {
     if (!this.thermal) {
       this.enterGliding();
       return;
     }
-    const angle = Math.atan2(this.state.z - this.thermal.z, this.state.x - this.thermal.x) + dt * 0.34;
-    const radius = 56;
-    const desiredX = this.thermal.x + Math.cos(angle) * radius;
-    const desiredZ = this.thermal.z + Math.sin(angle) * radius;
-    this.state.x += (desiredX - this.state.x) * Math.min(1, dt * 2.3);
-    this.state.z += (desiredZ - this.state.z) * Math.min(1, dt * 2.3);
-    this.state.heading = wrapAngle(-angle);
-    this.state.bank += (-0.42 - this.state.bank) * Math.min(1, dt * 2);
-    this.state.y = Math.min(this.state.y + this.thermal.strength * dt * 3.1, ground + this.heightRange.max);
-    // Skip the max-height exit on the entry tick: gliding can arrive already at/above max over low ground,
+    const strengthT = clamp((this.thermal.strength - 0.72) / 0.72, 0, 1);
+    const climbRate = (THERMAL_CLIMB_RANGE.min + (THERMAL_CLIMB_RANGE.max - THERMAL_CLIMB_RANGE.min) * strengthT) * this.rideLift;
+    this.rideLift = Math.max(0, this.rideLift - dt * (0.008 - 0.0055 * strengthT));
+
+    this.circleDrift += dt * 0.07;
+    const driftRadius = 6 + (1 - strengthT) * 4;
+    this.thermal.x = this.thermalCore.x + Math.cos(this.circleDrift) * driftRadius;
+    this.thermal.z = this.thermalCore.z + Math.sin(this.circleDrift) * driftRadius;
+
+    this.circleRadius += (this.targetRadius - this.circleRadius) * Math.min(1, dt * 0.35);
+    const radius = clamp(this.circleRadius + Math.sin(this.totalTime * 0.35) * 2.5, THERMAL_RADIUS_RANGE.min, THERMAL_RADIUS_RANGE.max);
+    this.circleAngle += dt * (THERMAL_CIRCLE_SPEED / radius);
+    const desiredX = this.thermal.x + Math.cos(this.circleAngle) * radius;
+    const desiredZ = this.thermal.z + Math.sin(this.circleAngle) * radius;
+    const follow = Math.min(1, dt * 1.6);
+    this.state.x += (desiredX - this.state.x) * follow;
+    this.state.z += (desiredZ - this.state.z) * follow;
+    const tangent = wrapAngle(-this.circleAngle);
+    this.state.heading = wrapAngle(this.state.heading + wrapAngle(tangent - this.state.heading) * Math.min(1, dt * 2.4));
+
+    const span = THERMAL_RADIUS_RANGE.max - THERMAL_RADIUS_RANGE.min;
+    const bankSpan = THERMAL_BANK_RANGE.max - THERMAL_BANK_RANGE.min;
+    const bankMag = THERMAL_BANK_RANGE.max - ((radius - THERMAL_RADIUS_RANGE.min) / span) * bankSpan
+      + Math.sin(this.totalTime * 0.5) * ((1.5 * Math.PI) / 180);
+    const targetBank = -clamp(bankMag, THERMAL_BANK_RANGE.min, THERMAL_BANK_RANGE.max);
+    this.state.bank += (targetBank - this.state.bank) * Math.min(1, dt * 1.4);
+
+    this.state.y = Math.min(this.state.y + climbRate * dt, ground + this.heightRange.max);
+    // Skip the max-height/weaken exit on the entry tick: gliding can arrive already at/above max over low ground,
     // and this guarantees at least one visible thermal-riding tick before assessing it.
-    if (this.behaviorTime > 19 || (this.behaviorTime > 0 && this.state.y - ground >= this.heightRange.max)) {
-      this.thermal = null;
+    const clearance = this.state.y - ground;
+    if (this.behaviorTime > 0 && (clearance >= this.heightRange.max || this.rideLift < THERMAL_WEAK_LIFT)) {
       this.enterGliding();
     }
   }
@@ -188,6 +231,7 @@ export class EagleNavigator {
   private enter(behavior: EagleBehavior): void {
     this.state.behavior = behavior;
     this.behaviorTime = 0;
+    if (behavior === 'thermal-riding') this.beginRide();
   }
 
   private chooseScenicTarget(): void {

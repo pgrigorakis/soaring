@@ -1,7 +1,8 @@
 import { Group } from 'three';
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, GLIDE_SINK_RATE, normalizeFlightHeight, TERRAIN_SAFETY_MARGIN,
+  DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, GLIDE_SINK_RATE, normalizeFlightHeight,
+  TERRAIN_SAFETY_MARGIN, THERMAL_BANK_RANGE, THERMAL_CLIMB_RANGE, THERMAL_RADIUS_RANGE,
 } from '../src/eagle';
 import { WorldModel } from '../src/world';
 
@@ -125,5 +126,99 @@ describe('autonomous eagle navigation', () => {
     state.flapping = false;
     view.update(state, 0.2);
     expect(Math.abs(wing!.rotation.z)).toBeLessThan(0.03);
+  });
+
+  it('circles a thermal with varying radius and bank, climbing without flapping',
+    () => {
+      const world = new WorldModel(448122);
+      const navigator = new EagleNavigator(world, world.scenicStart(2));
+      let riding = false;
+      const radii: number[] = [];
+      const banks: number[] = [];
+      let startY = 0;
+      let elapsed = 0;
+      let startThermalX = 0;
+      let startThermalZ = 0;
+      for (let step = 0; step < 36_000 && radii.length < 40; step += 1) {
+        const before = navigator.state.behavior;
+        const state = navigator.update(0.1);
+        if (before !== 'thermal-riding' && state.behavior === 'thermal-riding' && navigator.activeThermal) {
+          riding = true;
+          const ground = world.sample(state.x, state.z).height;
+          state.y = ground + DEFAULT_FLIGHT_HEIGHT.min + 40;
+          startY = state.y;
+          startThermalX = navigator.activeThermal.x;
+          startThermalZ = navigator.activeThermal.z;
+          elapsed = 0;
+          radii.length = 0;
+          banks.length = 0;
+          continue;
+        }
+        if (riding && (state.behavior !== 'thermal-riding' || !navigator.activeThermal)) {
+          riding = false;
+          continue;
+        }
+        if (!riding || !navigator.activeThermal) continue;
+        elapsed += 0.1;
+        if (elapsed < 2) continue; // settle after entry
+        expect(state.flapping).toBe(false);
+        const radius = Math.hypot(state.x - navigator.activeThermal.x, state.z - navigator.activeThermal.z);
+        radii.push(radius);
+        banks.push(Math.abs(state.bank));
+        expect(Math.abs(state.bank)).toBeGreaterThanOrEqual(THERMAL_BANK_RANGE.min - 0.02);
+        expect(Math.abs(state.bank)).toBeLessThanOrEqual(THERMAL_BANK_RANGE.max + 0.02);
+        expect(radius).toBeGreaterThan(THERMAL_RADIUS_RANGE.min - 12);
+        expect(radius).toBeLessThan(THERMAL_RADIUS_RANGE.max + 12);
+      }
+      expect(radii.length).toBeGreaterThan(20);
+      expect(Math.max(...radii) - Math.min(...radii)).toBeGreaterThan(0.4);
+      expect(Math.max(...banks) - Math.min(...banks)).toBeGreaterThan(0.01);
+      const climbRate = (navigator.state.y - startY) / elapsed;
+      expect(climbRate).toBeGreaterThanOrEqual(THERMAL_CLIMB_RANGE.min * 0.4);
+      expect(climbRate).toBeLessThanOrEqual(THERMAL_CLIMB_RANGE.max + 0.05);
+      const thermal = navigator.activeThermal;
+      expect(thermal).not.toBeNull();
+      expect(Math.hypot(thermal!.x - startThermalX, thermal!.z - startThermalZ)).toBeGreaterThan(0.05);
+    });
+
+  it('keeps thermal-riding past 19 s when below maximum flight height', () => {
+    const world = new WorldModel(448122);
+    const navigator = new EagleNavigator(world, world.scenicStart(2));
+    let riding = false;
+    let held = 0;
+    for (let step = 0; step < 36_000 && held < 20; step += 1) {
+      const before = navigator.state.behavior;
+      const state = navigator.update(0.1);
+      if (before !== 'thermal-riding' && state.behavior === 'thermal-riding') {
+        riding = true;
+        const ground = world.sample(state.x, state.z).height;
+        state.y = ground + DEFAULT_FLIGHT_HEIGHT.min + 20;
+        held = 0;
+        continue;
+      }
+      if (riding && state.behavior === 'thermal-riding') held += 0.1;
+      else if (riding) break;
+    }
+    expect(held).toBeGreaterThan(19);
+  });
+
+  it('leaves thermal-riding at maximum flight height without a fixed timer', () => {
+    const world = new WorldModel(448122);
+    const navigator = new EagleNavigator(world, world.scenicStart(2));
+    let exitedAtMax = false;
+    for (let step = 0; step < 36_000; step += 1) {
+      const before = navigator.state.behavior;
+      const beforeY = navigator.state.y;
+      const beforeX = navigator.state.x;
+      const beforeZ = navigator.state.z;
+      const state = navigator.update(0.1);
+      if (before !== 'thermal-riding' || state.behavior === 'thermal-riding') continue;
+      const ground = world.sample(beforeX, beforeZ).height;
+      if (beforeY - ground >= DEFAULT_FLIGHT_HEIGHT.max - 0.05) {
+        exitedAtMax = true;
+        break;
+      }
+    }
+    expect(exitedAtMax).toBe(true);
   });
 });
