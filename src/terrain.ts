@@ -22,6 +22,8 @@ export class TerrainStream {
   private pending: Pending[] = [];
 
   private readonly terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0 });
+  // Fades the shadow to fully lit near the fixed shadow camera's edge, in place of a hard cutoff.
+  private readonly shadowFadeRange = { value: new THREE.Vector2(500, 600) };
   private readonly waterMaterial = new THREE.MeshStandardMaterial({
     color: 0x477d8b,
     roughness: 0.38,
@@ -54,6 +56,26 @@ export class TerrainStream {
     this.scene = scene;
     this.world = world;
     this.reach = reach;
+    this.terrainMaterial.onBeforeCompile = (shader) => {
+      shader.uniforms.shadowFadeRange = this.shadowFadeRange;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <shadowmap_pars_fragment>',
+        `${THREE.ShaderChunk.shadowmap_pars_fragment.replace('float getShadow(', 'float getShadowUnfaded(')}
+#ifdef USE_SHADOWMAP
+uniform vec2 shadowFadeRange;
+float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity, float shadowBias, float shadowRadius, vec4 shadowCoord ) {
+  float raw = getShadowUnfaded( shadowMap, shadowMapSize, shadowIntensity, shadowBias, shadowRadius, shadowCoord );
+  float fade = 1.0 - smoothstep( shadowFadeRange.x, shadowFadeRange.y, length( vViewPosition ) );
+  return mix( 1.0, raw, fade );
+}
+#endif`,
+      );
+    };
+  }
+
+  // Distance (from the camera) at which the fixed-range shadow starts, and finishes, fading to fully lit.
+  setShadowFadeRange(inner: number, outer: number): void {
+    this.shadowFadeRange.value.set(inner, outer);
   }
 
   get chunkCount(): number {
