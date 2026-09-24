@@ -137,7 +137,6 @@ let pointerX = 0;
 let pointerY = 0;
 const cameraPosition = new THREE.Vector3(navigator.state.x, navigator.state.y + 70, navigator.state.z - settings.cameraDistance);
 const lookAt = new THREE.Vector3();
-const shadowCenter = new THREE.Vector3();
 
 renderer.domElement.addEventListener('pointerdown', (event) => {
   dragging = true;
@@ -257,7 +256,6 @@ visibilityInput.addEventListener('input', () => {
   settings.terrainVisibility = Number(visibilityInput.value);
   visibilityValue.value = `${Math.round(settings.terrainVisibility)} m`;
   terrain.setReach(terrainReach());
-  updateShadowArea();
   saveSettings();
 });
 showThermalInput.addEventListener('change', () => {
@@ -301,22 +299,31 @@ function updateFog(): void {
   fog.far = Math.min(settings.terrainVisibility, coveredDepth);
   fog.near = fog.far * 0.5;
 }
-// Use selected visibility so streaming does not resize the shadow area each frame.
-// Longer distances use a larger map to keep texels at or below about 1.8 m.
-function updateShadowArea(): void {
-  const extent = settings.terrainVisibility;
-  const size = Math.min(extent > 1800 ? 4096 : 2048, renderer.capabilities.maxTextureSize);
-  if (sun.shadow.mapSize.x !== size) {
-    sun.shadow.map?.dispose();
-    sun.shadow.map = null;
-    sun.shadow.mapSize.set(size, size);
-  }
-  sun.shadow.camera.left = sun.shadow.camera.bottom = -extent;
-  sun.shadow.camera.right = sun.shadow.camera.top = extent;
-  sun.shadow.camera.far = (extent + 300) * 2;
-  sun.shadow.camera.updateProjectionMatrix();
+// A fixed range around the camera, independent of terrain visibility, keeps the shadow camera's
+// size (and so its texel size) constant, which is required for the texel snapping below.
+const SHADOW_EXTENT = 600;
+const SHADOW_MAP_SIZE = Math.min(2048, renderer.capabilities.maxTextureSize);
+const SHADOW_TEXEL_SIZE = (SHADOW_EXTENT * 2) / SHADOW_MAP_SIZE;
+sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+sun.shadow.camera.left = sun.shadow.camera.bottom = -SHADOW_EXTENT;
+sun.shadow.camera.right = sun.shadow.camera.top = SHADOW_EXTENT;
+sun.shadow.camera.far = (SHADOW_EXTENT + 300) * 2;
+sun.shadow.camera.updateProjectionMatrix();
+terrain.setShadowFadeRange(SHADOW_EXTENT * 0.7, SHADOW_EXTENT * 0.95);
+
+// The shadow camera's basis (its right/up axes) is constant because the sun always sits at a
+// fixed offset direction from its target. Precomputing it lets the snap below stay a dot product.
+const shadowBasis = new THREE.Matrix4().lookAt(SUN_OFFSET, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
+const shadowRight = new THREE.Vector3().setFromMatrixColumn(shadowBasis, 0);
+const shadowUp = new THREE.Vector3().setFromMatrixColumn(shadowBasis, 1);
+// Snaps a world point to the shadow map's texel grid so the shadow only moves in whole-texel
+// steps, which stops the sub-pixel shimmer of a smoothly following shadow camera.
+function snapToShadowGrid(point: THREE.Vector3): void {
+  const right = point.dot(shadowRight);
+  const up = point.dot(shadowUp);
+  point.addScaledVector(shadowRight, Math.round(right / SHADOW_TEXEL_SIZE) * SHADOW_TEXEL_SIZE - right);
+  point.addScaledVector(shadowUp, Math.round(up / SHADOW_TEXEL_SIZE) * SHADOW_TEXEL_SIZE - up);
 }
-updateShadowArea();
 
 let diagnosticsVisible = false;
 window.addEventListener('keydown', (event) => {
@@ -364,9 +371,9 @@ function frame(now: number): void {
 
   sky.position.set(state.x, state.y - 40, state.z);
   sunDisc.position.copy(SUN_OFFSET).setLength(700).add(eagle.group.position);
-  camera.getWorldDirection(shadowCenter).setY(0).setLength(settings.terrainVisibility * 0.5).add(camera.position);
-  sun.target.position.set(shadowCenter.x, world.sample(shadowCenter.x, shadowCenter.z).height, shadowCenter.z);
-  sun.position.copy(SUN_OFFSET).setLength(settings.terrainVisibility + 300).add(sun.target.position);
+  sun.target.position.set(camera.position.x, world.sample(camera.position.x, camera.position.z).height, camera.position.z);
+  snapToShadowGrid(sun.target.position);
+  sun.position.copy(SUN_OFFSET).setLength(SHADOW_EXTENT + 300).add(sun.target.position);
   sun.target.updateMatrixWorld();
 
   renderer.render(scene, camera);
