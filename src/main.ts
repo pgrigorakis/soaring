@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
+import { Sky } from 'three/addons/objects/Sky.js';
 import './style.css';
 import { Soundscape } from './audio';
 import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS, normalizeFlightHeight } from './eagle';
@@ -65,11 +67,7 @@ soundscape.setMusicVolume(settings.musicVolume);
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('Missing application root');
 
-const HORIZON_COLOR = 0xd8d4b3;
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(HORIZON_COLOR);
-const fog = new THREE.Fog(HORIZON_COLOR, MIN_VISIBILITY * 0.5, MIN_VISIBILITY);
-scene.fog = fog;
 
 // Only the development smoke harness uses a smaller software-WebGL render budget.
 const smokeMode = import.meta.env.DEV && new URLSearchParams(location.search).has('smoke');
@@ -87,7 +85,9 @@ app.append(renderer.domElement);
 
 const hemisphere = new THREE.HemisphereLight(0xd9e6e1, 0x596448, 2.25);
 scene.add(hemisphere);
+// Fixed mid-afternoon sun; no time-of-day cycle. Shadows and the Sky/Lensflare below all share this direction.
 const SUN_OFFSET = new THREE.Vector3(-420, 190, -300);
+const sunDirection = SUN_OFFSET.clone().normalize();
 const sun = new THREE.DirectionalLight(0xffe1ab, 3.6);
 sun.position.copy(SUN_OFFSET);
 sun.castShadow = !smokeMode;
@@ -96,23 +96,63 @@ sun.shadow.bias = -0.0005;
 sun.shadow.normalBias = 0.8;
 scene.add(sun, sun.target);
 
-const skyGeometry = new THREE.SphereGeometry(820, 20, 12);
-const skyMaterial = new THREE.ShaderMaterial({
-  side: THREE.BackSide,
-  depthWrite: false,
-  fog: false,
-  uniforms: {
-    topColor: { value: new THREE.Color(0x6f9fb2) },
-    horizonColor: { value: new THREE.Color(HORIZON_COLOR) },
-  },
-  vertexShader: 'varying float vHeight; void main(){ vHeight = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: 'uniform vec3 topColor; uniform vec3 horizonColor; varying float vHeight; void main(){ float h = smoothstep(-0.12, 0.74, vHeight); gl_FragColor = vec4(mix(horizonColor, topColor, h), 1.0); \n#include <colorspace_fragment>\n}',
-});
-const sky = new THREE.Mesh(skyGeometry, skyMaterial);
-sky.renderOrder = -1;
+const sky = new Sky();
+sky.scale.setScalar(450000);
+sky.material.uniforms.sunPosition!.value.copy(sunDirection);
+sky.material.uniforms.turbidity!.value = 2;
+sky.material.uniforms.rayleigh!.value = 1.5;
+sky.material.uniforms.mieCoefficient!.value = 0.004;
+sky.material.uniforms.mieDirectionalG!.value = 0.8;
+// The Preetham model's near-horizon radiance saturates well above 1.0 regardless of the uniforms
+// above (it is driven by a fixed sun-intensity constant baked into the shader), which clips the
+// horizon band to flat white under the renderer's normal tone-mapping exposure. Scale the sky's
+// own linear output before tone mapping so it stays a gradient instead of a flat clip - independent
+// of scene.toneMappingExposure, which stays tuned for the terrain.
+sky.material.uniforms.skyExposure = { value: 0.45 };
+sky.material.fragmentShader = sky.material.fragmentShader
+  .replace('uniform float mieDirectionalG;', 'uniform float mieDirectionalG;\nuniform float skyExposure;')
+  .replace(
+    'vec3 retColor = pow( texColor, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) );',
+    'vec3 retColor = pow( texColor, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) ) * skyExposure;',
+  );
 scene.add(sky);
-const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(18, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffe5a8, fog: false }));
-scene.add(sunDisc);
+
+// Sample the sky shader itself near the horizon so fog/haze reads as the same blue-grey, not a fixed beige.
+function skyHorizonColor(): THREE.Color {
+  const probe = new THREE.Mesh(sky.geometry, sky.material);
+  const probeScene = new THREE.Scene();
+  probeScene.add(probe);
+  const probeCamera = new THREE.PerspectiveCamera(1, 1, 0.1, 10);
+  probeCamera.lookAt(0.35, 0.05, -0.9);
+  const target = new THREE.WebGLRenderTarget(1, 1);
+  renderer.setRenderTarget(target);
+  renderer.render(probeScene, probeCamera);
+  const pixel = new Uint8Array(4);
+  renderer.readRenderTargetPixels(target, 0, 0, 1, 1, pixel);
+  renderer.setRenderTarget(null);
+  target.dispose();
+  return new THREE.Color().setRGB(pixel[0]! / 255, pixel[1]! / 255, pixel[2]! / 255, THREE.SRGBColorSpace);
+}
+const fog = new THREE.Fog(skyHorizonColor(), MIN_VISIBILITY * 0.5, MIN_VISIBILITY);
+scene.fog = fog;
+
+// Small procedural flare textures - no bundled image assets needed.
+function flareTexture(size: number, stops: [number, string][]): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  for (const [offset, color] of stops) gradient.addColorStop(offset, color);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(canvas);
+}
+const flareGlow = flareTexture(256, [[0, 'rgba(255,246,222,0.85)'], [0.4, 'rgba(255,228,180,0.3)'], [1, 'rgba(255,228,180,0)']]);
+const flareRing = flareTexture(128, [[0, 'rgba(210,225,255,0)'], [0.55, 'rgba(210,225,255,0.14)'], [0.75, 'rgba(210,225,255,0)'], [1, 'rgba(210,225,255,0)']]);
+const lensflare = new Lensflare();
+lensflare.addElement(new LensflareElement(flareGlow, 220, 0));
+lensflare.addElement(new LensflareElement(flareRing, 60, 0.6));
+sun.add(lensflare);
 
 scene.add(eagle.group);
 // Fog uses view depth, not distance. A point at horizontal distance d can have a depth as small
@@ -369,8 +409,6 @@ function frame(now: number): void {
   terrain.update(cameraPosition.x, cameraPosition.z);
   updateFog();
 
-  sky.position.set(state.x, state.y - 40, state.z);
-  sunDisc.position.copy(SUN_OFFSET).setLength(700).add(eagle.group.position);
   sun.target.position.set(camera.position.x, world.sample(camera.position.x, camera.position.z).height, camera.position.z);
   snapToShadowGrid(sun.target.position);
   sun.position.copy(SUN_OFFSET).setLength(SHADOW_EXTENT + 300).add(sun.target.position);
