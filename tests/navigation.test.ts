@@ -1,3 +1,4 @@
+import { Group } from 'three';
 import { describe, expect, it } from 'vitest';
 import { EagleNavigator, EagleView, normalizeFlightHeight } from '../src/eagle';
 import { WorldModel } from '../src/world';
@@ -79,12 +80,13 @@ describe('autonomous eagle navigation', () => {
     const view = new EagleView();
     const world = new WorldModel(448122);
     const state = new EagleNavigator(world, world.scenicStart(2)).state;
-    const wing = view.group.children[4]!;
+    const wing = view.group.children.find((child) => child instanceof Group && child.position.x < 0);
+    expect(wing).toBeDefined();
     state.behavior = 'seeking thermal';
     view.update(state, 0.2);
-    expect(Math.abs(wing.rotation.z)).toBeGreaterThan(0.1);
+    expect(Math.abs(wing!.rotation.z)).toBeGreaterThan(0.1);
     state.behavior = 'circling thermal';
     view.update(state, 0.2);
-    expect(Math.abs(wing.rotation.z)).toBeLessThan(0.03);
+    expect(Math.abs(wing!.rotation.z)).toBeLessThan(0.03);
   });
 });
