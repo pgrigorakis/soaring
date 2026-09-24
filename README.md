@@ -26,7 +26,7 @@ Sound is procedural and starts muted on every page load. If sound was previously
 
 ## Terrain visibility
 
-High graphics are the standard presentation. The terrain visibility slider ranges from 720 m to 3,600 m (five times the original default), independently of camera distance. Haze reaches only loaded terrain, even while new tiles stream in. Terrain loading is capped at the reach needed for a 16:9 window; wider windows can show a shorter haze distance than the selected value. Nearby terrain has detailed meshes, trees, and rocks; distant terrain uses simpler meshes and trees at the same positions. A low afternoon sun casts shadows from terrain and trees, within a fixed 600 m range around the camera that fades out near its edge. Old High-preset settings start at 1,080 m; other old presets start at 720 m.
+High graphics are the standard presentation. The terrain visibility slider ranges from 720 m to 3,600 m (five times the original default), independently of camera distance. Haze reaches only loaded terrain, even while new tiles stream in. Terrain loading is capped at the reach needed for a 16:9 window; wider windows can show a shorter haze distance than the selected value. Nearby terrain has detailed meshes, trees, and rocks; distant terrain uses simpler meshes and trees at the same positions. A fixed mid-afternoon sun (three.js `Sky` addon, physical Preetham model) casts shadows from terrain and trees, within a fixed 600 m range around the camera that fades out near its edge. Fog/haze color is sampled from the sky near the horizon rather than fixed, and a subtle `Lensflare` tracks the sun when it is on screen and unoccluded by terrain. Old High-preset settings start at 1,080 m; other old presets start at 720 m.
 
 ## Diagnostics and validation
 
