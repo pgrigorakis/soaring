@@ -106,7 +106,6 @@ test('visibility and camera distance persist independently; old settings migrate
   expect(errors).toEqual([]);
 });
 
-
 test('settings stay scrollable within short desktop and mobile viewports', async ({ page }) => {
   await page.goto('/?smoke');
   await page.locator('#settings-toggle').click();
