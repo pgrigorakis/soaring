@@ -24,12 +24,19 @@ export class TerrainStream {
   private readonly terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0 });
   // Fades the shadow to fully lit near the fixed shadow camera's edge, in place of a hard cutoff.
   private readonly shadowFadeRange = { value: new THREE.Vector2() };
-  private readonly waterMaterial = new THREE.MeshStandardMaterial({
-    color: 0x477d8b,
-    roughness: 0.38,
-    metalness: 0.05,
+  private readonly waterSkyColor = { value: new THREE.Color(0x9bb4c8) };
+  private readonly waterSunDirection = { value: new THREE.Vector3(-0.78, 0.35, -0.56).normalize() };
+  private readonly lakeColor = new THREE.Color(0x0d2b4e);
+  private readonly riverColor = new THREE.Color(0x1c3f66);
+  // One material for lakes and rivers; vertex color makes rivers a little lighter (shallower).
+  private readonly waterMaterial = new THREE.MeshPhysicalMaterial({
+    vertexColors: true,
+    roughness: 0.22,
+    metalness: 0,
+    ior: 1.333,
+    specularIntensity: 0.9,
     transparent: true,
-    opacity: 0.78,
+    opacity: 0.88,
     side: THREE.DoubleSide,
     depthWrite: false,
   });
@@ -71,6 +78,30 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
 #endif`,
       );
     };
+    this.waterMaterial.onBeforeCompile = (shader) => {
+      shader.uniforms.waterSkyColor = this.waterSkyColor;
+      shader.uniforms.waterSunDirection = this.waterSunDirection;
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>
+uniform vec3 waterSkyColor;
+uniform vec3 waterSunDirection;`)
+        .replace(
+          '#include <opaque_fragment>',
+          `vec3 viewDir = normalize( vViewPosition );
+float fresnel = pow( 1.0 - saturate( dot( normal, viewDir ) ), 5.0 );
+outgoingLight = mix( outgoingLight, waterSkyColor, fresnel * 0.32 );
+vec3 sunView = normalize( ( viewMatrix * vec4( waterSunDirection, 0.0 ) ).xyz );
+float glint = pow( saturate( dot( normal, normalize( sunView + viewDir ) ) ), 220.0 );
+outgoingLight += vec3( 1.0, 0.95, 0.86 ) * glint * 0.28;
+#include <opaque_fragment>`,
+        );
+    };
+  }
+
+  // Sky-horizon color and sun direction so water fresnel and glint match the Sky addon.
+  setWaterLook(skyColor: THREE.Color, sunDirection: THREE.Vector3): void {
+    this.waterSkyColor.value.copy(skyColor);
+    this.waterSunDirection.value.copy(sunDirection).normalize();
   }
 
   // Distance (from the camera) at which the fixed-range shadow starts, and finishes, fading to fully lit.
@@ -194,6 +225,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     const sampleAt = (xIndex: number, zIndex: number) => samples[(zIndex + 1) * row + xIndex + 1]!;
     const heightAt = (xIndex: number, zIndex: number) => sampleAt(xIndex, zIndex).height;
     const water: boolean[] = [];
+    const river: boolean[] = [];
 
     for (let zIndex = 0; zIndex <= segments; zIndex += 1) {
       for (let xIndex = 0; xIndex <= segments; xIndex += 1) {
@@ -201,6 +233,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         const z = originZ + zIndex * step;
         const sample = sampleAt(xIndex, zIndex);
         water.push(sample.water);
+        river.push(sample.river);
         positions.push(x, sample.height, z);
         normal.set(
           heightAt(xIndex - 1, zIndex) - heightAt(xIndex + 1, zIndex),
@@ -208,7 +241,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
           heightAt(xIndex, zIndex - 1) - heightAt(xIndex, zIndex + 1),
         ).normalize();
         normals.push(normal.x, normal.y, normal.z);
-        if (sample.water) color.set(0x586957);
+        if (sample.water) color.set(0x0a1f38);
         else if (sample.rock > 0.67) color.set(0x77766c).lerp(new THREE.Color(0x8a8374), sample.rock - 0.67);
         else if (sample.forest > 0.55) color.set(0x456345);
         else color.set(0x718258).lerp(new THREE.Color(0x8c925f), 1 - sample.moisture);
@@ -260,7 +293,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     terrain.castShadow = true;
     group.add(terrain);
 
-    const waterGeometry = this.createWaterGeometry(originX, originZ, segments, water);
+    const waterGeometry = this.createWaterGeometry(originX, originZ, segments, water, river);
     if (waterGeometry) group.add(new THREE.Mesh(waterGeometry, this.waterMaterial));
 
     const treeObjects = detailed ? this.createTrees(originX, originZ, TREE_SPACING) : this.createFarTrees(originX, originZ);
@@ -281,11 +314,14 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     };
   }
 
-  private createWaterGeometry(originX: number, originZ: number, segments: number, water: boolean[]): THREE.BufferGeometry | null {
+  private createWaterGeometry(originX: number, originZ: number, segments: number, water: boolean[], river: boolean[]): THREE.BufferGeometry | null {
     const step = CHUNK_SIZE / segments;
     const y = this.world.waterLevel + 0.15;
     const positions: number[] = [];
+    const colors: number[] = [];
     const indices: number[] = [];
+    const tint = (index: number, target: THREE.Color) => target.copy(river[index] ? this.riverColor : this.lakeColor);
+    const corner = new THREE.Color();
     for (let iz = 0; iz < segments; iz += 1) {
       for (let ix = 0; ix < segments; ix += 1) {
         const a = iz * (segments + 1) + ix;
@@ -294,12 +330,17 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         const z = originZ + iz * step;
         const base = positions.length / 3;
         positions.push(x, y, z, x + step, y, z, x, y, z + step, x + step, y, z + step);
+        for (const index of [a, a + 1, a + segments + 1, a + segments + 2]) {
+          tint(index, corner);
+          colors.push(corner.r, corner.g, corner.b);
+        }
         indices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
       }
     }
     if (positions.length === 0) return null;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     return geometry;
