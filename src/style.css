@@ -78,7 +78,7 @@ canvas.dragging { cursor: grabbing; }
   width: 100%; margin-top: 9px; padding: 8px !important; cursor: pointer;
   letter-spacing: .04em;
 }
-.audio-note { margin: 9px 0 0; color: rgba(255,255,255,.58); font-size: 10px; line-height: 1.4; }
+.audio-note, .height-note { margin: 9px 0 0; color: rgba(255,255,255,.58); font-size: 10px; line-height: 1.4; }
 
 .diagnostics {
   position: fixed;
