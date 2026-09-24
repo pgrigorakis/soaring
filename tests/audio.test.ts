@@ -70,7 +70,7 @@ test('ambience (wind and flaps) and music each have an independent output level 
   expect(await sound.setMuted(false)).toBe(true);
   const context = BrowserAudio.instances[0]!;
   context.currentTime = 4;
-  sound.update('seeking thermal');
+  sound.update('thermal-seeking', true);
   const wind = context.sources.find((source) => source.loop)!;
   const flap = context.sources.find((source) => source.buffer && !source.loop)!;
   const music = context.sources.find((source) => !source.buffer)!;
@@ -96,7 +96,7 @@ test('ambience (wind and flaps) and music each have an independent output level 
   expect(outputLevel(wind)).toBeGreaterThan(0);
 });
 
-test('flaps sound only while seeking a thermal, including after a glide', async () => {
+test('flaps sound only while actually flapping, including after a glide', async () => {
   vi.stubGlobal('AudioContext', BrowserAudio);
   const sound = new Soundscape();
   await sound.setMuted(false);
@@ -104,31 +104,31 @@ test('flaps sound only while seeking a thermal, including after a glide', async 
   const flapCount = () => context.sources.filter((source) => source.buffer && !source.loop).length;
 
   context.currentTime = 4;
-  sound.update('circling thermal');
+  sound.update('thermal-riding', false);
   context.currentTime = 7;
-  sound.update('circling thermal');
+  sound.update('thermal-riding', false);
   expect(flapCount()).toBe(0);
 
   context.currentTime = 7.1;
-  sound.update('seeking thermal');
+  sound.update('gliding', true);
   expect(flapCount()).toBe(1);
   context.currentTime = 7.5;
-  sound.update('seeking thermal');
+  sound.update('gliding', true);
   expect(flapCount()).toBe(1);
   context.currentTime = 8;
-  sound.update('seeking thermal');
+  sound.update('gliding', true);
   expect(flapCount()).toBe(2);
 
   context.currentTime = 11;
-  sound.update('circling thermal');
+  sound.update('gliding', false);
   context.currentTime = 14;
-  sound.update('circling thermal');
+  sound.update('gliding', false);
   context.currentTime = 17;
-  sound.update('scenic glide');
+  sound.update('gliding', false);
   expect(flapCount()).toBe(2);
 
   context.currentTime = 17.1;
-  sound.update('seeking thermal');
+  sound.update('thermal-seeking', true);
   expect(flapCount()).toBe(3);
 });
 
@@ -163,7 +163,7 @@ test('the musical bed stays in D major but does not settle into a fixed loop', a
   for (let bar = 0; bar < 96; bar += 1) {
     const before = context.sources.length;
     context.currentTime = 1 + bar * 2.52;
-    sound.update(bar % 3 ? 'scenic glide' : 'circling thermal');
+    sound.update(bar % 3 ? 'gliding' : 'thermal-riding', false);
     const notes = context.sources.slice(before).filter((source) => !source.buffer)
       .map((source) => Math.round(69 + 12 * Math.log2(source.frequency.value / 440)));
     expect(notes.length).toBeGreaterThan(0);

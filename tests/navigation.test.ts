@@ -1,6 +1,8 @@
 import { Group } from 'three';
 import { describe, expect, it } from 'vitest';
-import { EagleNavigator, EagleView, normalizeFlightHeight } from '../src/eagle';
+import {
+  DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, GLIDE_SINK_RATE, normalizeFlightHeight, TERRAIN_SAFETY_MARGIN,
+} from '../src/eagle';
 import { WorldModel } from '../src/world';
 
 describe('autonomous eagle navigation', () => {
@@ -15,7 +17,7 @@ describe('autonomous eagle navigation', () => {
       const previous = navigator.activeThermal;
       const previousBehavior = navigator.state.behavior;
       const state = navigator.update(0.1);
-      if (state.behavior === 'seeking thermal' && navigator.activeThermal) {
+      if (state.behavior === 'thermal-seeking' && navigator.activeThermal) {
         const distance = Math.hypot(state.x - navigator.activeThermal.x, state.z - navigator.activeThermal.z);
         if (distance < 150) {
           closeApproaches += 1;
@@ -23,14 +25,14 @@ describe('autonomous eagle navigation', () => {
         }
         if (approachingSince !== null) expect(step - approachingSince).toBeLessThan(100);
       }
-      if (previousBehavior === 'seeking thermal' && previous &&
+      if (previousBehavior === 'thermal-seeking' && previous &&
         Math.hypot(state.x - previous.x, state.z - previous.z) < 150 &&
-        state.behavior === 'seeking thermal' && navigator.activeThermal !== previous) closeRetargets += 1;
-      if (state.behavior === 'circling thermal' && previousBehavior === 'seeking thermal') {
+        state.behavior === 'thermal-seeking' && navigator.activeThermal !== previous) closeRetargets += 1;
+      if (state.behavior === 'thermal-riding' && previousBehavior === 'thermal-seeking') {
         entries += 1;
         approachingSince = null;
       }
-      if (approachingSince !== null && state.behavior !== 'seeking thermal') {
+      if (approachingSince !== null && state.behavior !== 'thermal-seeking') {
         throw new Error('Thermal approach abandoned before circling');
       }
     }
@@ -40,13 +42,12 @@ describe('autonomous eagle navigation', () => {
   });
 
   it.each([{ min: 50, max: 70 }, { min: 90, max: 145 }, { min: 65, max: 210 }])(
-    'keeps local clearance in $min–$max m bounds during a one-hour flight', (range) => {
+    'never enters terrain and caps thermal-riding climb at the max in $min–$max m during a one-hour flight', (range) => {
       const world = new WorldModel(448122);
       const navigator = new EagleNavigator(world, world.scenicStart(2), range);
       const start = { x: navigator.state.x, z: navigator.state.z };
       const behaviors = new Set<string>();
       let minimumClearance = Infinity;
-      let maximumClearance = -Infinity;
       let seekingTurns = 0;
       let circleEntries = 0;
       for (let step = 0; step < 36_000; step += 1) {
@@ -56,18 +57,21 @@ describe('autonomous eagle navigation', () => {
         behaviors.add(state.behavior);
         const clearance = state.y - world.sample(state.x, state.z).height;
         minimumClearance = Math.min(minimumClearance, clearance);
-        maximumClearance = Math.max(maximumClearance, clearance);
-        if (state.behavior === 'seeking thermal' && Math.abs(state.heading - heading) > 0.001) seekingTurns += 1;
-        if (state.behavior === 'circling thermal' && before === 'seeking thermal') circleEntries += 1;
+        if (state.behavior === 'thermal-seeking' && Math.abs(state.heading - heading) > 0.001) seekingTurns += 1;
+        if (state.behavior === 'thermal-riding' && before === 'thermal-seeking') circleEntries += 1;
+        // Max flight height only caps climbing while thermal-riding; gliding may drift higher over low ground.
+        if (state.behavior === 'thermal-riding') {
+          expect(state.flapping).toBe(false);
+          expect(clearance).toBeLessThanOrEqual(range.max + 0.001);
+        }
       }
-      expect(minimumClearance).toBeGreaterThanOrEqual(range.min - 0.001);
-      expect(maximumClearance).toBeLessThanOrEqual(range.max + 0.001);
+      expect(minimumClearance).toBeGreaterThanOrEqual(TERRAIN_SAFETY_MARGIN - 0.001);
       expect(seekingTurns).toBeGreaterThan(10);
       expect(circleEntries).toBeGreaterThan(0);
       expect(Math.hypot(navigator.state.x - start.x, navigator.state.z - start.z)).toBeGreaterThan(700);
-      expect(behaviors.has('seeking thermal')).toBe(true);
-      expect(behaviors.has('circling thermal')).toBe(true);
-      expect(behaviors.size).toBeGreaterThanOrEqual(3);
+      expect(behaviors.has('thermal-seeking')).toBe(true);
+      expect(behaviors.has('thermal-riding')).toBe(true);
+      expect(behaviors.size).toBe(3);
     },
   );
 
@@ -76,16 +80,49 @@ describe('autonomous eagle navigation', () => {
     expect(normalizeFlightHeight(230, 40)).toEqual({ min: 220, max: 240 });
   });
 
-  it('flaps when seeking but glides while riding', () => {
+  it('sinks while gliding, trading height for distance with no flapping', () => {
+    const world = new WorldModel(448122);
+    const navigator = new EagleNavigator(world, world.scenicStart(2));
+    expect(navigator.state.behavior).toBe('gliding');
+    navigator.state.y += 1000; // clear of the floor trigger regardless of local terrain
+    const startY = navigator.state.y;
+    for (let step = 0; step < 20; step += 1) {
+      const state = navigator.update(0.1);
+      expect(state.flapping).toBe(false);
+    }
+    expect(navigator.state.y).toBeCloseTo(startY - GLIDE_SINK_RATE * 2, 1);
+  });
+
+  it('flaps to climb when clearance nears the minimum flight height floor', () => {
+    const world = new WorldModel(448122);
+    const navigator = new EagleNavigator(world, world.scenicStart(2), DEFAULT_FLIGHT_HEIGHT);
+    const ground = world.sample(navigator.state.x, navigator.state.z).height;
+    navigator.state.y = ground + DEFAULT_FLIGHT_HEIGHT.min + 5; // just under the soft floor trigger
+    const before = navigator.state.y;
+    const state = navigator.update(0.1);
+    expect(state.flapping).toBe(true);
+    expect(state.y).toBeGreaterThan(before);
+  });
+
+  it('never flaps while thermal-riding', () => {
+    const world = new WorldModel(448122);
+    const navigator = new EagleNavigator(world, world.scenicStart(2));
+    navigator.state.behavior = 'thermal-riding';
+    navigator.state.flapping = true;
+    const state = navigator.update(0.1);
+    expect(state.flapping).toBe(false);
+  });
+
+  it('wings flap only when the flapping wing state is set, independent of behavior', () => {
     const view = new EagleView();
     const world = new WorldModel(448122);
     const state = new EagleNavigator(world, world.scenicStart(2)).state;
     const wing = view.group.children.find((child) => child instanceof Group && child.position.x < 0);
     expect(wing).toBeDefined();
-    state.behavior = 'seeking thermal';
+    state.flapping = true;
     view.update(state, 0.2);
     expect(Math.abs(wing!.rotation.z)).toBeGreaterThan(0.1);
-    state.behavior = 'circling thermal';
+    state.flapping = false;
     view.update(state, 0.2);
     expect(Math.abs(wing!.rotation.z)).toBeLessThan(0.03);
   });

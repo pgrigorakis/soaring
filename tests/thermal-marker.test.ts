@@ -53,8 +53,8 @@ describe('active thermal marker', () => {
         expect([marker.mesh.position.x, marker.mesh.position.z]).toEqual([active.x, active.z]);
         targets.add(`${active.x},${active.z}`);
       }
-      seeking ||= navigator.state.behavior === 'seeking thermal';
-      circling ||= navigator.state.behavior === 'circling thermal';
+      seeking ||= navigator.state.behavior === 'thermal-seeking';
+      circling ||= navigator.state.behavior === 'thermal-riding';
       if (seeking && circling && targets.size >= 2) break;
     }
     expect(seeking).toBe(true);

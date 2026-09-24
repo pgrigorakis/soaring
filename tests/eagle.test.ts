@@ -17,7 +17,7 @@ describe('procedural eagle', () => {
     expect(meshes.filter((mesh) => mesh.geometry.getAttribute('color'))).toHaveLength(3);
 
     const geometries = meshes.map((mesh) => mesh.geometry);
-    const state: EagleState = { x: 14, y: 70, z: -9, heading: 0.7, bank: -0.25, behavior: 'circling thermal' };
+    const state: EagleState = { x: 14, y: 70, z: -9, heading: 0.7, bank: -0.25, behavior: 'thermal-riding', flapping: false };
     for (let frame = 0; frame < 240; frame += 1) eagle.update(state, 1 / 60);
     expect(eagle.group.position.toArray()).toEqual([14, 70, -9]);
     expect(eagle.group.rotation.y).toBe(0.7);
