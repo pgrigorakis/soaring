@@ -70,7 +70,7 @@ test('ambience (wind and flaps) and music each have an independent output level 
   expect(await sound.setMuted(false)).toBe(true);
   const context = BrowserAudio.instances[0]!;
   context.currentTime = 4;
-  sound.update('circling thermal');
+  sound.update('seeking thermal');
   const wind = context.sources.find((source) => source.loop)!;
   const flap = context.sources.find((source) => source.buffer && !source.loop)!;
   const music = context.sources.find((source) => !source.buffer)!;
@@ -94,6 +94,42 @@ test('ambience (wind and flaps) and music each have an independent output level 
   expect([wind, flap, music].map(outputLevel)).toEqual([0, 0, 0]);
   await sound.setMuted(false);
   expect(outputLevel(wind)).toBeGreaterThan(0);
+});
+
+test('flaps sound only while seeking a thermal, including after a glide', async () => {
+  vi.stubGlobal('AudioContext', BrowserAudio);
+  const sound = new Soundscape();
+  await sound.setMuted(false);
+  const context = BrowserAudio.instances[0]!;
+  const flapCount = () => context.sources.filter((source) => source.buffer && !source.loop).length;
+
+  context.currentTime = 4;
+  sound.update('circling thermal');
+  context.currentTime = 7;
+  sound.update('circling thermal');
+  expect(flapCount()).toBe(0);
+
+  context.currentTime = 7.1;
+  sound.update('seeking thermal');
+  expect(flapCount()).toBe(1);
+  context.currentTime = 7.5;
+  sound.update('seeking thermal');
+  expect(flapCount()).toBe(1);
+  context.currentTime = 8;
+  sound.update('seeking thermal');
+  expect(flapCount()).toBe(2);
+
+  context.currentTime = 11;
+  sound.update('circling thermal');
+  context.currentTime = 14;
+  sound.update('circling thermal');
+  context.currentTime = 17;
+  sound.update('scenic glide');
+  expect(flapCount()).toBe(2);
+
+  context.currentTime = 17.1;
+  sound.update('seeking thermal');
+  expect(flapCount()).toBe(3);
 });
 
 test('audio startup errors leave the sound muted and a later gesture can retry', async () => {

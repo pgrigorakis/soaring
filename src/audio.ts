@@ -78,9 +78,11 @@ export class Soundscape {
       this.nextBar = start + BAR;
       this.bar += 1;
     }
-    if (now >= this.nextFlap && this.wind?.buffer && this.ambience) {
+    if (behavior !== 'seeking thermal') {
+      this.nextFlap = now;
+    } else if (now >= this.nextFlap && this.wind?.buffer && this.ambience) {
       this.playFlap(now + 0.04);
-      this.nextFlap = now + (behavior === 'circling thermal' ? 2.4 : 6.8);
+      this.nextFlap = now + 0.8;
     }
   }
 
@@ -172,7 +174,6 @@ export class Soundscape {
       this.music = music;
       this.wind = wind;
       this.nextBar = context.currentTime + 0.12;
-      this.nextFlap = context.currentTime + 3;
       this.applyVolume();
     } catch (error) {
       void context.close().catch(() => {});
