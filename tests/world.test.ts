@@ -12,6 +12,49 @@ describe('deterministic world generation', () => {
     expect(first.thermalAtCell(-2, 7)).toEqual(second.thermalAtCell(-2, 7));
   });
 
+  it('generates the same tree positions and forms after a chunk is rebuilt', () => {
+    const first = new WorldModel(80231);
+    const second = new WorldModel(80231);
+    const trees = first.treesInArea(-1440, -360, 360, 36);
+    expect(trees.length).toBeGreaterThan(0);
+    expect(trees).toEqual(second.treesInArea(-1440, -360, 360, 36));
+    expect(trees).not.toEqual(new WorldModel(80232).treesInArea(-1440, -360, 360, 36));
+    expect(new Set(trees.map((tree) => tree.kind)).size).toBeGreaterThan(1);
+  });
+
+  it('keeps tree positions identical across chunk partitions, including negative boundaries', () => {
+    const world = new WorldModel(80231);
+    const whole = world.treesInArea(-1440, -720, 720, 36);
+    const streamed = [
+      world.treesInArea(-1440, -720, 360, 36),
+      world.treesInArea(-1080, -720, 360, 36),
+      world.treesInArea(-1440, -360, 360, 36),
+      world.treesInArea(-1080, -360, 360, 36),
+    ].flat();
+    const byPosition = (a: { x: number; z: number }, b: { x: number; z: number }) => a.x - b.x || a.z - b.z;
+    expect(streamed.length).toBeGreaterThan(100);
+    expect(streamed.sort(byPosition)).toEqual(whole.sort(byPosition));
+    const nearLeft = streamed.filter((tree) => tree.x >= -1170 && tree.x < -1080).length;
+    const nearRight = streamed.filter((tree) => tree.x >= -1080 && tree.x < -990).length;
+    expect(nearLeft).toBeGreaterThan(5);
+    expect(nearRight).toBeGreaterThan(5);
+  });
+
+  it('makes large forests, open meadows, small groves and isolated trees', () => {
+    const world = new WorldModel(80231);
+    const count = (x: number, z: number) => world.treesInArea(x * 360, z * 360, 360, 36).length;
+    expect(count(-4, -1)).toBeGreaterThan(50);
+    expect(count(-3, -1)).toBeGreaterThan(50); // forest spans chunks
+    expect(count(0, -3)).toBe(0);
+    expect(count(1, -3)).toBe(0); // broad meadow
+    expect(count(-3, -5)).toBeGreaterThan(15); // a smaller grove
+    expect(count(-4, -5)).toBeLessThan(5);
+    expect(count(-2, -5)).toBeLessThan(5); // surrounded by open ground
+    expect(count(1, 2)).toBe(1); // rare lone tree in open country
+    expect(count(0, 2)).toBe(0);
+    expect(count(2, 2)).toBe(0);
+  });
+
   it('does not quantize heights at chunk-size boundaries', () => {
     const world = new WorldModel(80231);
     const left = world.sample(359.999, 127.25).height;
