@@ -211,19 +211,22 @@ toggle.addEventListener('click', () => {
   toggle.setAttribute('aria-label', open ? 'Close settings' : 'Open settings');
   showControls();
 });
-window.addEventListener('pointerdown', async (event) => {
-  if (!settings.muted && event.target !== muteButton) {
-    const started = await soundscape.setMuted(false);
-    muteButton.textContent = soundscape.isMuted ? 'Muted' : 'On';
-    if (!started) audioNote.textContent = 'Audio could not start in this browser. Try enabling sound again.';
-  }
-}, { once: true });
-muteButton.addEventListener('click', async () => {
-  const started = await soundscape.setMuted(!soundscape.isMuted);
+let muteRevision = 0;
+async function changeMute(muted: boolean, persist: boolean): Promise<void> {
+  const revision = ++muteRevision;
+  settings.muted = muted;
+  const started = await soundscape.setMuted(muted);
+  if (revision !== muteRevision) return;
   settings.muted = soundscape.isMuted;
   muteButton.textContent = settings.muted ? 'Muted' : 'On';
   audioNote.textContent = started ? 'Sound is generated in your browser; no media is downloaded.' : 'Audio could not start in this browser. Try enabling sound again.';
-  saveSettings();
+  if (persist || !started) saveSettings();
+}
+window.addEventListener('pointerdown', (event) => {
+  if (!settings.muted && event.target !== muteButton) void changeMute(false, false);
+}, { once: true });
+muteButton.addEventListener('click', () => {
+  void changeMute(!settings.muted, true);
   showControls();
 });
 ambienceInput.addEventListener('input', () => {

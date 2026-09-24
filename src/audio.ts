@@ -32,6 +32,7 @@ export class Soundscape {
   private ambienceVolume = 0.52;
   private musicVolume = 0.52;
   private muted = true;
+  private muteRequest = 0;
 
   get isMuted(): boolean {
     return this.muted;
@@ -39,17 +40,20 @@ export class Soundscape {
 
   /** Returns false if the browser cannot start audio; the sound stays muted. */
   async setMuted(muted: boolean): Promise<boolean> {
+    const request = ++this.muteRequest;
     if (!muted) {
       try {
         this.ensureAudio();
         await this.context!.resume();
         if (this.context!.state !== 'running') throw new Error('Audio did not start');
       } catch {
+        if (request !== this.muteRequest) return true;
         this.muted = true;
         this.applyVolume();
         return false;
       }
     }
+    if (request !== this.muteRequest) return true;
     this.muted = muted;
     this.applyVolume();
     return true;
