@@ -49,6 +49,8 @@ canvas.dragging { cursor: grabbing; }
 
 .settings-panel {
   width: 245px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
   padding: 17px 18px 16px;
   border: 1px solid rgba(255,255,255,.22);
   border-radius: 15px;
@@ -114,5 +116,5 @@ canvas.dragging { cursor: grabbing; }
 @media (max-width: 700px) {
   .controls { right: 60px; top: 12px; }
   .settings-toggle { right: 12px; top: 12px; }
-  .settings-panel { width: min(245px, calc(100vw - 70px)); }
+  .settings-panel { width: min(245px, calc(100vw - 70px)); max-height: calc(100dvh - 24px); }
 }

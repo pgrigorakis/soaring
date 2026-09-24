@@ -6,27 +6,28 @@ import { MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
 import { ThermalMarker } from './thermal-marker';
 import { WorldModel } from './world';
 
-type StoredSettings = { volume: number; muted: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
+type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
 const SETTINGS_KEY = 'soaring.settings.v1';
 const SEED_KEY = 'soaring.world-seed.v1';
 const VISIT_KEY = 'soaring.scenic-visit.v1';
-const defaultSettings: StoredSettings = { volume: 0.52, muted: true, cameraDistance: 178, terrainVisibility: MIN_VISIBILITY,
+const defaultSettings: StoredSettings = { ambienceVolume: 0.52, musicVolume: 0.52, muted: true, cameraDistance: 178, terrainVisibility: MIN_VISIBILITY,
   showThermal: true, minFlightHeight: DEFAULT_FLIGHT_HEIGHT.min, maxFlightHeight: DEFAULT_FLIGHT_HEIGHT.max };
 const clamp = (value: unknown, fallback: number, min: number, max: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 
 function loadSettings(): StoredSettings {
   try {
-    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<StoredSettings> & { quality?: unknown };
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<StoredSettings> & { volume?: number; quality?: unknown };
     const height = normalizeFlightHeight(saved.minFlightHeight ?? defaultSettings.minFlightHeight,
       saved.maxFlightHeight ?? defaultSettings.maxFlightHeight);
     return {
-      volume: clamp(saved.volume, defaultSettings.volume, 0, 1),
+      ambienceVolume: clamp(saved.ambienceVolume, clamp(saved.volume, defaultSettings.ambienceVolume, 0, 1), 0, 1),
+      musicVolume: clamp(saved.musicVolume, clamp(saved.volume, defaultSettings.musicVolume, 0, 1), 0, 1),
       muted: typeof saved.muted === 'boolean' ? saved.muted : defaultSettings.muted,
       cameraDistance: clamp(saved.cameraDistance, defaultSettings.cameraDistance, 110, 270),
       showThermal: typeof saved.showThermal === 'boolean' ? saved.showThermal : defaultSettings.showThermal,
-      // Old saves had a quality preset, not a visibility preference. Keep the old
-      // camera and sound preferences and the view distance of the old High preset.
+      // Old saves had a quality preset, not a visibility preference. Keep the
+      // High preset's view distance and migrate the old sound level to both sliders.
       terrainVisibility: clamp(saved.terrainVisibility, saved.quality === 'high' ? 1080 : defaultSettings.terrainVisibility, MIN_VISIBILITY, MAX_VISIBILITY),
       minFlightHeight: height.min,
       maxFlightHeight: height.max,
@@ -58,7 +59,8 @@ const start = world.scenicStart(nextVisit());
 const navigator = new EagleNavigator(world, start, { min: settings.minFlightHeight, max: settings.maxFlightHeight });
 const eagle = new EagleView();
 const soundscape = new Soundscape();
-soundscape.setVolume(settings.volume);
+soundscape.setAmbienceVolume(settings.ambienceVolume);
+soundscape.setMusicVolume(settings.musicVolume);
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('Missing application root');
@@ -166,7 +168,8 @@ app.insertAdjacentHTML('beforeend', `
     <section class="settings-panel" id="settings-panel" aria-label="Settings">
       <h1>Soaring</h1>
       <label class="setting">Sound <button class="mute-button" id="mute" type="button">Muted</button></label>
-      <label class="setting">Volume <output id="volume-value">${Math.round(settings.volume * 100)}%</output><input id="volume" type="range" min="0" max="1" step="0.01" value="${settings.volume}"></label>
+      <label class="setting">Ambience <output id="ambience-value">${Math.round(settings.ambienceVolume * 100)}%</output><input id="ambience" type="range" min="0" max="1" step="0.01" value="${settings.ambienceVolume}"></label>
+      <label class="setting">Music <output id="music-value">${Math.round(settings.musicVolume * 100)}%</output><input id="music" type="range" min="0" max="1" step="0.01" value="${settings.musicVolume}"></label>
       <label class="setting">Terrain visibility <output id="visibility-value">${Math.round(settings.terrainVisibility)} m</output><input id="visibility" type="range" min="${MIN_VISIBILITY}" max="${MAX_VISIBILITY}" step="120" value="${settings.terrainVisibility}"></label>
       <label class="setting">Show thermal <input id="show-thermal" type="checkbox" ${settings.showThermal ? 'checked' : ''}></label>
       <label class="setting">Minimum flight height <output id="min-height-value">${settings.minFlightHeight} m</output><input id="min-height" type="range" min="${FLIGHT_HEIGHT_LIMITS.min}" max="${FLIGHT_HEIGHT_LIMITS.max - FLIGHT_HEIGHT_LIMITS.gap}" step="1" value="${settings.minFlightHeight}"></label>
@@ -174,7 +177,7 @@ app.insertAdjacentHTML('beforeend', `
       <p class="height-note">Height above local terrain · ${FLIGHT_HEIGHT_LIMITS.gap} m minimum range</p>
       <label class="setting">Camera distance <output id="distance-value">${Math.round(settings.cameraDistance)} m</output><input id="distance" type="range" min="110" max="270" step="1" value="${settings.cameraDistance}"></label>
       <label class="setting"><button class="new-world" id="new-world" type="button">Generate a new world</button></label>
-      <p class="audio-note">Sound starts muted. It is generated in your browser; no media is downloaded.</p>
+      <p class="audio-note" role="status">Sound starts muted. It is generated in your browser; no media is downloaded.</p>
     </section>
   </div>
   <button class="settings-toggle" id="settings-toggle" type="button" aria-label="Open settings" aria-controls="settings-panel" aria-expanded="false">⚙</button>
@@ -185,8 +188,11 @@ const controls = document.querySelector<HTMLElement>('#controls')!;
 const panel = document.querySelector<HTMLElement>('#settings-panel')!;
 const toggle = document.querySelector<HTMLButtonElement>('#settings-toggle')!;
 const muteButton = document.querySelector<HTMLButtonElement>('#mute')!;
-const volumeInput = document.querySelector<HTMLInputElement>('#volume')!;
-const volumeValue = document.querySelector<HTMLOutputElement>('#volume-value')!;
+const ambienceInput = document.querySelector<HTMLInputElement>('#ambience')!;
+const ambienceValue = document.querySelector<HTMLOutputElement>('#ambience-value')!;
+const musicInput = document.querySelector<HTMLInputElement>('#music')!;
+const musicValue = document.querySelector<HTMLOutputElement>('#music-value')!;
+const audioNote = document.querySelector<HTMLElement>('.audio-note')!;
 const visibilityInput = document.querySelector<HTMLInputElement>('#visibility')!;
 const visibilityValue = document.querySelector<HTMLOutputElement>('#visibility-value')!;
 const showThermalInput = document.querySelector<HTMLInputElement>('#show-thermal')!;
@@ -217,23 +223,34 @@ toggle.addEventListener('click', () => {
   toggle.setAttribute('aria-label', open ? 'Close settings' : 'Open settings');
   showControls();
 });
-window.addEventListener('pointerdown', async () => {
-  if (!settings.muted) {
-    await soundscape.setMuted(false);
-    muteButton.textContent = 'On';
-  }
+let muteRevision = 0;
+async function changeMute(muted: boolean, persist: boolean): Promise<void> {
+  const revision = ++muteRevision;
+  settings.muted = muted;
+  const started = await soundscape.setMuted(muted);
+  if (revision !== muteRevision) return;
+  settings.muted = soundscape.isMuted;
+  muteButton.textContent = settings.muted ? 'Muted' : 'On';
+  audioNote.textContent = started ? 'Sound is generated in your browser; no media is downloaded.' : 'Audio could not start in this browser. Try enabling sound again.';
+  if (persist || !started) saveSettings();
+}
+window.addEventListener('pointerdown', (event) => {
+  if (!settings.muted && event.target !== muteButton) void changeMute(false, false);
 }, { once: true });
-muteButton.addEventListener('click', async () => {
-  settings.muted = !soundscape.isMuted;
-  await soundscape.setMuted(settings.muted);
-  muteButton.textContent = soundscape.isMuted ? 'Muted' : 'On';
-  saveSettings();
+muteButton.addEventListener('click', () => {
+  void changeMute(!settings.muted, true);
   showControls();
 });
-volumeInput.addEventListener('input', () => {
-  settings.volume = Number(volumeInput.value);
-  volumeValue.value = `${Math.round(settings.volume * 100)}%`;
-  soundscape.setVolume(settings.volume);
+ambienceInput.addEventListener('input', () => {
+  settings.ambienceVolume = Number(ambienceInput.value);
+  ambienceValue.value = `${Math.round(settings.ambienceVolume * 100)}%`;
+  soundscape.setAmbienceVolume(settings.ambienceVolume);
+  saveSettings();
+});
+musicInput.addEventListener('input', () => {
+  settings.musicVolume = Number(musicInput.value);
+  musicValue.value = `${Math.round(settings.musicVolume * 100)}%`;
+  soundscape.setMusicVolume(settings.musicVolume);
   saveSettings();
 });
 visibilityInput.addEventListener('input', () => {

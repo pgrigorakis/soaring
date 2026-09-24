@@ -19,10 +19,10 @@ Open `http://127.0.0.1:4173`. Production output is created with `npm run build`.
 
 - Drag on the landscape to orbit the camera. Release to let it return slowly to the trailing view.
 - Move the pointer to reveal the settings control.
-- Settings provide sound mute and volume, terrain visibility, minimum and maximum flight height above local terrain, camera distance, a persistent Show thermal toggle, and a new-world action. Height bounds persist across reloads; the eagle selects its own height and route within them.
+- Settings provide an overall sound mute, independent ambience (wind and wing flaps) and music volume sliders, terrain visibility, minimum and maximum flight height above local terrain, camera distance, a persistent Show thermal toggle, and a new-world action. Height bounds persist across reloads; the eagle selects its own height and route within them.
 - Press `D` to show or hide diagnostics.
 
-Sound is procedural and starts muted on every page load. If sound was previously enabled, it resumes only after the next pointer gesture; otherwise the mute preference remains. Settings and the world seed live in `localStorage`. A reload keeps the seed but increments a scenic-visit index, so it starts elsewhere in the same world.
+Sound is procedural and starts muted on every page load. If sound was previously enabled, a pointer gesture can resume it; pressing Sound to mute instead keeps it muted. If the browser cannot start audio, sound stays muted and the control can retry. The two volume settings persist independently; existing single-volume preferences initialize both sliders. Settings and the world seed live in `localStorage`. A reload keeps the seed but increments a scenic-visit index, so it starts elsewhere in the same world.
 
 ## Terrain visibility
 
@@ -53,6 +53,6 @@ The product reliability target is one uninterrupted hour without intervention or
 - `src/eagle.ts` separates the explicit navigation state machine from the visual model. The eagle alternates scenic glides and panoramic flight, seeks deterministic thermals, circles to climb, and maintains terrain clearance.
 - `src/thermal-marker.ts` owns the reusable translucent marker for the eagle's active thermal.
 - `src/main.ts` owns rendering, camera input, lighting/haze, persistence, controls, diagnostics, and lifecycle wiring.
-- `src/audio.ts` creates wind and sparse adaptive music: short pentatonic phrases separated by long rests, with register, pacing, and contour following the eagle's behavior with the Web Audio API. It uses no downloaded media.
+- `src/audio.ts` creates wind, soft wing flaps, and a continuous original musical bed with the Web Audio API. The music and flap rate adapt to the eagle's behavior; ambience and music use separate level buses under the shared mute. It uses no downloaded media.
 
 The world is deterministic for a seed, but the generated audio noise is not part of world simulation. There are no remote runtime assets.
