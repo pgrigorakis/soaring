@@ -99,16 +99,16 @@ scene.add(sun, sun.target);
 const sky = new Sky();
 sky.scale.setScalar(450000);
 sky.material.uniforms.sunPosition!.value.copy(sunDirection);
-sky.material.uniforms.turbidity!.value = 2;
-sky.material.uniforms.rayleigh!.value = 1.5;
-sky.material.uniforms.mieCoefficient!.value = 0.004;
+sky.material.uniforms.turbidity!.value = 3;
+sky.material.uniforms.rayleigh!.value = 3;
+sky.material.uniforms.mieCoefficient!.value = 0.003;
 sky.material.uniforms.mieDirectionalG!.value = 0.8;
 // The Preetham model's near-horizon radiance saturates well above 1.0 regardless of the uniforms
 // above (it is driven by a fixed sun-intensity constant baked into the shader), which clips the
 // horizon band to flat white under the renderer's normal tone-mapping exposure. Scale the sky's
 // own linear output before tone mapping so it stays a gradient instead of a flat clip - independent
 // of scene.toneMappingExposure, which stays tuned for the terrain.
-sky.material.uniforms.skyExposure = { value: 0.45 };
+sky.material.uniforms.skyExposure = { value: 0.35 };
 sky.material.fragmentShader = sky.material.fragmentShader
   .replace('uniform float mieDirectionalG;', 'uniform float mieDirectionalG;\nuniform float skyExposure;')
   .replace(
