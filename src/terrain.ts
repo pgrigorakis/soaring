@@ -23,7 +23,7 @@ export class TerrainStream {
 
   private readonly terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0 });
   // Fades the shadow to fully lit near the fixed shadow camera's edge, in place of a hard cutoff.
-  private readonly shadowFadeRange = { value: new THREE.Vector2(500, 600) };
+  private readonly shadowFadeRange = { value: new THREE.Vector2() };
   private readonly waterMaterial = new THREE.MeshStandardMaterial({
     color: 0x477d8b,
     roughness: 0.38,

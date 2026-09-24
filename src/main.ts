@@ -137,7 +137,6 @@ let pointerX = 0;
 let pointerY = 0;
 const cameraPosition = new THREE.Vector3(navigator.state.x, navigator.state.y + 70, navigator.state.z - settings.cameraDistance);
 const lookAt = new THREE.Vector3();
-const shadowCenter = new THREE.Vector3();
 
 renderer.domElement.addEventListener('pointerdown', (event) => {
   dragging = true;
@@ -372,9 +371,8 @@ function frame(now: number): void {
 
   sky.position.set(state.x, state.y - 40, state.z);
   sunDisc.position.copy(SUN_OFFSET).setLength(700).add(eagle.group.position);
-  shadowCenter.copy(camera.position);
-  snapToShadowGrid(shadowCenter);
-  sun.target.position.set(shadowCenter.x, world.sample(shadowCenter.x, shadowCenter.z).height, shadowCenter.z);
+  sun.target.position.set(camera.position.x, world.sample(camera.position.x, camera.position.z).height, camera.position.z);
+  snapToShadowGrid(sun.target.position);
   sun.position.copy(SUN_OFFSET).setLength(SHADOW_EXTENT + 300).add(sun.target.position);
   sun.target.updateMatrixWorld();
 
