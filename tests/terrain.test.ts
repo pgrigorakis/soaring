@@ -106,4 +106,35 @@ describe('terrain streaming', () => {
     expect(renderedPositions).toEqual(trees.map((tree) => [Math.fround(tree.x), Math.fround(tree.z)]));
     terrain.dispose();
   });
+
+  it('matches terrain and river water across a chunk seam built by separate streams', () => {
+    const seam = 10 * CHUNK_SIZE;
+    const probe = new WorldModel(448122);
+    const chunkZ = Array.from({ length: 21 }, (_, i) => i - 10)
+      .find((z) => Array.from({ length: 41 }, (_, i) => probe.sample(seam, (z + i / 40) * CHUNK_SIZE).river).some(Boolean))!;
+    expect(chunkZ).toBeDefined();
+    // Each side comes from its own world and stream, built in a different order.
+    const edge = (chunkX: number, x: number) => {
+      const scene = new THREE.Scene();
+      const terrain = new TerrainStream(scene, new WorldModel(448122));
+      terrain.update((chunkX + 0.5) * CHUNK_SIZE, (chunkZ + 0.5) * CHUNK_SIZE, 1);
+      const [ground, water] = scene.getObjectByName(`land ${chunkX},${chunkZ}`)!.children as THREE.Mesh[];
+      const points = (mesh: THREE.Mesh) => {
+        const position = mesh.geometry.getAttribute('position');
+        return new Map(Array.from({ length: position.count }, (_, i) => [position.getX(i), position.getY(i), position.getZ(i)])
+          .filter(([px]) => px === x).map(([, y, z]) => [z!, y!]));
+      };
+      const result = { ground: points(ground!), water: points(water!) };
+      terrain.dispose();
+      return result;
+    };
+    const west = edge(9, seam);
+    const east = edge(10, seam);
+    expect(west.ground.size).toBe(41);
+    expect(west.ground).toEqual(east.ground);
+    // Each side draws water only on its own quads; wherever both have a seam vertex, the surface matches.
+    const shared = [...west.water.keys()].filter((z) => east.water.has(z));
+    expect(shared.length).toBeGreaterThan(0);
+    for (const z of shared) expect(west.water.get(z)).toBe(east.water.get(z));
+  });
 });
