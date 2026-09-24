@@ -98,9 +98,9 @@ export class Soundscape {
     // Thermal-riding lifts the arpeggio an octave higher.
     const lift = behavior === 'thermal-riding' ? 24 : 12;
     const order = ARPEGGIOS[Math.floor(Math.random() * ARPEGGIOS.length)]!;
-    for (const beat of order) {
-      this.playTone(frequency(notes[beat]! + lift), start + beat * BEAT, BEAT * 1.65, 0.13, 'sine', 0.045);
-    }
+    order.forEach((noteIndex, position) => {
+      this.playTone(frequency(notes[noteIndex]! + lift), start + position * BEAT, BEAT * 1.65, 0.13, 'sine', 0.045);
+    });
     if (this.bar % 2 === 1) {
       const answer = notes[1 + Math.floor(Math.random() * 3)]!;
       this.playTone(frequency(answer + 12), start + BEAT * 3, BEAT * 2.3, 0.11, 'triangle', 0.12);
