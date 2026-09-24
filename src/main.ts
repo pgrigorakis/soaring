@@ -256,7 +256,7 @@ function updateFog(): void {
   fog.far = Math.min(settings.terrainVisibility, coveredDepth);
   fog.near = fog.far * 0.5;
 }
-// The shadow area follows the view out to the haze distance, so it has no visible edge.
+// Use selected visibility so streaming does not resize the shadow area each frame.
 // Longer distances use a larger map to keep texels at or below about 1.8 m.
 function updateShadowArea(): void {
   const extent = settings.terrainVisibility;
