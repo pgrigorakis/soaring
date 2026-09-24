@@ -10,6 +10,12 @@ export type LandscapeSample = {
 export type Thermal = { x: number; z: number; strength: number };
 export type Tree = { x: number; y: number; z: number; kind: number; scale: number; turn: number };
 
+/** Mid-afternoon sun used for lighting and sun-facing thermal scores. */
+export const SUN_OFFSET = { x: -420, y: 190, z: -300 } as const;
+const SUN_LENGTH = Math.hypot(SUN_OFFSET.x, SUN_OFFSET.y, SUN_OFFSET.z);
+const THERMAL_CELL = 1100;
+const THERMAL_CANDIDATES = 5;
+
 const fract = (value: number) => value - Math.floor(value);
 const smooth = (value: number) => value * value * (3 - 2 * value);
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -56,6 +62,7 @@ function smootherstep(edge0: number, edge1: number, value: number): number {
 export class WorldModel {
   readonly seed: number;
   readonly waterLevel = 2;
+  private readonly thermals = new Map<string, Thermal | null>();
 
   constructor(seed: number) {
     this.seed = seed | 0;
@@ -128,24 +135,58 @@ export class WorldModel {
     return trees;
   }
 
-  thermalAtCell(cellX: number, cellZ: number): Thermal {
-    const size = 1100;
-    const x = (cellX + 0.16 + hash2(cellX, cellZ, this.seed + 211) * 0.68) * size;
-    const z = (cellZ + 0.16 + hash2(cellX, cellZ, this.seed + 223) * 0.68) * size;
-    return { x, z, strength: 0.72 + hash2(cellX, cellZ, this.seed + 227) * 0.72 };
+  thermalAtCell(cellX: number, cellZ: number): Thermal | null {
+    const key = `${cellX},${cellZ}`;
+    const cached = this.thermals.get(key);
+    if (cached !== undefined) return cached;
+    let best: Thermal | null = null;
+    let bestScore = 0;
+    const strength = 0.72 + hash2(cellX, cellZ, this.seed + 227) * 0.72;
+    for (let iz = 0; iz < THERMAL_CANDIDATES; iz += 1) {
+      for (let ix = 0; ix < THERMAL_CANDIDATES; ix += 1) {
+        const gx = cellX * THERMAL_CANDIDATES + ix;
+        const gz = cellZ * THERMAL_CANDIDATES + iz;
+        const x = (cellX + (ix + 0.18 + hash2(gx, gz, this.seed + 211) * 0.64) / THERMAL_CANDIDATES) * THERMAL_CELL;
+        const z = (cellZ + (iz + 0.18 + hash2(gx, gz, this.seed + 223) * 0.64) / THERMAL_CANDIDATES) * THERMAL_CELL;
+        const score = this.thermalScore(x, z);
+        if (score <= bestScore) continue;
+        bestScore = score;
+        best = { x, z, strength };
+      }
+    }
+    this.thermals.set(key, best);
+    return best;
   }
 
   nearbyThermals(x: number, z: number, radiusCells = 2): Thermal[] {
-    const cellSize = 1100;
-    const centerX = Math.floor(x / cellSize);
-    const centerZ = Math.floor(z / cellSize);
+    const centerX = Math.floor(x / THERMAL_CELL);
+    const centerZ = Math.floor(z / THERMAL_CELL);
     const thermals: Thermal[] = [];
     for (let dz = -radiusCells; dz <= radiusCells; dz += 1) {
       for (let dx = -radiusCells; dx <= radiusCells; dx += 1) {
-        thermals.push(this.thermalAtCell(centerX + dx, centerZ + dz));
+        const thermal = this.thermalAtCell(centerX + dx, centerZ + dz);
+        if (thermal) thermals.push(thermal);
       }
     }
     return thermals;
+  }
+
+  /** Dry, open, sun-facing ground scores high; forest is low; water is zero. */
+  private thermalScore(x: number, z: number): number {
+    const sample = this.sample(x, z);
+    if (sample.water) return 0;
+    const step = 28;
+    const nx = this.sample(x - step, z).height - this.sample(x + step, z).height;
+    const ny = step * 2;
+    const nz = this.sample(x, z - step).height - this.sample(x, z + step).height;
+    const invLength = 1 / Math.hypot(nx, ny, nz);
+    const sunFacing = clamp01((nx * SUN_OFFSET.x + ny * SUN_OFFSET.y + nz * SUN_OFFSET.z) * invLength / SUN_LENGTH);
+    const dry = 1 - sample.moisture;
+    const open = 1 - sample.forest;
+    const slope = 1 - ny * invLength;
+    // Meadows, ridges, and modest sunlit slopes all qualify; steep rock is a bonus, not a magnet.
+    const land = dry * 0.4 + open * 0.45 + sunFacing * 0.4 + slope * 0.12 + sample.rock * 0.12;
+    return land * (0.2 + 0.8 * open);
   }
 
   interest(x: number, z: number): number {

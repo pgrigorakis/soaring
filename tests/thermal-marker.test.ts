@@ -9,8 +9,10 @@ describe('active thermal marker', () => {
     const scene = new THREE.Scene();
     const world = new WorldModel(448122);
     const marker = new ThermalMarker(scene, world);
-    const first = world.thermalAtCell(0, 0);
-    const second = world.thermalAtCell(1, 1);
+    const first = world.thermalAtCell(0, 0)!;
+    const second = world.thermalAtCell(1, 1)!;
+    expect(first).toBeTruthy();
+    expect(second).toBeTruthy();
     const geometry = marker.mesh.geometry;
     const material = marker.mesh.material;
 

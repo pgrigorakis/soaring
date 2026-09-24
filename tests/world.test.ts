@@ -69,6 +69,24 @@ describe('deterministic world generation', () => {
     expect(first.thermalAtCell(2, 3)).not.toEqual(second.thermalAtCell(2, 3));
   });
 
+  it('places thermals deterministically and never on water', () => {
+    const first = new WorldModel(448122);
+    const second = new WorldModel(448122);
+    const placed: Array<{ x: number; z: number }> = [];
+    for (let cellZ = -8; cellZ <= 8; cellZ += 1) {
+      for (let cellX = -8; cellX <= 8; cellX += 1) {
+        const thermal = first.thermalAtCell(cellX, cellZ);
+        expect(thermal).toEqual(second.thermalAtCell(cellX, cellZ));
+        if (!thermal) continue;
+        expect(first.sample(thermal.x, thermal.z).water).toBe(false);
+        placed.push(thermal);
+      }
+    }
+    expect(placed.length).toBeGreaterThan(200);
+    expect(first.nearbyThermals(0, 0, 2)).toEqual(second.nearbyThermals(0, 0, 2));
+    expect(new WorldModel(448123).thermalAtCell(2, 3)).not.toEqual(first.thermalAtCell(2, 3));
+  });
+
   it('carves river valleys without near-vertical walls', () => {
     const world = new WorldModel(448122);
     let steepest = 0;
