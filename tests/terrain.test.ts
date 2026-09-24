@@ -1,31 +1,96 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { CHUNK_SIZE, QUALITY, TerrainStream } from '../src/terrain';
+import { CHUNK_SIZE, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from '../src/terrain';
 import { WorldModel } from '../src/world';
 
+function expectLoadedWithin(scene: THREE.Scene, terrain: TerrainStream, x: number, z: number): void {
+  const covered = terrain.coveredDistance(x, z);
+  for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 90) {
+    const px = x + Math.cos(angle) * (covered - 1);
+    const pz = z + Math.sin(angle) * (covered - 1);
+    expect(scene.getObjectByName(`land ${Math.floor(px / CHUNK_SIZE)},${Math.floor(pz / CHUNK_SIZE)}`)).toBeDefined();
+  }
+}
+
+function instances(group: THREE.Object3D, geometry: abstract new (...args: never[]) => THREE.BufferGeometry): number {
+  return group.children.reduce((sum, child) =>
+    sum + (child instanceof THREE.InstancedMesh && child.geometry instanceof geometry ? child.count : 0), 0);
+}
+const treeCrowns = (group: THREE.Object3D) => instances(group, THREE.IcosahedronGeometry);
+const treeTrunks = (group: THREE.Object3D) => group.children.reduce((sum, child) =>
+  sum + (child instanceof THREE.InstancedMesh && child.geometry.type === 'CylinderGeometry' ? child.count : 0), 0);
+
 describe('terrain streaming', () => {
-  it('builds a bounded number of chunks per update, nearest first, until the full square is covered', () => {
+  it('builds at most two tiles per frame, nearest first, and covers the reach', () => {
     const scene = new THREE.Scene();
-    const terrain = new TerrainStream(scene, new WorldModel(80231), 'medium');
+    const terrain = new TerrainStream(scene, new WorldModel(80231));
     const x = CHUNK_SIZE * 0.99;
     const z = CHUNK_SIZE * 0.99;
     terrain.update(x, z);
     expect(terrain.chunkCount).toBe(2);
     expect(scene.getObjectByName('land 0,0')).toBeDefined();
-    for (let frame = 0; frame < 20; frame += 1) terrain.update(x, z);
+    expect(terrain.coveredDistance(x, z)).toBeLessThan(MIN_VISIBILITY);
+    expectLoadedWithin(scene, terrain, x, z);
+    while (terrain.pendingCount) terrain.update(x, z);
     expect(terrain.chunkCount).toBe(25);
-    expect(scene.getObjectByName('land 2,2')).toBeDefined();
-    expect(scene.getObjectByName('land -2,-2')).toBeDefined();
+    expect(terrain.coveredDistance(x, z)).toBe(MIN_VISIBILITY);
+    expectLoadedWithin(scene, terrain, x, z);
+    terrain.dispose();
+  });
+
+  it('keeps haze on loaded tiles while extending the reach, including after recentering', () => {
+    const scene = new THREE.Scene();
+    const terrain = new TerrainStream(scene, new WorldModel(80231));
+    const reach = MAX_VISIBILITY * 1.3;
+    const radius = Math.ceil(reach / CHUNK_SIZE);
+    const x = CHUNK_SIZE * 0.5;
+    const z = CHUNK_SIZE * 0.5;
+    terrain.update(x, z, 25);
+    terrain.setReach(reach);
+    expect(terrain.coveredDistance(x, z)).toBeLessThan(reach);
+    let previous = terrain.chunkCount;
+    while (terrain.pendingCount) {
+      terrain.update(x, z);
+      expect(terrain.chunkCount - previous).toBeLessThanOrEqual(2);
+      previous = terrain.chunkCount;
+      expectLoadedWithin(scene, terrain, x, z);
+    }
+    expect(terrain.chunkCount).toBeLessThan((2 * radius + 1) ** 2 * 0.9);
+    expect(terrain.coveredDistance(x, z)).toBe(reach);
+    expectLoadedWithin(scene, terrain, x, z);
+    terrain.update(x + CHUNK_SIZE * 2, z);
+    expect(terrain.coveredDistance(x + CHUNK_SIZE * 2, z)).toBeLessThan(reach);
+    expectLoadedWithin(scene, terrain, x + CHUNK_SIZE * 2, z);
+    terrain.setReach(MIN_VISIBILITY);
+    expect(terrain.chunkCount).toBeLessThanOrEqual(25);
+    terrain.dispose();
+  });
+
+  it('gives distant tiles the same trees and shadows as detailed tiles', () => {
+    const scene = new THREE.Scene();
+    const terrain = new TerrainStream(scene, new WorldModel(80231), MAX_VISIBILITY);
+    terrain.update(CHUNK_SIZE * 0.5, CHUNK_SIZE * 0.5, Infinity);
+    const far = Array.from({ length: 7 }, (_, i) => scene.getObjectByName(`land 4,${i - 3}`)!)
+      .find((group) => treeCrowns(group) > 0)!;
+    expect(far).toBeDefined();
+    const farTrees = treeCrowns(far);
+    expect(treeTrunks(far)).toBe(farTrees);
+    far.traverse((object) => { if (object instanceof THREE.Mesh && !object.material.transparent) expect(object.castShadow).toBe(true); });
+    const name = far.name;
+    terrain.update(CHUNK_SIZE * 1.5, CHUNK_SIZE * 0.5, Infinity);
+    const detailed = scene.getObjectByName(name)!;
+    expect(detailed).not.toBe(far);
+    expect(treeTrunks(detailed)).toBe(farTrees);
     terrain.dispose();
   });
 
   it('renders several distinct instanced tree silhouettes at generated world positions', () => {
     const scene = new THREE.Scene();
     const world = new WorldModel(80231);
-    const terrain = new TerrainStream(scene, world, 'high');
+    const terrain = new TerrainStream(scene, world);
     terrain.update(-4 * CHUNK_SIZE + 1, -CHUNK_SIZE + 1, 1);
     const chunk = scene.getObjectByName('land -4,-1')!;
-    const trees = world.treesInArea(-4 * CHUNK_SIZE, -CHUNK_SIZE, CHUNK_SIZE, QUALITY.high.treeSpacing);
+    const trees = world.treesInArea(-4 * CHUNK_SIZE, -CHUNK_SIZE, CHUNK_SIZE, 29);
     const instances = chunk.children.filter((child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh);
     const trunks = instances.find((mesh) => mesh.geometry.type === 'CylinderGeometry')!;
     expect(trunks.count).toBe(trees.length);
