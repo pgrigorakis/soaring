@@ -26,12 +26,12 @@ Sound is procedural and starts muted on every page load. If sound was previously
 
 ## Terrain visibility
 
-High graphics are the standard presentation. The terrain visibility slider ranges from 720 m to 10,000 m, defaulting to 5,000 m, independently of camera distance. Haze reaches only loaded terrain, even while new tiles stream in. Terrain loading is capped at the reach needed for a 16:9 window; wider windows can show a shorter haze distance than the selected value.
+High graphics are the standard presentation. The terrain visibility slider ranges from 720 m to 5,000 m, defaulting to 5,000 m, independently of camera distance. Haze reaches only loaded terrain, even while new tiles stream in. Terrain loading is capped at the reach needed for a 16:9 window; wider windows can show a shorter haze distance than the selected value.
 
 Three mesh levels of detail stream on concentric grids, sized so a coarser tile's edges always land on a finer tile's grid lines, and a downward skirt on every non-nearest tile hides the resulting resolution seam:
 - **near** (out to 1,080 m): full-density mesh, individual trees, and rocks.
 - **mid** (1,080 m–4,320 m): a lower-density mesh; out to 3,000 m it keeps simplified individual trees, then drops to terrain-color forest only (no per-tree geometry) to avoid pop-in right at the cutoff.
-- **far** (4,320 m–10,000 m): a coarser mesh on 4x larger tiles, terrain-color forest only.
+- **far** (4,320 m–5,000 m): a coarser mesh on 4x larger tiles, terrain-color forest only.
 
 A fixed mid-afternoon sun (three.js `Sky` addon, physical Preetham model) casts shadows from terrain and trees, within a fixed 600 m range around the camera that fades out near its edge. Fog/haze color is sampled from the sky near the horizon rather than fixed, and a subtle `Lensflare` tracks the sun when it is on screen and unoccluded by terrain.
 

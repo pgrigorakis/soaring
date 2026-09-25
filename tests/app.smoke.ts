@@ -111,7 +111,7 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   await expect(page.locator('#ambience')).toHaveValue('0.4');
   await expect(page.locator('#music')).toHaveValue('0.4');
   await expect(page.locator('#visibility')).toHaveValue('1080');
-  expect(await page.locator('#visibility').getAttribute('max')).toBe('10000');
+  expect(await page.locator('#visibility').getAttribute('max')).toBe('5000');
   await page.locator('#visibility').fill('3600');
   await expect(page.locator('#distance')).toHaveValue('220');
   await page.locator('#distance').fill('160');
@@ -129,7 +129,7 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   expect(errors).toEqual([]);
 });
 
-test('defaults terrain visibility to 5 km and streams bounded work at each LOD tier out to 10 km', async ({ page }) => {
+test('defaults terrain visibility to 5 km and streams bounded work at each LOD tier out to the 5 km max', async ({ page }) => {
   test.setTimeout(90_000);
   const errors = captureErrors(page);
   await page.goto('/?smoke');
@@ -143,27 +143,26 @@ test('defaults terrain visibility to 5 km and streams bounded work at each LOD t
   await page.locator('#settings-toggle').click();
   await expect(page.locator('#visibility')).toHaveValue('720');
 
-  // Push the slider to the 10 km max and confirm all three LOD tiers populate with bounded work.
+  // Push the slider to the 5 km max and confirm all three LOD tiers populate with bounded work.
   await page.locator('#visibility').evaluate((input: HTMLInputElement) => {
-    input.value = '10000';
+    input.value = '5000';
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.evaluate(() => window.__SOARING__.setTimeScale(1));
   // Full far-field draining is covered by the unit tests; on the software-WebGL CI runner even the
-  // real per-frame build budget (2 chunks/frame) takes too long to fully drain ~500+ chunks within
-  // a test timeout, so this only waits for every tier to start populating - bounded progress, not
+  // real per-frame build budget (2 chunks/frame) can take a while to fully drain hundreds of
+  // chunks, so this only waits for every tier to start populating - bounded progress, not
   // completion.
   await page.waitForFunction(() => window.__SOARING__.snapshot().tiers.far > 0, undefined, { timeout: 60_000 });
   const snapshot = await page.evaluate(() => window.__SOARING__.snapshot());
-  // The range input snaps to its step grid (720 + n*120), so the max settable value is 9,960, not 10,000.
-  expect(snapshot.requestedDistance).toBeGreaterThanOrEqual(9900);
+  expect(snapshot.requestedDistance).toBeGreaterThanOrEqual(4900);
   expect(snapshot.tiers.near).toBeGreaterThan(0);
   expect(snapshot.tiers.mid).toBeGreaterThan(0);
   expect(snapshot.tiers.far).toBeGreaterThan(0);
-  // Bounded chunk/mesh work even at the 10 km max: the coarse far grid keeps total tile count low,
+  // Bounded chunk/mesh work even at the 5 km max: the coarse far grid keeps total tile count low,
   // and the total (built + still queued) stays bounded even before the stream fully drains.
-  expect(snapshot.chunks).toBeLessThan(1200);
-  expect(snapshot.chunks + snapshot.pending).toBeLessThan(1200);
+  expect(snapshot.chunks).toBeLessThan(700);
+  expect(snapshot.chunks + snapshot.pending).toBeLessThan(700);
   expect(errors).toEqual([]);
 });
 

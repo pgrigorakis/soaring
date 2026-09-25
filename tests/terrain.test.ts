@@ -53,7 +53,7 @@ describe('terrain streaming', () => {
     terrain.setReach(reach);
     expect(terrain.coveredDistance(x, z)).toBeLessThan(reach);
     // Test-only: a larger-than-production build budget keeps this test's own
-    // bookkeeping (not real frame work) from scaling with the 10 km reach.
+    // bookkeeping (not real frame work) from scaling with the max reach.
     // Real per-frame streaming still uses the default budget of 2 (see the
     // first test above and TerrainStream.update's default parameter).
     const testBuildBudget = 50;

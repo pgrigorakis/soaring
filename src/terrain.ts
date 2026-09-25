@@ -3,7 +3,7 @@ import { hash2, type LandscapeSample, WorldModel } from './world';
 
 export const CHUNK_SIZE = 360;
 export const MIN_VISIBILITY = 720;
-export const MAX_VISIBILITY = 10000;
+export const MAX_VISIBILITY = 5000;
 export const DEFAULT_VISIBILITY = 5000;
 const NEAR_RADIUS = 3; // chunks (fine grid): individual trees, rocks, full-density mesh
 // Beyond this distance, forest reads as terrain color only - no per-tree geometry.

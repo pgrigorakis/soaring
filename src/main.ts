@@ -54,7 +54,7 @@ function nextVisit(): number {
 }
 
 // Development-only smoke harness uses a smaller software-WebGL render budget: a bounded default
-// terrain visibility so CI never has to stream toward the 10 km product default. Test-only, not a
+// terrain visibility so CI never has to stream toward the 5 km product default. Test-only, not a
 // product setting; a saved value (set explicitly by a test) always wins.
 const smokeMode = import.meta.env.DEV && new URLSearchParams(location.search).has('smoke');
 const hasSavedSettings = localStorage.getItem(SETTINGS_KEY) != null;
