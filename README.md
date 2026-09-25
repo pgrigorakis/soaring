@@ -19,7 +19,7 @@ Open `http://127.0.0.1:4173`. Production output is created with `npm run build`.
 
 - Drag on the landscape to orbit the camera. Release to let it return slowly to the trailing view.
 - Move the pointer to reveal the settings control.
-- Settings provide an overall sound mute, independent ambience (wind and wing flaps) and music volume sliders, terrain visibility, minimum and maximum flight height above local terrain, camera distance, a persistent Show thermal toggle, and a new-world action. Height bounds persist across reloads; the eagle selects its own height and route within them.
+- Settings provide an overall sound mute, independent ambience (wind and wing flaps) and music volume sliders, terrain visibility, minimum and maximum flight height above local terrain, camera distance, a persistent Show thermal toggle, and a new-world action. Show thermal marks every thermal within 3.5 km of the eagle; the selected thermal stays hotter. Height bounds persist across reloads; the eagle selects its own height and route within them.
 - Press `D` to show or hide diagnostics.
 
 Sound is procedural and starts muted on every page load. If sound was previously enabled, a pointer gesture can resume it; pressing Sound to mute instead keeps it muted. If the browser cannot start audio, sound stays muted and the control can retry. The two volume settings persist independently; existing single-volume preferences initialize both sliders. Settings and the world seed live in `localStorage`. A reload keeps the seed but increments a scenic-visit index, so it starts elsewhere in the same world.
@@ -59,7 +59,7 @@ The product reliability target is one uninterrupted hour without intervention or
 - `src/terrain.ts` turns the world model into recyclable Three.js chunks across three mesh levels of detail (see Terrain visibility above). Missing chunks are queued nearest first and built two per frame to avoid stalls. Shared materials and instanced vegetation keep GPU use bounded; distant chunks are disposed.
 - `src/eagle.ts` separates the explicit navigation state machine from the visual model. The eagle glides toward interesting places, sinking as it goes, and flaps in short bursts only to climb: near the soft minimum-height floor, when terrain rises ahead, or while thermal-seeking. It never flaps while thermal-riding: it circles at 30–60 m, banked 20–35° toward the thermal, climbing 3–4 m/s as the circle drifts with the thermal, and leaves at maximum flight height or when the thermal weakens.
 - `src/main.ts` owns rendering, camera input, lighting/haze, persistence, controls, diagnostics, and lifecycle wiring. During thermal-riding the chase camera follows more loosely and yaws slower than the eagle so the bird moves around the frame; entry and exit ease rather than jerk.
-- `src/thermal-marker.ts` owns the reusable translucent marker for the eagle's active thermal.
+- `src/thermal-marker.ts` owns one pooled instanced column for every thermal within 3.5 km of the eagle. The selected thermal stays hotter. Columns fade at the range edge instead of popping.
 - `src/audio.ts` creates wind, wing flaps that follow the eagle's actual flapping, and a continuous original musical bed with the Web Audio API. The music adapts to the eagle's behavior; ambience and music use separate level buses under the shared mute. It uses no downloaded media.
 
 The world is deterministic for a seed, but the generated audio noise is not part of world simulation. There are no remote runtime assets.

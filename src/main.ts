@@ -5,7 +5,7 @@ import './style.css';
 import { Soundscape } from './audio';
 import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS, normalizeFlightHeight } from './eagle';
 import { DEFAULT_VISIBILITY, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
-import { ThermalMarker } from './thermal-marker';
+import { THERMAL_MARKER_RANGE, ThermalMarker } from './thermal-marker';
 import { SUN_OFFSET as SUN_VECTOR, WorldModel } from './world';
 
 type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
@@ -320,7 +320,7 @@ visibilityInput.addEventListener('input', () => {
 });
 showThermalInput.addEventListener('change', () => {
   settings.showThermal = showThermalInput.checked;
-  thermalMarker.update(navigator.activeThermal, settings.showThermal, performance.now() / 1000);
+  thermalMarker.update(navigator.state, navigator.activeThermal, settings.showThermal, performance.now() / 1000);
   saveSettings();
 });
 distanceInput.addEventListener('input', () => {
@@ -406,7 +406,7 @@ function frame(now: number): void {
   let state = navigator.state;
   for (let step = 0; step < substeps; step += 1) state = navigator.update(delta / substeps);
   eagle.update(state, delta);
-  thermalMarker.update(navigator.activeThermal, settings.showThermal, now / 1000);
+  thermalMarker.update(state, navigator.activeThermal, settings.showThermal, now / 1000);
   soundscape.update(state.behavior, state.flapping);
 
   if (!dragging) {
@@ -457,6 +457,7 @@ function frame(now: number): void {
       `clearance    ${(state.y - world.sample(state.x, state.z).height).toFixed(0)} m`,
       `position     ${state.x.toFixed(0)}, ${state.z.toFixed(0)}`,
       `thermal      ${navigator.activeThermal ? `${navigator.activeThermal.x.toFixed(0)}, ${navigator.activeThermal.z.toFixed(0)}` : 'none selected'}`,
+      `markers      ${thermalMarker.count} within ${THERMAL_MARKER_RANGE} m`,
       `nearby       ${nearby}`,
       `time scale   ${timeScale.toFixed(1)}×`,
     ].join('\n');
@@ -480,28 +481,36 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; tiers: { near: number; mid: number; far: number } };
+      snapshot: () => { seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number } };
       setTimeScale: (scale: number) => void;
     };
   }
 }
 window.__SOARING__ = {
-  snapshot: () => ({
-    seed: world.seed,
-    chunks: terrain.chunkCount,
-    pending: terrain.pendingCount,
-    visibleDistance: fog.far,
-    requestedDistance: settings.terrainVisibility,
-    cameraDistance: settings.cameraDistance,
-    behavior: navigator.state.behavior,
-    flapping: navigator.state.flapping,
-    bank: navigator.state.bank,
-    heading: navigator.state.heading,
-    position: [navigator.state.x, navigator.state.y, navigator.state.z],
-    geometries: renderer.info.memory.geometries,
-    activeThermal: navigator.activeThermal ? [navigator.activeThermal.x, navigator.activeThermal.z] : null,
-    marker: thermalMarker.mesh.visible ? [thermalMarker.mesh.position.x, thermalMarker.mesh.position.z] : null,
-    tiers: terrain.tierCounts,
-  }),
+  snapshot: () => {
+    const placed = thermalMarker.placements();
+    const activeMarker = placed.find((marker) => marker.active);
+    return {
+      seed: world.seed,
+      chunks: terrain.chunkCount,
+      pending: terrain.pendingCount,
+      visibleDistance: fog.far,
+      requestedDistance: settings.terrainVisibility,
+      cameraDistance: settings.cameraDistance,
+      behavior: navigator.state.behavior,
+      flapping: navigator.state.flapping,
+      bank: navigator.state.bank,
+      heading: navigator.state.heading,
+      position: [navigator.state.x, navigator.state.y, navigator.state.z],
+      geometries: renderer.info.memory.geometries,
+      activeThermal: navigator.activeThermal ? [navigator.activeThermal.x, navigator.activeThermal.z] : null,
+      marker: activeMarker ? [activeMarker.x, activeMarker.z] : null,
+      markerRange: THERMAL_MARKER_RANGE,
+      markers: placed.map((marker) => [marker.x, marker.z, marker.active ? 1 : 0]),
+      // Wider than the marker window so smoke tests can see thermals the marker must exclude.
+      thermalCandidates: world.nearbyThermals(navigator.state.x, navigator.state.z, 6).map((thermal) => [thermal.x, thermal.z]),
+      tiers: terrain.tierCounts,
+    };
+  },
   setTimeScale: (scale: number) => { timeScale = Math.max(1, Math.min(12, scale)); },
 };

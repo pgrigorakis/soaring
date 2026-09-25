@@ -359,6 +359,18 @@ export class WorldModel {
     return thermals;
   }
 
+  /** Thermals whose current position is within `range` meters. Cell scan covers the full disk. */
+  thermalsWithin(x: number, z: number, range: number): Thermal[] {
+    if (!(range > 0)) return [];
+    const cells = Math.floor(range / THERMAL_CELL) + 1;
+    const rangeSq = range * range;
+    return this.nearbyThermals(x, z, cells).filter((thermal) => {
+      const dx = thermal.x - x;
+      const dz = thermal.z - z;
+      return dx * dx + dz * dz <= rangeSq;
+    });
+  }
+
   /** Dry, open, sun-facing ground scores high; forest is low; water is zero. */
   private thermalScore(x: number, z: number): number {
     const sample = this.sample(x, z);

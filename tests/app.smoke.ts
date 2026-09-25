@@ -35,6 +35,27 @@ test('renders high-detail terrain, streams, and supports camera controls', async
   expect(errors).toEqual([]);
 });
 
+function expectMarkersInRange(snapshot: {
+  position: number[];
+  markerRange: number;
+  markers: number[][];
+  thermalCandidates: number[][];
+  activeThermal: number[] | null;
+}): void {
+  const x = snapshot.position[0] ?? 0;
+  const z = snapshot.position[2] ?? 0;
+  const marked = new Set(snapshot.markers.map((marker) => `${marker[0]},${marker[1]}`));
+  const inside = snapshot.thermalCandidates.filter((thermal) => Math.hypot((thermal[0] ?? 0) - x, (thermal[1] ?? 0) - z) <= snapshot.markerRange);
+  const outside = snapshot.thermalCandidates.filter((thermal) => Math.hypot((thermal[0] ?? 0) - x, (thermal[1] ?? 0) - z) > snapshot.markerRange);
+  expect(snapshot.markers.length).toBeGreaterThanOrEqual(2);
+  expect(inside.length).toBeGreaterThanOrEqual(2);
+  expect(outside.length).toBeGreaterThanOrEqual(1);
+  expect(marked).toEqual(new Set(inside.map((thermal) => `${thermal[0]},${thermal[1]}`)));
+  const activeMarks = snapshot.markers.filter((marker) => marker[2] === 1);
+  expect(activeMarks).toHaveLength(1);
+  expect([activeMarks[0]?.[0], activeMarks[0]?.[1]]).toEqual(snapshot.activeThermal);
+}
+
 test('tracks the active thermal and persists the visibility setting', async ({ page }) => {
   test.setTimeout(90_000);
   const errors = captureErrors(page);
@@ -46,17 +67,21 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
   await page.evaluate(() => window.__SOARING__.setTimeScale(12));
   await page.waitForFunction(() => window.__SOARING__.snapshot().activeThermal !== null, undefined, { timeout: 25_000 });
   const active = await page.evaluate(() => window.__SOARING__.snapshot());
+  expectMarkersInRange(active);
   expect(active.marker).toEqual(active.activeThermal);
   await setting.uncheck();
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).marker).toBeNull();
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).markers).toEqual([]);
   await page.reload();
   await page.locator('#settings-toggle').click();
   await expect(setting).not.toBeChecked();
   await page.evaluate(() => window.__SOARING__.setTimeScale(12));
   await page.waitForFunction(() => window.__SOARING__.snapshot().activeThermal !== null, undefined, { timeout: 25_000 });
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).marker).toBeNull();
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).markers).toEqual([]);
   await setting.check();
   const enabled = await page.evaluate(() => window.__SOARING__.snapshot());
+  expectMarkersInRange(enabled);
   expect(enabled.marker).toEqual(enabled.activeThermal);
   expect(errors).toEqual([]);
 });
