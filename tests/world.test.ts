@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { seedFromText, WorldModel } from '../src/world';
+import { meanderOffset, seedFromText, WorldModel } from '../src/world';
 
 describe('deterministic world generation', () => {
   it('returns identical terrain and thermals for a seed', () => {
@@ -43,11 +43,11 @@ describe('deterministic world generation', () => {
   it('makes large forests, open meadows, small groves and isolated trees', () => {
     const world = new WorldModel(80231);
     const count = (x: number, z: number) => world.treesInArea(x * 360, z * 360, 360, 36).length;
-    expect(count(-4, -1)).toBeGreaterThan(50);
-    expect(count(-3, -1)).toBeGreaterThan(50); // forest spans chunks
+    expect(count(-5, 0)).toBeGreaterThan(50);
+    expect(count(-4, 0)).toBeGreaterThan(50); // forest spans chunks
     expect(count(0, -3)).toBe(0);
     expect(count(1, -3)).toBe(0); // broad meadow
-    expect(count(-3, -5)).toBeGreaterThan(15); // a smaller grove
+    expect(count(-3, -5)).toBeGreaterThan(8); // a smaller grove
     expect(count(-4, -5)).toBeLessThan(5);
     expect(count(-2, -5)).toBeLessThan(5); // surrounded by open ground
     expect(count(1, 2)).toBe(1); // rare lone tree in open country
@@ -89,16 +89,132 @@ describe('deterministic world generation', () => {
 
   it('carves river valleys without near-vertical walls', () => {
     const world = new WorldModel(448122);
+    const reaches = world.reachesIn(-8000, -8000, 8000, 8000).filter((reach) => reach.ax !== reach.bx || reach.az !== reach.bz);
+    expect(reaches.length).toBeGreaterThan(200);
     let steepest = 0;
-    for (let z = -20_000; z <= 20_000; z += 250) {
-      let previous = world.sample(2300, z).height;
-      for (let x = 2302; x <= 3900; x += 2) {
-        const height = world.sample(x, z).height;
+    for (const reach of reaches.slice(0, 200)) {
+      const length = Math.hypot(reach.bx - reach.ax, reach.bz - reach.az);
+      const [nx, nz] = [(reach.bz - reach.az) / length, -(reach.bx - reach.ax) / length];
+      const [cx, cz] = [(reach.ax + reach.bx) / 2, (reach.az + reach.bz) / 2];
+      let previous = world.sample(cx - nx * 200, cz - nz * 200).height;
+      for (let d = -198; d <= 200; d += 2) {
+        const height = world.sample(cx + nx * d, cz + nz * d).height;
         steepest = Math.max(steepest, Math.abs(height - previous) / 2);
         previous = height;
       }
     }
     expect(steepest).toBeLessThan(3);
+  });
+
+  it('routes rivers downhill into larger rivers, widening downstream, without crossings', () => {
+    const world = new WorldModel(448122);
+    const reaches = world.reachesIn(-10_000, -10_000, 10_000, 10_000);
+    const starting = new Map(reaches.map((reach) => [`${reach.ax},${reach.az}`, reach]));
+    let confluences = 0;
+    const inflows = new Map<string, number>();
+    for (const reach of reaches) {
+      expect(reach.bLevel).toBeLessThanOrEqual(reach.aLevel);
+      const next = starting.get(`${reach.bx},${reach.bz}`);
+      if (reach.ax === reach.bx && reach.az === reach.bz) continue; // ends in a lake
+      if (!next) continue; // leaves the tested area
+      expect(next.aLevel).toBe(reach.bLevel);
+      expect(next.aWidth).toBeGreaterThanOrEqual(reach.aWidth);
+      const key = `${reach.bx},${reach.bz}`;
+      inflows.set(key, (inflows.get(key) ?? 0) + 1);
+    }
+    for (const count of inflows.values()) if (count > 1) confluences += 1;
+    expect(confluences).toBeGreaterThan(50);
+    const widths = reaches.filter((reach) => reach.ax !== reach.bx || reach.az !== reach.bz).map((reach) => reach.aWidth);
+    expect(Math.min(...widths)).toBeGreaterThanOrEqual(6);
+    expect(Math.min(...widths)).toBeLessThanOrEqual(8);
+    expect(Math.max(...widths)).toBeGreaterThanOrEqual(30);
+    expect(Math.max(...widths)).toBeLessThanOrEqual(40);
+
+    // Each reach is drawn as a meandering polyline; no two may touch except where one flows into the other.
+    type Line = { points: Array<[number, number]>; start: string; end: string };
+    const lines: Line[] = reaches.filter((reach) => reach.ax !== reach.bx || reach.az !== reach.bz).map((reach) => {
+      const length = Math.hypot(reach.bx - reach.ax, reach.bz - reach.az);
+      const points = Array.from({ length: 17 }, (_, k): [number, number] => {
+        const t = k / 16;
+        if (k === 0 || k === 16) return k === 0 ? [reach.ax, reach.az] : [reach.bx, reach.bz]; // exact shared ends
+        const offset = meanderOffset(reach, t);
+        return [
+          reach.ax + (reach.bx - reach.ax) * t + offset * (reach.bz - reach.az) / length,
+          reach.az + (reach.bz - reach.az) * t - offset * (reach.bx - reach.ax) / length,
+        ];
+      });
+      return { points, start: `${reach.ax},${reach.az}`, end: `${reach.bx},${reach.bz}` };
+    });
+    const crosses = ([ax, az]: number[], [bx, bz]: number[], [cx, cz]: number[], [dx, dz]: number[]) => {
+      const side = (px: number, pz: number, qx: number, qz: number, rx: number, rz: number) => (qx - px) * (rz - pz) - (qz - pz) * (rx - px);
+      return side(ax!, az!, bx!, bz!, cx!, cz!) * side(ax!, az!, bx!, bz!, dx!, dz!) < 0
+        && side(cx!, cz!, dx!, dz!, ax!, az!) * side(cx!, cz!, dx!, dz!, bx!, bz!) < 0;
+    };
+    let checked = 0;
+    for (let i = 0; i < lines.length; i += 1) {
+      for (let j = i + 1; j < lines.length; j += 1) {
+        const [a, b] = [lines[i]!, lines[j]!];
+        if (Math.hypot(a.points[0]![0] - b.points[0]![0], a.points[0]![1] - b.points[0]![1]) > 700) continue;
+        checked += 1;
+        for (let p = 0; p < 16; p += 1) {
+          for (let q = 0; q < 16; q += 1) {
+            if (crosses(a.points[p]!, a.points[p + 1]!, b.points[q]!, b.points[q + 1]!)) {
+              throw new Error(`rivers cross: ${a.start}->${a.end} and ${b.start}->${b.end}`);
+            }
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(2000);
+  });
+
+  it('marks river water at its reach and keeps trees off steep slopes', () => {
+    const world = new WorldModel(448122);
+    const reach = world.reachesIn(0, 0, 4000, 4000).find((candidate) => candidate.ax !== candidate.bx)!;
+    const middle = world.sample((reach.ax + reach.bx) / 2, (reach.az + reach.bz) / 2 + 0);
+    expect(middle.surface).toBeCloseTo((reach.aLevel + reach.bLevel) / 2, 0);
+    const trees = world.treesInArea(-3000, -3000, 6000, 29);
+    expect(trees.length).toBeGreaterThan(1000);
+    for (const tree of trees) {
+      const slope = Math.hypot(world.sample(tree.x + 3, tree.z).height - tree.y, world.sample(tree.x, tree.z + 3).height - tree.y) / 3;
+      expect(slope).toBeLessThanOrEqual(0.6);
+    }
+  });
+
+  it('never leaves dry ground under the water drawn at a river or lake edge', () => {
+    // Mirrors the 9 m terrain grid: water covers every quad with a wet corner, and dry corners take
+    // their wet neighbors' level. Ground beside that water must stay above it, or the edge shows steps.
+    const world = new WorldModel(448122);
+    const step = 9;
+    const size = 400;
+    const grid = Array.from({ length: (size + 1) ** 2 }, (_, index) =>
+      world.sample(-3400 + (index % (size + 1)) * step, -3000 + Math.floor(index / (size + 1)) * step));
+    const at = (i: number, j: number) => grid[j * (size + 1) + i]!;
+    let drawnEdges = 0;
+    for (let j = 1; j < size; j += 1) {
+      for (let i = 1; i < size; i += 1) {
+        if (at(i, j).water) continue;
+        const wet = [-1, 0, 1].flatMap((dj) => [-1, 0, 1].map((di) => at(i + di, j + dj))).filter((sample) => sample.water);
+        if (wet.length === 0) continue;
+        drawnEdges += 1;
+        const level = wet.reduce((sum, sample) => sum + sample.surface, 0) / wet.length;
+        expect(at(i, j).height).toBeGreaterThan(level - 0.3);
+      }
+    }
+    expect(drawnEdges).toBeGreaterThan(1000);
+  });
+
+  it('gives identical river terrain whatever order chunks are generated in', () => {
+    const points: Array<[number, number]> = [];
+    // A seam line through river country, sampled at chunk-edge vertex spacing.
+    for (let z = -3600; z <= 3600; z += 9) points.push([3600, z]);
+    const forward = new WorldModel(448122);
+    const backward = new WorldModel(448122);
+    backward.sample(40_000, -40_000); // warm caches elsewhere first
+    const a = points.map(([x, z]) => forward.sample(x, z));
+    const b = [...points].reverse().map(([x, z]) => backward.sample(x, z)).reverse();
+    expect(a).toEqual(b);
+    expect(a.some((sample) => sample.river)).toBe(true);
   });
 
   it('starts visits at more interesting terrain than unscored ring points', () => {

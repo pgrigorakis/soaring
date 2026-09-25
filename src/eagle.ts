@@ -88,7 +88,7 @@ export class EagleNavigator {
         this.target.z = this.thermal.z;
         const distance = Math.hypot(this.state.x - this.thermal.x, this.state.z - this.thermal.z);
         if (distance < 70) this.enter('thermal-riding');
-        else if (this.behaviorTime > 42) this.enterGliding();
+        else if (this.behaviorTime > 42 && distance > 150) this.enterGliding(); // never give up on a final approach
       } else if (this.behaviorTime > 34) {
         const altitude = this.state.y - ground;
         const span = this.heightRange.max - this.heightRange.min;

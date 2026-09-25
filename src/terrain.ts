@@ -194,6 +194,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     const sampleAt = (xIndex: number, zIndex: number) => samples[(zIndex + 1) * row + xIndex + 1]!;
     const heightAt = (xIndex: number, zIndex: number) => sampleAt(xIndex, zIndex).height;
     const water: boolean[] = [];
+    const surface: number[] = [];
 
     for (let zIndex = 0; zIndex <= segments; zIndex += 1) {
       for (let xIndex = 0; xIndex <= segments; xIndex += 1) {
@@ -201,6 +202,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         const z = originZ + zIndex * step;
         const sample = sampleAt(xIndex, zIndex);
         water.push(sample.water);
+        surface.push(sample.water ? sample.surface : this.dryWaterLevel(sampleAt, xIndex, zIndex));
         positions.push(x, sample.height, z);
         normal.set(
           heightAt(xIndex - 1, zIndex) - heightAt(xIndex + 1, zIndex),
@@ -260,7 +262,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     terrain.castShadow = true;
     group.add(terrain);
 
-    const waterGeometry = this.createWaterGeometry(originX, originZ, segments, water);
+    const waterGeometry = this.createWaterGeometry(originX, originZ, segments, water, surface);
     if (waterGeometry) group.add(new THREE.Mesh(waterGeometry, this.waterMaterial));
 
     const treeObjects = detailed ? this.createTrees(originX, originZ, TREE_SPACING) : this.createFarTrees(originX, originZ);
@@ -281,19 +283,35 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     };
   }
 
-  private createWaterGeometry(originX: number, originZ: number, segments: number, water: boolean[]): THREE.BufferGeometry | null {
+  // A dry vertex at a water edge takes its wet neighbors' level, so river and lake edges stay flat.
+  private dryWaterLevel(sampleAt: (xIndex: number, zIndex: number) => LandscapeSample, xIndex: number, zIndex: number): number {
+    let sum = 0;
+    let count = 0;
+    for (let dz = -1; dz <= 1; dz += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        const neighbor = sampleAt(xIndex + dx, zIndex + dz);
+        if (!neighbor.water) continue;
+        sum += neighbor.surface;
+        count += 1;
+      }
+    }
+    return count > 0 ? sum / count : sampleAt(xIndex, zIndex).surface;
+  }
+
+  private createWaterGeometry(originX: number, originZ: number, segments: number, water: boolean[], surface: number[]): THREE.BufferGeometry | null {
     const step = CHUNK_SIZE / segments;
-    const y = this.world.waterLevel + 0.15;
     const positions: number[] = [];
     const indices: number[] = [];
     for (let iz = 0; iz < segments; iz += 1) {
       for (let ix = 0; ix < segments; ix += 1) {
         const a = iz * (segments + 1) + ix;
-        if (!water[a] && !water[a + 1] && !water[a + segments + 1] && !water[a + segments + 2]) continue;
+        const corners = [a, a + 1, a + segments + 1, a + segments + 2];
         const x = originX + ix * step;
         const z = originZ + iz * step;
+        if (!corners.some((corner) => water[corner])) continue;
+        const [y0, y1, y2, y3] = corners.map((corner) => surface[corner]! + 0.15);
         const base = positions.length / 3;
-        positions.push(x, y, z, x + step, y, z, x, y, z + step, x + step, y, z + step);
+        positions.push(x, y0!, z, x + step, y1!, z, x, y2!, z + step, x + step, y3!, z + step);
         indices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
       }
     }
