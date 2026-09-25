@@ -27,9 +27,21 @@ const FLAP_BURST_SECONDS = 0.9; // a few wing beats, then glide again
 export const TERRAIN_SAFETY_MARGIN = 6;
 export const THERMAL_RADIUS_RANGE = { min: 30, max: 60 } as const;
 export const THERMAL_BANK_RANGE = { min: (20 * Math.PI) / 180, max: (35 * Math.PI) / 180 } as const;
-export const THERMAL_CLIMB_RANGE = { min: 1, max: 3 } as const;
+export const THERMAL_CLIMB_RANGE = { min: 3, max: 4 } as const;
 const THERMAL_CIRCLE_SPEED = 14; // m/s; with 30–60 m radius this yields a 20–35° bank
 const THERMAL_WEAK_LIFT = 0.18;
+
+// Positive bank is a positive local-Z rotation: it lowers the left wing. After the heading yaw,
+// the right wing (+X) points along (cos heading, -sin heading). The sign follows that wing and
+// the thermal, so either orbit direction banks inward instead of a fixed roll.
+export function inwardThermalBankSign(
+  heading: number, birdX: number, birdZ: number, thermalX: number, thermalZ: number,
+): 1 | -1 {
+  const rightX = Math.cos(heading);
+  const rightZ = -Math.sin(heading);
+  const rightTowardCenter = rightX * (thermalX - birdX) + rightZ * (thermalZ - birdZ);
+  return rightTowardCenter > 0 ? -1 : 1;
+}
 
 export function normalizeFlightHeight(min: number, max: number): FlightHeightRange {
   const safeMin = clamp(Number.isFinite(min) ? min : DEFAULT_FLIGHT_HEIGHT.min,
@@ -189,7 +201,10 @@ export class EagleNavigator {
     const bankSpan = THERMAL_BANK_RANGE.max - THERMAL_BANK_RANGE.min;
     const bankMag = THERMAL_BANK_RANGE.max - ((radius - THERMAL_RADIUS_RANGE.min) / span) * bankSpan
       + Math.sin(this.totalTime * 0.5) * ((1.5 * Math.PI) / 180);
-    const targetBank = -clamp(bankMag, THERMAL_BANK_RANGE.min, THERMAL_BANK_RANGE.max);
+    const bankSign = inwardThermalBankSign(
+      this.state.heading, this.state.x, this.state.z, this.thermal.x, this.thermal.z,
+    );
+    const targetBank = bankSign * clamp(bankMag, THERMAL_BANK_RANGE.min, THERMAL_BANK_RANGE.max);
     this.state.bank += (targetBank - this.state.bank) * Math.min(1, dt * 1.4);
 
     this.state.y = Math.min(this.state.y + climbRate * dt, ground + this.heightRange.max);
