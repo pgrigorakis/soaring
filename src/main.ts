@@ -233,6 +233,7 @@ terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, 4
 
 let orbitYaw = 0;
 let orbitPitch = 0;
+let heldViewpoint: { x: number; y: number; z: number; lookX: number; lookY: number; lookZ: number } | null = null;
 let dragging = false;
 let pointerX = 0;
 let pointerY = 0;
@@ -546,6 +547,9 @@ function frame(now: number): void {
     cameraPosition.set(state.x, state.y + 16, state.z).addScaledVector(skyAim, -36);
     cameraPosition.y = Math.max(cameraPosition.y, world.sample(cameraPosition.x, cameraPosition.z).height + 8);
     lookAt.copy(cameraPosition).addScaledVector(skyAim, 280);
+  } else if (heldViewpoint) {
+    cameraPosition.set(heldViewpoint.x, heldViewpoint.y, heldViewpoint.z);
+    lookAt.set(heldViewpoint.lookX, heldViewpoint.lookY, heldViewpoint.lookZ);
   } else {
     if (!dragging) {
       const returnRate = 1 - Math.exp(-rawDelta * 0.42);
@@ -631,6 +635,10 @@ declare global {
       setTimeScale: (scale: number) => void;
       setTimeOfDay: (phase: number) => void;
       lookAtBody: (body: 'sun' | 'moon' | 'horizon' | 'chase') => void;
+      landmark: () => { x: number; z: number; surface: number; lake: boolean } | null;
+      sample: (x: number, z: number) => { water: boolean; river: boolean; height: number; surface: number };
+      setViewpoint: (pose: { x: number; y: number; z: number; lookX: number; lookY: number; lookZ: number }) => void;
+      clearViewpoint: () => void;
     };
   }
 }
@@ -674,4 +682,8 @@ window.__SOARING__ = {
   lookAtBody: (body: 'sun' | 'moon' | 'horizon' | 'chase') => {
     skyLook = body === 'chase' ? null : body;
   },
+  landmark: () => world.landmarkNear(navigator.state.x, navigator.state.z),
+  sample: (x: number, z: number) => world.sample(x, z),
+  setViewpoint: (pose) => { heldViewpoint = pose; },
+  clearViewpoint: () => { heldViewpoint = null; },
 };

@@ -24,7 +24,8 @@ describe('autonomous eagle navigation', () => {
           closeApproaches += 1;
           approachingSince ??= step;
         }
-        if (approachingSince !== null) expect(step - approachingSince).toBeLessThan(100);
+        // Carved valleys can add a short detour on the last part of an approach.
+        if (approachingSince !== null) expect(step - approachingSince).toBeLessThan(120);
       }
       if (previousBehavior === 'thermal-seeking' && previous &&
         Math.hypot(state.x - previous.x, state.z - previous.z) < 150 &&

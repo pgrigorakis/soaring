@@ -2,7 +2,7 @@ export type LandscapeSample = {
   height: number;
   /** Water surface height: the river's level in a river channel, otherwise the lake level. */
   surface: number;
-  /** Distance from the nearest river channel's edge; negative inside it. */
+  /** Distance from the nearest river or lake shore; negative inside the water. */
   bank: number;
   moisture: number;
   forest: number;
@@ -19,28 +19,62 @@ export const SUN_OFFSET = { x: -420, y: 190, z: -300 } as const;
 const SUN_LENGTH = Math.hypot(SUN_OFFSET.x, SUN_OFFSET.y, SUN_OFFSET.z);
 const THERMAL_CELL = 1100;
 const THERMAL_CANDIDATES = 5;
-// Rivers follow steepest descent between jittered nodes of a coarse grid.
-const RIVER_CELL = 200;
-const RIVER_JITTER = 0.3;
-const RIVER_MEANDER = 0.06;
-const RIVER_MIN_FLOW = 14;
-const RIVER_MAX_FLOW = 600;
-const BANK_SLOPE = 0.12;
+/**
+ * Drainage is decided on this lattice before the terrain is shaped.
+ * Far tiles sample every 90 m, so a channel narrower than the far-grid diagonal
+ * disappears between vertices. Half-width stays above that diagonal.
+ */
+export const DRAINAGE_SPACING = 500;
+export const MIN_RIVER_HALF_WIDTH = 84;
+const MAX_RIVER_HALF_WIDTH = 124;
+const RIVER_MIN_FLOW = 4;
+const RIVER_MAX_FLOW = 500;
+const MIN_LAKE_RADIUS = 175;
+const MAX_LAKE_RADIUS = 360;
+const SHELF = 150;
 const MAX_TREE_SLOPE = 0.6;
-// One detailed terrain quad: water is drawn on every quad that touches a channel vertex.
-const TREE_BANK_CLEARANCE = 9;
-// Half the diagonal of a detailed terrain quad: narrower channels would slip between terrain vertices and vanish.
-const MIN_WATER_HALF_WIDTH = 6.5;
+const TREE_BANK_CLEARANCE = 18;
 const NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]] as const;
 
 type RiverNode = {
-  i: number; j: number; x: number; z: number; elevation: number; level: number;
-  down?: RiverNode | null; flow?: number; reach?: Reach | null;
+  i: number;
+  j: number;
+  x: number;
+  z: number;
+  elevation: number;
+  level?: number;
+  down?: RiverNode | null;
+  flow?: number;
+  reach?: Reach | null;
 };
-/** A straight river reach from a node to its downstream node, bent by a gentle meander. */
+
+/** A river segment, or a lake disc when `lake` is set (then the endpoints coincide). */
 export type Reach = {
-  ax: number; az: number; bx: number; bz: number;
-  aLevel: number; bLevel: number; aWidth: number; bWidth: number; meander: number;
+  ax: number;
+  az: number;
+  bx: number;
+  bz: number;
+  aLevel: number;
+  bLevel: number;
+  aWidth: number;
+  bWidth: number;
+  meander: number;
+  /** Second sideways harmonic, or a lake-outline phase when `lake` is set. */
+  bend: number;
+  lake: boolean;
+};
+
+export type DrainageNode = {
+  i: number;
+  j: number;
+  x: number;
+  z: number;
+  elevation: number;
+  level: number;
+  flow: number;
+  lake: boolean;
+  downstreamI: number | null;
+  downstreamJ: number | null;
 };
 
 const fract = (value: number) => value - Math.floor(value);
@@ -82,18 +116,29 @@ export function fbm(x: number, z: number, seed: number, octaves = 5): number {
 }
 
 const nodeKey = (i: number, j: number) => (i + 2 ** 20) * 2 ** 21 + j + 2 ** 20;
-const riverWidth = (flow: number) =>
-  7 + 31 * clamp01(Math.log(flow / RIVER_MIN_FLOW) / Math.log(RIVER_MAX_FLOW / RIVER_MIN_FLOW));
+const riverHalf = (flow: number) => MIN_RIVER_HALF_WIDTH
+  + (MAX_RIVER_HALF_WIDTH - MIN_RIVER_HALF_WIDTH)
+  * clamp01(Math.log(flow / RIVER_MIN_FLOW) / Math.log(RIVER_MAX_FLOW / RIVER_MIN_FLOW));
+const lakeRadius = (flow: number) => MIN_LAKE_RADIUS
+  + (MAX_LAKE_RADIUS - MIN_LAKE_RADIUS) * clamp01(Math.sqrt(flow) / Math.sqrt(120));
 
-/** Sideways meander offset at a fraction along a reach; zero at both ends. */
-export const meanderOffset = (reach: Reach, t: number) =>
-  reach.meander * Math.hypot(reach.bx - reach.ax, reach.bz - reach.az) * Math.sin(Math.PI * t);
+/** Sideways offset at a fraction along a reach; zero at both ends. */
+export const meanderOffset = (reach: Reach, t: number) => {
+  const length = Math.hypot(reach.bx - reach.ax, reach.bz - reach.az);
+  return length * (reach.meander * Math.sin(Math.PI * t) + reach.bend * Math.sin(2 * Math.PI * t));
+};
 
 function reachDistance(reach: Reach, x: number, z: number): { distance: number; t: number } {
   const dx = reach.bx - reach.ax;
   const dz = reach.bz - reach.az;
   const length = Math.hypot(dx, dz);
-  if (length === 0) return { distance: Math.hypot(x - reach.ax, z - reach.az), t: 0 };
+  if (length === 0) {
+    const dx = x - reach.ax;
+    const dz = z - reach.az;
+    const angle = Math.atan2(dz, dx);
+    const warp = 1 + 0.2 * Math.sin(2 * angle + reach.meander) + 0.11 * Math.sin(5 * angle + reach.bend);
+    return { distance: Math.hypot(dx, dz) / Math.max(0.7, warp), t: 0 };
+  }
   const along = ((x - reach.ax) * dx + (z - reach.az) * dz) / length;
   const t = clamp01(along / length);
   if (along < 0 || along > length) return { distance: Math.hypot(x - mix(reach.ax, reach.bx, t), z - mix(reach.az, reach.bz, t)), t };
@@ -108,7 +153,6 @@ function smootherstep(edge0: number, edge1: number, value: number): number {
 
 export class WorldModel {
   readonly seed: number;
-  readonly waterLevel = 2;
   private readonly thermals = new Map<string, Thermal | null>();
   private readonly riverNodes = new Map<number, RiverNode>();
   private readonly nearbyReaches = new Map<number, Reach[]>();
@@ -118,88 +162,160 @@ export class WorldModel {
   }
 
   sample(x: number, z: number): LandscapeSample {
-    const { land, lake, lakeShape, mountainRegion, detail } = this.land(x, z);
+    const bare = this.baseHeight(x, z);
+    const detail = fbm(x / 125, z / 125, this.seed + 31, 3) * 4.2 + fbm(x / 46, z / 46, this.seed + 37, 2) * 1.05;
+    const { mountainRegion } = this.relief(x, z);
 
-    // Shape terrain toward each nearby river's profile: a channel below the water, a bank just above it,
-    // a floodplain, and a valley that widens with the river and with how far the land must be cut.
-    // Where valleys overlap, the nearest channel dominates, so a neighbor's bank never fills a channel.
-    let blend = 0;
-    let shift = 0;
-    let surfaceSum = 0;
-    let bank = Infinity;
+    // The nearest channel owns the valley. A second channel blends in only near a divide,
+    // so a higher neighbor cannot lift this river onto a ridge or leave a cliff at the shore.
+    type Shore = { shoreDist: number; surface: number; lake: boolean; distance: number; half: number };
+    let nearest: Shore | null = null;
+    let second: Shore | null = null;
+    let wet: Shore | null = null;
+    const coneOf = (shore: Shore) => shore.surface + Math.max(0, shore.shoreDist) * (shore.lake ? 0.05 : 0.075);
     for (const reach of this.reachesNear(x, z)) {
       const { distance, t } = reachDistance(reach, x, z);
-      const width = mix(reach.aWidth, reach.bWidth, t);
+      const half = mix(reach.aWidth, reach.bWidth, t) / 2;
       const surface = mix(reach.aLevel, reach.bLevel, t);
-      const channel = Math.max(width / 2, MIN_WATER_HALF_WIDTH);
-      bank = Math.min(bank, distance - channel);
-      // The bank crosses the water surface exactly at the channel edge, over more than a terrain quad.
-      const floor = surface + 1;
-      const target = Math.max(surface - 1.2 - width * 0.06, Math.min(floor, surface + (distance - channel) * BANK_SLOPE));
-      // A floodplain at bank height keeps low land from dipping under the water drawn beside the channel.
-      const plain = channel + 1 / BANK_SLOPE + 12 + width * 0.5;
-      const weight = 1 - smootherstep(plain, plain + 25 + width * 1.5 + Math.abs(land - floor) * 2.4, distance);
-      if (weight <= 0) continue;
-      const strength = weight * Math.exp(-Math.max(0, distance - channel) / 6);
-      blend += strength;
-      shift += strength * weight * (target - land);
-      surfaceSum += strength * surface;
+      const shore: Shore = { shoreDist: distance - half, surface, lake: reach.lake, distance, half };
+      if (shore.shoreDist > 1600) continue;
+      if (!nearest || shore.shoreDist < nearest.shoreDist) {
+        second = nearest;
+        nearest = shore;
+      } else if (!second || shore.shoreDist < second.shoreDist) second = shore;
+      if (shore.shoreDist <= 0 && (!wet || (shore.lake && !wet.lake) || (shore.lake === wet.lake && shore.shoreDist < wet.shoreDist))) {
+        wet = shore;
+      }
     }
-    const river = bank < 0;
-    let height = blend > 0 ? land + shift / blend : land;
-    if (lake) height = Math.min(height, this.waterLevel - 3.5 - lakeShape * 3);
-    const surface = river && !lake ? surfaceSum / blend : this.waterLevel;
 
-    const riverside = 1 - smootherstep(2, 45, bank);
-    const moisture = clamp01(0.58 + fbm(x / 650, z / 650, this.seed + 121, 4) * 0.42 + (lake || river ? 0.3 : riverside * 0.2));
-    // Broad clearings and grove-scale variation, with a narrow transition for visible forest edges.
+    let height = bare;
+    let bank = nearest?.shoreDist ?? Infinity;
+    let surface = nearest?.surface ?? bare;
+    if (nearest) {
+      const primary = coneOf(nearest);
+      const share = second ? 0.5 * (1 - smootherstep(0, 48, second.shoreDist - nearest.shoreDist)) : 0;
+      height = mix(primary, second ? coneOf(second) : primary, share);
+      const land = smootherstep(280, 900, Math.max(0, nearest.shoreDist));
+      height = mix(height, bare, land);
+    }
+    let river = false;
+    let lake = false;
+    if (wet) {
+      river = !wet.lake;
+      lake = wet.lake;
+      surface = wet.surface;
+      bank = wet.shoreDist;
+      const bowl = wet.lake ? 0.7 + 0.3 * (1 - wet.distance / Math.max(wet.half, 1)) : 1;
+      height = surface - (wet.lake ? 3.6 : 2.7) * bowl;
+    } else if (bank < SHELF && bank > 0) {
+      height = Math.max(height, surface + 0.85);
+    }
+    const detailScale = clamp01((bank - 18) / 80);
+    height += detail * detailScale;
+    if (wet) height = Math.min(height, surface - 1.5);
+    else if (bank < SHELF && bank > 0) height = Math.max(height, surface + 0.85);
+
+    const riverside = 1 - smootherstep(6, 80, bank);
+    const moisture = clamp01(0.5 + fbm(x / 650, z / 650, this.seed + 121, 4) * 0.42 + ((lake || river) ? 0.3 : riverside * 0.22));
     const woodland = fbm(x / 1450, z / 1450, this.seed + 139, 4) * 0.86
       + fbm(x / 290, z / 290, this.seed + 149, 3) * 0.25
       + (moisture - 0.5) * 0.18;
-    const forest = Math.max(smootherstep(-0.04, 0.05, woodland), riverside * 0.8) * (1 - mountainRegion * 0.45);
-    const rock = clamp01(mountainRegion * 0.75 + smootherstep(74, 148, height) + Math.abs(detail) * 0.2);
+    const forest = Math.max(smootherstep(-0.04, 0.05, woodland), riverside * 0.62) * (1 - mountainRegion * 0.5) * ((river || lake) ? 0 : 1);
+    const rock = clamp01(mountainRegion * 0.74 + smootherstep(96, 170, height) + Math.abs(detail) * 0.16);
 
-    return { height, surface, bank, moisture, forest, rock, water: lake || river || height < this.waterLevel, river };
+    return { height, surface, bank, moisture, forest, rock, water: lake || river, river };
   }
 
-  private land(x: number, z: number) {
-    const broad = fbm(x / 2200, z / 2200, this.seed + 7, 4);
-    const rolling = fbm(x / 430, z / 430, this.seed + 19, 5);
-    const detail = fbm(x / 115, z / 115, this.seed + 31, 3);
-    const ridges = 1 - Math.abs(fbm(x / 1050, z / 1050, this.seed + 47, 5));
-    const mountainRegion = smootherstep(0.08, 0.52, broad + fbm(x / 4300, z / 4300, this.seed + 59, 3) * 0.42);
-    const mountains = mountainRegion * Math.pow(clamp01((ridges - 0.42) / 0.58), 2) * 185;
-    const lakeNoise = fbm(x / 540, z / 540, this.seed + 83, 4);
-    const lakeGate = fbm(x / 1700, z / 1700, this.seed + 97, 3);
-    const lakeShape = smootherstep(0.57, 0.72, lakeNoise) * smootherstep(-0.15, 0.25, lakeGate);
-    const lake = lakeShape > 0.58;
-    const land = 18 + broad * 35 + rolling * 22 + detail * 4 + mountains - lakeShape * 48;
-    return { land, lake, lakeShape, mountains, mountainRegion, detail };
+  /** Broad landform. Drainage and the rendered hills share this field, so rivers follow the visible relief. */
+  private relief(x: number, z: number) {
+    const broad = fbm(x / 3200, z / 3200, this.seed + 7, 4);
+    const ridges = 1 - Math.abs(fbm(x / 1550, z / 1550, this.seed + 47, 4));
+    const mountainRegion = smootherstep(0.04, 0.48, fbm(x / 5400, z / 5400, this.seed + 59, 3));
+    const mountains = mountainRegion * Math.pow(clamp01((ridges - 0.34) / 0.66), 1.65) * 188;
+    return { elevation: 28 + broad * 52 + mountains, mountainRegion };
   }
 
-  /** River reaches (node to downstream node, or a pond at a sink) that can shape the ground near a point. */
+  private baseHeight(x: number, z: number): number {
+    const gx = x / DRAINAGE_SPACING - 0.5;
+    const gz = z / DRAINAGE_SPACING - 0.5;
+    const i = Math.floor(gx);
+    const j = Math.floor(gz);
+    const tx = smooth(gx - i);
+    const tz = smooth(gz - j);
+    return mix(
+      mix(this.node(i, j).elevation, this.node(i + 1, j).elevation, tx),
+      mix(this.node(i, j + 1).elevation, this.node(i + 1, j + 1).elevation, tx),
+      tz,
+    );
+  }
+
+  /** River reaches and lake discs that can shape the ground near a point. */
   reachesNear(x: number, z: number): Reach[] {
-    const ci = Math.floor(x / RIVER_CELL);
-    const cj = Math.floor(z / RIVER_CELL);
+    const ci = Math.floor(x / DRAINAGE_SPACING);
+    const cj = Math.floor(z / DRAINAGE_SPACING);
     const key = nodeKey(ci, cj);
     let reaches = this.nearbyReaches.get(key);
     if (!reaches) {
-      reaches = this.reachesIn((ci - 2) * RIVER_CELL, (cj - 2) * RIVER_CELL, (ci + 2) * RIVER_CELL, (cj + 2) * RIVER_CELL);
+      const margin = 4;
+      reaches = this.reachesIn(
+        (ci - margin) * DRAINAGE_SPACING,
+        (cj - margin) * DRAINAGE_SPACING,
+        (ci + margin) * DRAINAGE_SPACING,
+        (cj + margin) * DRAINAGE_SPACING,
+      );
       this.nearbyReaches.set(key, reaches);
     }
     return reaches;
   }
 
-  /** All reaches starting at nodes in a rectangle of world space. */
+  /** All reaches starting at nodes whose centers lie in a rectangle of world space. */
   reachesIn(minX: number, minZ: number, maxX: number, maxZ: number): Reach[] {
     const reaches: Reach[] = [];
-    for (let j = Math.floor(minZ / RIVER_CELL); j <= Math.floor(maxZ / RIVER_CELL); j += 1) {
-      for (let i = Math.floor(minX / RIVER_CELL); i <= Math.floor(maxX / RIVER_CELL); i += 1) {
+    const i0 = Math.floor(minX / DRAINAGE_SPACING - 0.5);
+    const i1 = Math.floor(maxX / DRAINAGE_SPACING - 0.5);
+    const j0 = Math.floor(minZ / DRAINAGE_SPACING - 0.5);
+    const j1 = Math.floor(maxZ / DRAINAGE_SPACING - 0.5);
+    for (let j = j0; j <= j1; j += 1) {
+      for (let i = i0; i <= i1; i += 1) {
         const reach = this.reachFrom(this.node(i, j));
         if (reach) reaches.push(reach);
       }
     }
     return reaches;
+  }
+
+  drainageAt(i: number, j: number): DrainageNode {
+    const node = this.node(i, j);
+    const down = this.downstream(node);
+    const flow = this.flow(node);
+    return {
+      i,
+      j,
+      x: node.x,
+      z: node.z,
+      elevation: node.elevation,
+      level: this.waterLevel(node),
+      flow,
+      lake: !down && flow >= RIVER_MIN_FLOW,
+      downstreamI: down?.i ?? null,
+      downstreamJ: down?.j ?? null,
+    };
+  }
+
+  /** Largest nearby lake, or the largest river node if no lake is in range. */
+  landmarkNear(x: number, z: number, radius = 10): { x: number; z: number; surface: number; lake: boolean } | null {
+    const ci = Math.round(x / DRAINAGE_SPACING - 0.5);
+    const cj = Math.round(z / DRAINAGE_SPACING - 0.5);
+    let best: DrainageNode | null = null;
+    for (let j = cj - radius; j <= cj + radius; j += 1) {
+      for (let i = ci - radius; i <= ci + radius; i += 1) {
+        const node = this.drainageAt(i, j);
+        const useful = node.lake || (node.downstreamI !== null && node.flow >= RIVER_MIN_FLOW);
+        if (!useful) continue;
+        if (!best || Number(node.lake) > Number(best.lake) || (node.lake === best.lake && node.flow > best.flow)) best = node;
+      }
+    }
+    return best ? { x: best.x, z: best.z, surface: best.level, lake: best.lake } : null;
   }
 
   private reachFrom(node: RiverNode): Reach | null {
@@ -208,19 +324,41 @@ export class WorldModel {
     const flow = this.flow(node);
     if (flow < RIVER_MIN_FLOW) return null;
     const down = this.downstream(node);
-    const aWidth = riverWidth(flow);
+    const level = this.waterLevel(node);
     if (!down) {
-      // A river that reaches a local low point ends in a pond.
-      const size = 20 + aWidth * 2.4;
-      node.reach = { ax: node.x, az: node.z, bx: node.x, bz: node.z, aLevel: node.level, bLevel: node.level, aWidth: size, bWidth: size, meander: 0 };
-    } else {
+      const radius = lakeRadius(flow);
       node.reach = {
-        ax: node.x, az: node.z, bx: down.x, bz: down.z,
-        aLevel: node.level, bLevel: down.level,
-        aWidth, bWidth: riverWidth(this.flow(down)),
-        meander: (hash2(node.i, node.j, this.seed + 181) - 0.5) * 2 * RIVER_MEANDER,
+        ax: node.x, az: node.z, bx: node.x, bz: node.z,
+        aLevel: level, bLevel: level,
+        aWidth: radius * 2, bWidth: radius * 2,
+        meander: hash2(node.i, node.j, this.seed + 181) * Math.PI * 2,
+        bend: hash2(node.i, node.j, this.seed + 183) * Math.PI * 2,
+        lake: true,
       };
+      return node.reach;
     }
+    const downLevel = this.waterLevel(down);
+    let bx = down.x;
+    let bz = down.z;
+    const downFlow = this.flow(down);
+    if (!this.downstream(down) && downFlow >= RIVER_MIN_FLOW) {
+      const radius = lakeRadius(downFlow);
+      const dx = down.x - node.x;
+      const dz = down.z - node.z;
+      const length = Math.hypot(dx, dz);
+      const scale = length === 0 ? 0 : Math.max(0, length - radius) / length;
+      bx = node.x + dx * scale;
+      bz = node.z + dz * scale;
+    }
+    node.reach = {
+      ax: node.x, az: node.z, bx, bz,
+      aLevel: level, bLevel: downLevel,
+      aWidth: riverHalf(flow) * 2,
+      bWidth: riverHalf(Math.max(flow, downFlow)) * 2,
+      meander: this.bendTowardLowSide(node, down),
+      bend: (hash2(node.i, node.j, this.seed + 183) - 0.5) * 0.06,
+      lake: false,
+    };
     return node.reach;
   }
 
@@ -228,19 +366,33 @@ export class WorldModel {
     const key = nodeKey(i, j);
     let node = this.riverNodes.get(key);
     if (node) return node;
-    const x = (i + 0.5 + (hash2(i, j, this.seed + 163) - 0.5) * RIVER_JITTER) * RIVER_CELL;
-    const z = (j + 0.5 + (hash2(i, j, this.seed + 167) - 0.5) * RIVER_JITTER) * RIVER_CELL;
-    const { lake, lakeShape, mountains } = this.land(x, z);
-    // Rivers route over the broad landform; smaller hills would trap them in countless hollows.
-    // Valley carving absorbs the difference.
-    const drainage = 18 + fbm(x / 2200, z / 2200, this.seed + 7, 2) * 35 + mountains - lakeShape * 48;
-    const elevation = lake ? Math.min(drainage, this.waterLevel - 3.5 - lakeShape * 3) : drainage;
-    node = { i, j, x, z, elevation, level: Math.max(this.waterLevel, elevation - 1.5) };
+    const x = (i + 0.5 + (hash2(i, j, this.seed + 163) - 0.5) * 0.36) * DRAINAGE_SPACING;
+    const z = (j + 0.5 + (hash2(i, j, this.seed + 167) - 0.5) * 0.36) * DRAINAGE_SPACING;
+    node = { i, j, x, z, elevation: this.relief(x, z).elevation };
     this.riverNodes.set(key, node);
     return node;
   }
 
-  /** Steepest strictly lower of the eight neighbors, ignoring crossings. */
+  /** Signed fraction of the segment length, toward the lower bank, plus a small wobble. */
+  private bendTowardLowSide(node: RiverNode, down: RiverNode): number {
+    const dx = down.x - node.x;
+    const dz = down.z - node.z;
+    const length = Math.hypot(dx, dz) || 1;
+    const midX = (node.x + down.x) / 2;
+    const midZ = (node.z + down.z) / 2;
+    const left = this.relief(midX - dz / length * 160, midZ + dx / length * 160).elevation;
+    const right = this.relief(midX + dz / length * 160, midZ - dx / length * 160).elevation;
+    const sign = left === right ? (hash2(node.i, node.j, this.seed + 179) < 0.5 ? -1 : 1) : left < right ? 1 : -1;
+    return sign * (0.055 + hash2(node.i, node.j, this.seed + 181) * 0.04);
+  }
+
+  private slopeTo(from: RiverNode, to: RiverNode): number {
+    const drop = from.elevation - to.elevation;
+    if (drop <= 0) return 0;
+    return drop / Math.hypot(to.x - from.x, to.z - from.z);
+  }
+
+  /** Strictly lowest neighbor. Cardinal-only is used when a diagonal would cross another. */
   private steepest(node: RiverNode, cardinalOnly = false): RiverNode | null {
     let best: RiverNode | null = null;
     let bestSlope = 0;
@@ -248,17 +400,18 @@ export class WorldModel {
       const [di, dj] = NEIGHBORS[k]!;
       if (cardinalOnly && di !== 0 && dj !== 0) continue;
       const other = this.node(node.i + di, node.j + dj);
-      // A per-node random preference bends rivers away from the grid axes on smooth slopes.
-      const slope = (node.elevation - other.elevation) / Math.hypot(other.x - node.x, other.z - node.z)
-        * (0.4 + 1.2 * hash2(node.i * 8 + k, node.j, this.seed + 191));
-      if (slope > bestSlope) { bestSlope = slope; best = other; }
+      const slope = this.slopeTo(node, other);
+      if (slope > bestSlope) {
+        bestSlope = slope;
+        best = other;
+      }
     }
     return best;
   }
 
   /**
-   * Downstream neighbor. Two diagonals can only cross inside the same grid square; the gentler one
-   * falls back to its best cardinal neighbor, so no two reaches cross.
+   * Downstream neighbor. Two diagonals can cross inside one grid square; the gentler
+   * one takes its lowest cardinal instead, so the network stays downhill and does not cross.
    */
   private downstream(node: RiverNode): RiverNode | null {
     if (node.down !== undefined) return node.down;
@@ -269,9 +422,9 @@ export class WorldModel {
       const rival = this.steepest(sideA) === sideB ? sideA : this.steepest(sideB) === sideA ? sideB : null;
       if (rival) {
         const rivalDown = rival === sideA ? sideB : sideA;
-        const own = (node.elevation - down.elevation) / Math.hypot(down.x - node.x, down.z - node.z);
-        const other = (rival.elevation - rivalDown.elevation) / Math.hypot(rivalDown.x - rival.x, rivalDown.z - rival.z);
-        if (own < other || (own === other && hash2(node.i, node.j, this.seed + 173) < hash2(rival.i, rival.j, this.seed + 173))) {
+        const own = this.slopeTo(node, down);
+        const other = this.slopeTo(rival, rivalDown);
+        if (own < other || (own === other && hash2(node.i, node.j, this.seed + 173) <= hash2(rival.i, rival.j, this.seed + 173))) {
           down = this.steepest(node, true);
         }
       }
@@ -280,21 +433,58 @@ export class WorldModel {
     return down;
   }
 
+  /** Nodes that drain directly into this one. */
+  private upstreams(node: RiverNode): RiverNode[] {
+    const upstream: RiverNode[] = [];
+    for (const [di, dj] of NEIGHBORS) {
+      const other = this.node(node.i + di, node.j + dj);
+      if (this.downstream(other) === node) upstream.push(other);
+    }
+    return upstream;
+  }
+
   /**
-   * Number of grid nodes draining through this node, capped so lookups stay bounded.
-   * ponytail: recursion depth is the longest upstream path (a few dozen nodes per basin); make it iterative if basins grow much larger.
+   * Upstream drainage count, cached per node. Walks only this basin, so a region query
+   * does not precompute the world. The cap bounds a pathological basin.
    */
   private flow(node: RiverNode): number {
     if (node.flow !== undefined) return node.flow;
-    let flow = 1;
-    for (const [di, dj] of NEIGHBORS) {
-      const upstream = this.node(node.i + di, node.j + dj);
-      if (this.downstream(upstream) !== node) continue;
-      flow += this.flow(upstream);
-      if (flow >= RIVER_MAX_FLOW) break;
+    const frames: Array<{ node: RiverNode; ups: RiverNode[]; index: number }> = [];
+    frames.push({ node, ups: this.upstreams(node), index: 0 });
+    let guard = 0;
+    while (frames.length > 0) {
+      const frame = frames[frames.length - 1]!;
+      if (frame.node.flow !== undefined) {
+        frames.pop();
+        continue;
+      }
+      if (frame.index < frame.ups.length && guard < 4000) {
+        const up = frame.ups[frame.index]!;
+        frame.index += 1;
+        if (up.flow === undefined) {
+          frames.push({ node: up, ups: this.upstreams(up), index: 0 });
+          guard += 1;
+        }
+        continue;
+      }
+      let flow = 1;
+      for (const up of frame.ups) flow += up.flow ?? 1;
+      frame.node.flow = Math.min(flow, RIVER_MAX_FLOW);
+      frames.pop();
     }
-    node.flow = Math.min(flow, RIVER_MAX_FLOW);
-    return node.flow;
+    return node.flow ?? 1;
+  }
+
+  private waterLevel(node: RiverNode, guard = 0): number {
+    if (node.level !== undefined) return node.level;
+    const down = this.downstream(node);
+    if (!down || guard > 512) {
+      node.level = node.elevation;
+      return node.level;
+    }
+    const below = this.waterLevel(down, guard + 1);
+    node.level = below + Math.max(0.45, node.elevation - down.elevation);
+    return node.level;
   }
 
   /** World-space grid keeps positions and density independent of chunk partitioning. */
@@ -306,7 +496,6 @@ export class WorldModel {
         const z = (cz + 0.15 + hash2(cx, cz, this.seed + 347) * 0.7) * spacing;
         if (x < minX || x >= minX + size || z < minZ || z >= minZ + size) continue;
         const sample = this.sample(x, z);
-        // Clumps and gaps inside forests, so woodland is not an even carpet.
         const clumping = 0.5 + fbm(x / 120, z / 120, this.seed + 157, 2) * 1.2;
         if (sample.water || sample.rock > 0.72 || hash2(cx, cz, this.seed + 349) > 0.018 + sample.forest * clumping) continue;
         if (sample.bank < TREE_BANK_CLEARANCE) continue;
@@ -384,7 +573,6 @@ export class WorldModel {
     const dry = 1 - sample.moisture;
     const open = 1 - sample.forest;
     const slope = 1 - ny * invLength;
-    // Meadows, ridges, and modest sunlit slopes all qualify; steep rock is a bonus, not a magnet.
     const land = dry * 0.4 + open * 0.45 + sunFacing * 0.4 + slope * 0.12 + sample.rock * 0.12;
     return land * (0.2 + 0.8 * open);
   }
