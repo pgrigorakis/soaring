@@ -14,7 +14,7 @@ export type LandscapeSample = {
 export type Thermal = { x: number; z: number; strength: number };
 export type Tree = { x: number; y: number; z: number; kind: number; scale: number; turn: number };
 
-/** Mid-afternoon sun used for lighting and sun-facing thermal scores. */
+/** Fixed placement azimuth for sun-facing thermal scores. Not the moving sky sun. */
 export const SUN_OFFSET = { x: -420, y: 190, z: -300 } as const;
 const SUN_LENGTH = Math.hypot(SUN_OFFSET.x, SUN_OFFSET.y, SUN_OFFSET.z);
 const THERMAL_CELL = 1100;

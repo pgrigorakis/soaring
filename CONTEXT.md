@@ -46,3 +46,7 @@ Near the eagle, the landscape shows individual trees and shadows; far away, it s
 **Ambience**:
 Environmental sounds such as wind and wing flaps, separate from music.
 _Avoid_: Music
+
+**Time of day**:
+The landscape's shared cycle of daylight and night. A full cycle lasts fifteen minutes. The sun and the full moon sit on opposite sides of the sky and do not follow the camera.
+_Avoid_: Fixed sun, camera sun

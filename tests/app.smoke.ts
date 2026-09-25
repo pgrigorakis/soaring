@@ -284,6 +284,53 @@ test('the first mute gesture and a pending audio start respect the saved mute ch
   expect(errors).toEqual([]);
 });
 
+test('renders noon, dusk, and midnight from the world clock', async ({ page }) => {
+  const errors = captureErrors(page);
+  await page.goto('/?smoke');
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.evaluate(() => {
+    document.querySelector('#intro')?.classList.add('hidden');
+    const toggle = document.querySelector<HTMLElement>('#settings-toggle');
+    if (toggle) toggle.style.visibility = 'hidden';
+  });
+
+  async function showPhase(phase: number, name: string, look: 'sun' | 'moon' | 'horizon' | 'chase'): Promise<{ timeOfDay: number; sunElevation: number; moonElevation: number }> {
+    await page.evaluate((value) => window.__SOARING__.setTimeOfDay(value), phase);
+    await page.evaluate((body) => window.__SOARING__.lookAtBody(body), look);
+    await page.evaluate(() => new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve(undefined))));
+    }));
+    const shot = await page.screenshot({ path: `test-results/sky-${name}.png` });
+    expect(shot.byteLength).toBeGreaterThan(1000);
+    return page.evaluate(() => {
+      const snapshot = window.__SOARING__.snapshot();
+      return { timeOfDay: snapshot.timeOfDay, sunElevation: snapshot.sunElevation, moonElevation: snapshot.moonElevation };
+    });
+  }
+
+  const horizon = await showPhase(0.25, 'horizon', 'chase');
+  expect(horizon.timeOfDay).toBeCloseTo(0.25, 2);
+  expect(Math.abs(horizon.sunElevation)).toBeLessThan(0.05);
+  expect(Math.abs(horizon.moonElevation)).toBeLessThan(0.05);
+
+  const dawn = await showPhase(0.28, 'dawn', 'sun');
+  expect(dawn.sunElevation).toBeGreaterThan(0.05);
+
+  const noon = await showPhase(0.5, 'noon', 'horizon');
+  expect(noon.sunElevation).toBeGreaterThan(0.25);
+  expect(noon.moonElevation).toBeLessThan(-0.25);
+
+  const dusk = await showPhase(0.72, 'dusk', 'sun');
+  expect(dusk.sunElevation).toBeGreaterThan(0.05);
+  expect(dusk.timeOfDay).toBeGreaterThan(0.7);
+  expect(dusk.timeOfDay).toBeLessThan(0.75);
+
+  const midnight = await showPhase(0, 'midnight', 'moon');
+  expect(midnight.sunElevation).toBeLessThan(-0.25);
+  expect(midnight.moonElevation).toBeGreaterThan(0.25);
+  expect(errors).toEqual([]);
+});
+
 test('a blocked browser audio context keeps the mute control usable without page errors', async ({ page }) => {
   const errors = captureErrors(page);
   await page.addInitScript(() => {
