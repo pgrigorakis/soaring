@@ -15,7 +15,7 @@ canvas.dragging { cursor: grabbing; }
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(255, 236, 193, 0.11), transparent 36%, rgba(42, 70, 76, 0.08));
+  background: linear-gradient(180deg, var(--veil-top, rgba(255, 236, 193, 0.11)), transparent 36%, var(--veil-bottom, rgba(42, 70, 76, 0.08)));
 }
 
 .controls {
