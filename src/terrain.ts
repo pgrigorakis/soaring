@@ -3,14 +3,24 @@ import { hash2, type LandscapeSample, WorldModel } from './world';
 
 export const CHUNK_SIZE = 360;
 export const MIN_VISIBILITY = 720;
-export const MAX_VISIBILITY = 3600;
-const NEAR_RADIUS = 3;
+export const MAX_VISIBILITY = 5000;
+export const DEFAULT_VISIBILITY = 5000;
+const NEAR_RADIUS = 3; // chunks (fine grid): individual trees, rocks, full-density mesh
+// Beyond this distance, forest reads as terrain color only - no per-tree geometry.
+const TREE_CUTOFF = 3000;
+// Mesh LOD switches to a coarser, larger-tile grid here. A multiple of both grid sizes so the
+// two grids' tile edges always coincide - the coarse grid never straddles a fine tile.
+const FAR_CHUNK_SIZE = CHUNK_SIZE * 4;
+const FAR_START = FAR_CHUNK_SIZE * 3;
 const DETAIL = { segments: 40, rocks: 10 };
-const DISTANT = { segments: 20, rocks: 0 };
+const MID = { segments: 20, rocks: 0 };
+const FAR = { segments: 16, rocks: 0 };
 const TREE_SPACING = 29;
 
-type Chunk = { group: THREE.Group; detailed: boolean; dispose: () => void };
-type Pending = { x: number; z: number; key: string; detailed: boolean };
+type Tier = 'near' | 'mid' | 'far';
+type TreeMode = 'near' | 'far' | 'none';
+type Chunk = { group: THREE.Group; tier: Tier; descriptor: string; dispose: () => void };
+type Pending = { x: number; z: number; key: string; chunkSize: number; tier: Tier; trees: TreeMode; descriptor: string };
 
 export class TerrainStream {
   private readonly scene: THREE.Scene;
@@ -19,6 +29,8 @@ export class TerrainStream {
   private reach: number;
   private centerX = Number.NaN;
   private centerZ = Number.NaN;
+  private rawX = 0;
+  private rawZ = 0;
   private pending: Pending[] = [];
 
   private readonly terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0 });
@@ -82,6 +94,13 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     return this.chunks.size;
   }
 
+  // Loaded chunk counts per level of detail, for diagnostics.
+  get tierCounts(): { near: number; mid: number; far: number } {
+    const counts = { near: 0, mid: 0, far: 0 };
+    for (const chunk of this.chunks.values()) counts[chunk.tier] += 1;
+    return counts;
+  }
+
   setReach(reach: number): void {
     if (reach === this.reach) return;
     this.reach = reach;
@@ -95,11 +114,11 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     let distance = Infinity;
     for (const tile of this.pending) {
       if (this.chunks.has(tile.key)) continue; // A coarse tile remains visible while it is upgraded.
-      const minX = tile.x * CHUNK_SIZE;
-      const minZ = tile.z * CHUNK_SIZE;
+      const minX = tile.x * tile.chunkSize;
+      const minZ = tile.z * tile.chunkSize;
       distance = Math.min(distance, Math.hypot(
-        Math.max(minX - x, 0, x - minX - CHUNK_SIZE),
-        Math.max(minZ - z, 0, z - minZ - CHUNK_SIZE),
+        Math.max(minX - x, 0, x - minX - tile.chunkSize),
+        Math.max(minZ - z, 0, z - minZ - tile.chunkSize),
       ));
     }
     return Math.max(0, Math.min(this.reach, distance - 12));
@@ -108,13 +127,15 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
   get pendingCount(): number { return this.pending.length; }
 
   update(x: number, z: number, buildBudget = 2): void {
+    this.rawX = x;
+    this.rawZ = z;
     const centerX = Math.floor(x / CHUNK_SIZE);
     const centerZ = Math.floor(z / CHUNK_SIZE);
     if (centerX !== this.centerX || centerZ !== this.centerZ) this.recenter(centerX, centerZ);
     for (let built = 0; built < buildBudget && this.pending.length > 0; built += 1) {
       const next = this.pending.shift()!;
       const old = this.chunks.get(next.key);
-      const chunk = this.createChunk(next.x, next.z, next.detailed);
+      const chunk = this.createChunk(next);
       if (old) { this.scene.remove(old.group); old.dispose(); }
       this.chunks.set(next.key, chunk);
     }
@@ -124,19 +145,62 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     this.centerX = centerX;
     this.centerZ = centerZ;
     const needed = new Set<string>();
-    const radius = Math.ceil(this.reach / CHUNK_SIZE);
     this.pending = [];
-    for (let dz = -radius; dz <= radius; dz += 1) {
-      for (let dx = -radius; dx <= radius; dx += 1) {
+
+    // Fine grid (near + mid tiers): full density near the eagle, thinning to mid density,
+    // covering the ground out to where the coarse far grid takes over.
+    const fineReach = Math.min(this.reach, FAR_START);
+    const fineRadius = Math.ceil(fineReach / CHUNK_SIZE);
+    for (let dz = -fineRadius; dz <= fineRadius; dz += 1) {
+      for (let dx = -fineRadius; dx <= fineRadius; dx += 1) {
         const gap = Math.hypot(Math.max(Math.abs(dx) - 1, 0), Math.max(Math.abs(dz) - 1, 0)) * CHUNK_SIZE;
-        if (gap >= this.reach) continue;
-        const key = `${centerX + dx},${centerZ + dz}`;
+        if (gap >= fineReach) continue;
+        const key = `n:${centerX + dx},${centerZ + dz}`;
         needed.add(key);
-        const detailed = Math.max(Math.abs(dx), Math.abs(dz)) <= NEAR_RADIUS;
-        if (this.chunks.get(key)?.detailed !== detailed) this.pending.push({ x: centerX + dx, z: centerZ + dz, key, detailed });
+        const tier: Tier = gap <= NEAR_RADIUS * CHUNK_SIZE ? 'near' : 'mid';
+        const trees: TreeMode = tier === 'near' ? 'near' : gap < TREE_CUTOFF ? 'far' : 'none';
+        const descriptor = `${tier}:${trees}`;
+        if (this.chunks.get(key)?.descriptor !== descriptor) {
+          this.pending.push({ x: centerX + dx, z: centerZ + dz, key, chunkSize: CHUNK_SIZE, tier, trees, descriptor });
+        }
       }
     }
-    this.pending.sort((a, b) => Math.hypot(a.x - centerX, a.z - centerZ) - Math.hypot(b.x - centerX, b.z - centerZ));
+
+    // Coarse far grid: lower mesh resolution, no trees, tiles are 4x the fine chunk size so
+    // their edges always land on fine-grid tile boundaries.
+    if (this.reach > FAR_START) {
+      const farCenterX = Math.floor(this.rawX / FAR_CHUNK_SIZE);
+      const farCenterZ = Math.floor(this.rawZ / FAR_CHUNK_SIZE);
+      const farRadius = Math.ceil(this.reach / FAR_CHUNK_SIZE);
+      for (let dz = -farRadius; dz <= farRadius; dz += 1) {
+        for (let dx = -farRadius; dx <= farRadius; dx += 1) {
+          const tileMinX = (farCenterX + dx) * FAR_CHUNK_SIZE;
+          const tileMinZ = (farCenterZ + dz) * FAR_CHUNK_SIZE;
+          const nearestGap = Math.hypot(
+            Math.max(tileMinX - this.rawX, 0, this.rawX - tileMinX - FAR_CHUNK_SIZE),
+            Math.max(tileMinZ - this.rawZ, 0, this.rawZ - tileMinZ - FAR_CHUNK_SIZE),
+          );
+          if (nearestGap >= this.reach) continue;
+          // Skip only when the tile's farthest point is still inside the fine grid's disk -
+          // i.e. the whole tile is already covered. A tile straddling the boundary is kept,
+          // even though that means a thin ring of overlap with the fine grid, never a gap.
+          const farthestX = Math.max(Math.abs(tileMinX - this.rawX), Math.abs(tileMinX + FAR_CHUNK_SIZE - this.rawX));
+          const farthestZ = Math.max(Math.abs(tileMinZ - this.rawZ), Math.abs(tileMinZ + FAR_CHUNK_SIZE - this.rawZ));
+          const farthestGap = Math.hypot(farthestX, farthestZ);
+          if (farthestGap <= FAR_START) continue;
+          const key = `f:${farCenterX + dx},${farCenterZ + dz}`;
+          needed.add(key);
+          const descriptor = 'far:none';
+          if (this.chunks.get(key)?.descriptor !== descriptor) {
+            this.pending.push({ x: farCenterX + dx, z: farCenterZ + dz, key, chunkSize: FAR_CHUNK_SIZE, tier: 'far', trees: 'none', descriptor });
+          }
+        }
+      }
+    }
+
+    this.pending.sort((a, b) =>
+      Math.hypot(a.x * a.chunkSize - centerX * CHUNK_SIZE, a.z * a.chunkSize - centerZ * CHUNK_SIZE)
+      - Math.hypot(b.x * b.chunkSize - centerX * CHUNK_SIZE, b.z * b.chunkSize - centerZ * CHUNK_SIZE));
 
     for (const [key, chunk] of this.chunks) {
       if (needed.has(key)) continue;
@@ -169,14 +233,15 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     this.farFoliageMaterial.dispose();
   }
 
-  private createChunk(chunkX: number, chunkZ: number, detailed: boolean): Chunk {
+  private createChunk({ x: chunkX, z: chunkZ, chunkSize, tier, trees: treeMode }: Pending): Chunk {
+    const detailed = tier === 'near';
     const group = new THREE.Group();
-    group.name = `land ${chunkX},${chunkZ}`;
-    const config = detailed ? DETAIL : DISTANT;
+    group.name = chunkSize === CHUNK_SIZE ? `land ${chunkX},${chunkZ}` : `land far ${chunkX},${chunkZ}`;
+    const config = tier === 'near' ? DETAIL : tier === 'mid' ? MID : FAR;
     const segments = config.segments;
-    const step = CHUNK_SIZE / segments;
-    const originX = chunkX * CHUNK_SIZE;
-    const originZ = chunkZ * CHUNK_SIZE;
+    const step = chunkSize / segments;
+    const originX = chunkX * chunkSize;
+    const originZ = chunkZ * chunkSize;
     const geometry = new THREE.BufferGeometry();
     const positions: number[] = [];
     const normals: number[] = [];
@@ -262,10 +327,12 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     terrain.castShadow = true;
     group.add(terrain);
 
-    const waterGeometry = this.createWaterGeometry(originX, originZ, segments, water, surface);
+    const waterGeometry = this.createWaterGeometry(originX, originZ, chunkSize, segments, water, surface);
     if (waterGeometry) group.add(new THREE.Mesh(waterGeometry, this.waterMaterial));
 
-    const treeObjects = detailed ? this.createTrees(originX, originZ, TREE_SPACING) : this.createFarTrees(originX, originZ);
+    const treeObjects = treeMode === 'near' ? this.createTrees(originX, originZ, TREE_SPACING)
+      : treeMode === 'far' ? this.createFarTrees(originX, originZ)
+      : [];
     treeObjects.forEach((object) => group.add(object));
     const rocks = this.createRocks(chunkX, chunkZ, config.rocks);
     if (rocks) group.add(rocks);
@@ -273,7 +340,8 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     this.scene.add(group);
     return {
       group,
-      detailed,
+      tier,
+      descriptor: `${tier}:${treeMode}`,
       dispose: () => {
         geometry.dispose();
         waterGeometry?.dispose();
@@ -298,8 +366,8 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     return count > 0 ? sum / count : sampleAt(xIndex, zIndex).surface;
   }
 
-  private createWaterGeometry(originX: number, originZ: number, segments: number, water: boolean[], surface: number[]): THREE.BufferGeometry | null {
-    const step = CHUNK_SIZE / segments;
+  private createWaterGeometry(originX: number, originZ: number, chunkSize: number, segments: number, water: boolean[], surface: number[]): THREE.BufferGeometry | null {
+    const step = chunkSize / segments;
     const positions: number[] = [];
     const indices: number[] = [];
     for (let iz = 0; iz < segments; iz += 1) {
