@@ -338,10 +338,12 @@ test('shows drainage water from altitude without page errors', async ({ page }) 
   await expect(page.locator('canvas')).toBeVisible();
   await expect(page.locator('#settings-panel')).toBeHidden();
   const landmark = await page.evaluate(() => {
+    window.__SOARING__.setTimeOfDay(0.5);
     window.__SOARING__.setVisibility(5000);
     window.__SOARING__.setCaptureClear(true);
     return window.__SOARING__.landmark();
   });
+  expect((await page.evaluate(() => window.__SOARING__.snapshot().sunElevation))).toBeGreaterThan(0.25);
   expect(landmark).not.toBeNull();
   await page.evaluate((mark) => {
     window.__SOARING__.setViewpoint({
