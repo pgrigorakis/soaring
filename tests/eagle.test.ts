@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { EagleView, type EagleState } from '../src/eagle';
+import {
+  EagleNavigator, EagleView, inwardThermalBankSign, THERMAL_CLIMB_RANGE, type EagleState,
+} from '../src/eagle';
+import { WorldModel } from '../src/world';
 
 describe('procedural eagle', () => {
   it('has a broad symmetric feathered silhouette and reuses its geometry in flight', () => {
@@ -29,4 +32,95 @@ describe('procedural eagle', () => {
     expect(flownGeometries).toHaveLength(geometries.length);
     flownGeometries.forEach((geometry, index) => expect(geometry).toBe(geometries[index]));
   });
+
+  it('lowers the left wing when bank is positive', () => {
+    const eagle = new EagleView();
+    eagle.update(pose({ heading: 0.4, bank: 0.5 }), 1 / 60);
+    const wings = wingWorldPositions(eagle);
+    expect(wings.left.y).toBeLessThan(wings.right.y);
+  });
+
+  it('banks toward the thermal for either circling direction', () => {
+    const thermal = { x: 20, z: -15 };
+    const radius = 48;
+    for (const orbit of [1, -1] as const) {
+      const circleAngle = 0.7;
+      const birdX = thermal.x + Math.cos(circleAngle) * radius;
+      const birdZ = thermal.z + Math.sin(circleAngle) * radius;
+      // Orbit angle increases counterclockwise in XZ; heading tracks the opposite tangent.
+      const heading = orbit > 0 ? -circleAngle : Math.PI - circleAngle;
+      const bank = inwardThermalBankSign(heading, birdX, birdZ, thermal.x, thermal.z) * 0.45;
+      const eagle = new EagleView();
+      eagle.update(pose({ x: birdX, y: 80, z: birdZ, heading, bank }), 1 / 60);
+      const wings = wingWorldPositions(eagle);
+      const lower = wings.left.y < wings.right.y ? wings.left : wings.right;
+      const higher = lower === wings.left ? wings.right : wings.left;
+      const distance = (wing: THREE.Vector3) => Math.hypot(wing.x - thermal.x, wing.z - thermal.z);
+      expect(distance(lower)).toBeLessThan(distance(higher));
+    }
+  });
+
+  it('circles with the rendered bank toward the thermal and climbs at 3–4 m/s', () => {
+    expect(THERMAL_CLIMB_RANGE).toEqual({ min: 3, max: 4 });
+    const world = new WorldModel(448122);
+    const navigator = new EagleNavigator(world, world.scenicStart(2));
+    let riding = false;
+    let checkedBank = false;
+    let checkedClimb = false;
+    for (let step = 0; step < 36_000 && !(checkedBank && checkedClimb); step += 1) {
+      const before = navigator.state.behavior;
+      const state = navigator.update(0.1);
+      if (before === 'thermal-riding' || state.behavior !== 'thermal-riding' || !navigator.activeThermal) continue;
+      const thermal = navigator.activeThermal;
+      const ground = world.sample(state.x, state.z).height;
+      state.y = ground + 80;
+      thermal.strength = 0.72;
+      const weakBefore = state.y;
+      const weak = navigator.update(0.1);
+      expect((weak.y - weakBefore) / 0.1).toBeCloseTo(THERMAL_CLIMB_RANGE.min, 2);
+      thermal.strength = 1.44;
+      const strongBefore = weak.y;
+      const strong = navigator.update(0.1);
+      expect((strong.y - strongBefore) / 0.1).toBeCloseTo(THERMAL_CLIMB_RANGE.max, 2);
+      checkedClimb = true;
+
+      for (let settle = 0; settle < 30 && navigator.state.behavior === 'thermal-riding'; settle += 1) {
+        navigator.update(0.1);
+      }
+      expect(navigator.state.behavior).toBe('thermal-riding');
+      const ridden = navigator.state;
+      const center = navigator.activeThermal;
+      expect(center).not.toBeNull();
+      const sign = inwardThermalBankSign(ridden.heading, ridden.x, ridden.z, center!.x, center!.z);
+      expect(Math.sign(ridden.bank)).toBe(sign);
+      const eagle = new EagleView();
+      eagle.update(ridden, 1 / 60);
+      const wings = wingWorldPositions(eagle);
+      const lower = wings.left.y < wings.right.y ? wings.left : wings.right;
+      const higher = lower === wings.left ? wings.right : wings.left;
+      const distance = (wing: THREE.Vector3) => Math.hypot(wing.x - center!.x, wing.z - center!.z);
+      expect(distance(lower)).toBeLessThan(distance(higher));
+      checkedBank = true;
+      riding = true;
+    }
+    expect(riding).toBe(true);
+    expect(checkedBank && checkedClimb).toBe(true);
+  });
 });
+
+function pose(overrides: Partial<EagleState> = {}): EagleState {
+  return {
+    x: 0, y: 40, z: 0, heading: 0, bank: 0, behavior: 'thermal-riding', flapping: false, ...overrides,
+  };
+}
+
+function wingWorldPositions(eagle: EagleView): { left: THREE.Vector3; right: THREE.Vector3 } {
+  eagle.group.updateMatrixWorld(true);
+  const left = eagle.group.children.find((child) => child.position.x < -0.1);
+  const right = eagle.group.children.find((child) => child.position.x > 0.1);
+  if (!left || !right) throw new Error('wing groups missing');
+  return {
+    left: left.getWorldPosition(new THREE.Vector3()),
+    right: right.getWorldPosition(new THREE.Vector3()),
+  };
+}
