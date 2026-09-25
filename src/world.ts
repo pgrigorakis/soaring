@@ -175,7 +175,8 @@ export class WorldModel {
     const coneOf = (shore: Shore) => shore.surface + Math.max(0, shore.shoreDist) * (shore.lake ? 0.05 : 0.075);
     for (const reach of this.reachesNear(x, z)) {
       const { distance, t } = reachDistance(reach, x, z);
-      const half = mix(reach.aWidth, reach.bWidth, t) / 2;
+      const wobble = reach.lake ? 1 : 1 + 0.18 * Math.sin(Math.PI * t);
+      const half = mix(reach.aWidth, reach.bWidth, t) / 2 * wobble;
       const surface = mix(reach.aLevel, reach.bLevel, t);
       const shore: Shore = { shoreDist: distance - half, surface, lake: reach.lake, distance, half };
       if (shore.shoreDist > 1600) continue;
@@ -318,6 +319,63 @@ export class WorldModel {
     return best ? { x: best.x, z: best.z, surface: best.level, lake: best.lake } : null;
   }
 
+  /** Four altitude viewpoints: a confluence, a basin lake, a multi-segment run, and a wide network. */
+  reviewSpots(): {
+    confluence: { x: number; z: number; surface: number };
+    lake: { x: number; z: number; surface: number };
+    run: { x: number; z: number; surface: number; heading: number };
+    network: { x: number; z: number; surface: number };
+  } {
+    let lake = this.drainageAt(0, 0);
+    let confluence = lake;
+    let bestInflows = 0;
+    const inflows = new Map<string, number>();
+    const nodes = [];
+    for (let j = -16; j <= 16; j += 1) {
+      for (let i = -16; i <= 16; i += 1) {
+        const node = this.drainageAt(i, j);
+        nodes.push(node);
+        if (node.lake && node.flow > lake.flow) lake = node;
+        if (node.downstreamI !== null) inflows.set(`${node.downstreamI},${node.downstreamJ}`, (inflows.get(`${node.downstreamI},${node.downstreamJ}`) ?? 0) + 1);
+      }
+    }
+    for (const node of nodes) {
+      const count = inflows.get(`${node.i},${node.j}`) ?? 0;
+      if (count > bestInflows && node.downstreamI !== null) {
+        bestInflows = count;
+        confluence = node;
+      }
+    }
+    let runStart = confluence;
+    let runEnd = confluence;
+    let runSteps = 0;
+    for (const node of nodes) {
+      if (node.flow < 4 || node.downstreamI === null) continue;
+      let current = node;
+      let steps = 0;
+      let end = node;
+      for (let step = 0; step < 8 && current.downstreamI !== null && current.downstreamJ !== null; step += 1) {
+        const next = this.drainageAt(current.downstreamI, current.downstreamJ);
+        if (next.lake || next.flow < 4) break;
+        end = next;
+        current = next;
+        steps += 1;
+      }
+      if (steps > runSteps) {
+        runSteps = steps;
+        runStart = node;
+        runEnd = end;
+      }
+    }
+    const heading = Math.atan2(runEnd.x - runStart.x, runEnd.z - runStart.z);
+    return {
+      confluence: { x: confluence.x, z: confluence.z, surface: confluence.level },
+      lake: { x: lake.x, z: lake.z, surface: lake.level },
+      run: { x: (runStart.x + runEnd.x) / 2, z: (runStart.z + runEnd.z) / 2, surface: (runStart.level + runEnd.level) / 2, heading },
+      network: { x: confluence.x, z: confluence.z, surface: confluence.level },
+    };
+  }
+
   private reachFrom(node: RiverNode): Reach | null {
     if (node.reach !== undefined) return node.reach;
     node.reach = null;
@@ -355,8 +413,7 @@ export class WorldModel {
       aLevel: level, bLevel: downLevel,
       aWidth: riverHalf(flow) * 2,
       bWidth: riverHalf(Math.max(flow, downFlow)) * 2,
-      meander: this.bendTowardLowSide(node, down),
-      bend: (hash2(node.i, node.j, this.seed + 183) - 0.5) * 0.06,
+      ...this.channelBend(node, down),
       lake: false,
     };
     return node.reach;
@@ -366,15 +423,19 @@ export class WorldModel {
     const key = nodeKey(i, j);
     let node = this.riverNodes.get(key);
     if (node) return node;
-    const x = (i + 0.5 + (hash2(i, j, this.seed + 163) - 0.5) * 0.36) * DRAINAGE_SPACING;
-    const z = (j + 0.5 + (hash2(i, j, this.seed + 167) - 0.5) * 0.36) * DRAINAGE_SPACING;
+    const x = (i + 0.5 + (hash2(i, j, this.seed + 163) - 0.5) * 0.42) * DRAINAGE_SPACING;
+    const z = (j + 0.5 + (hash2(i, j, this.seed + 167) - 0.5) * 0.42) * DRAINAGE_SPACING;
     node = { i, j, x, z, elevation: this.relief(x, z).elevation };
     this.riverNodes.set(key, node);
     return node;
   }
 
-  /** Signed fraction of the segment length, toward the lower bank, plus a small wobble. */
-  private bendTowardLowSide(node: RiverNode, down: RiverNode): number {
+  /**
+   * Signed bend fractions. The curve is zero at both lattice nodes, so seams and confluences stay put,
+   * and large enough that a segment does not read as a straight cut from altitude.
+   * If that curve would cross a neighbor, the deterministically lesser reach is pulled back.
+   */
+  private baseBend(node: RiverNode, down: RiverNode): { meander: number; bend: number } {
     const dx = down.x - node.x;
     const dz = down.z - node.z;
     const length = Math.hypot(dx, dz) || 1;
@@ -383,7 +444,73 @@ export class WorldModel {
     const left = this.relief(midX - dz / length * 160, midZ + dx / length * 160).elevation;
     const right = this.relief(midX + dz / length * 160, midZ - dx / length * 160).elevation;
     const sign = left === right ? (hash2(node.i, node.j, this.seed + 179) < 0.5 ? -1 : 1) : left < right ? 1 : -1;
-    return sign * (0.055 + hash2(node.i, node.j, this.seed + 181) * 0.04);
+    return {
+      meander: sign * (0.16 + hash2(node.i, node.j, this.seed + 181) * 0.08),
+      bend: (hash2(node.i, node.j, this.seed + 183) - 0.5) * 0.14,
+    };
+  }
+
+  private channelBend(node: RiverNode, down: RiverNode): { meander: number; bend: number } {
+    const own = this.baseBend(node, down);
+    const rivals = this.upstreams(down).filter((other) => other !== node && this.flow(other) >= RIVER_MIN_FLOW);
+    let scale = 1;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const hit = rivals.some((other) => {
+        const theirs = this.baseBend(other, down);
+        return this.curvesCross(
+          node, down, own.meander * scale, own.bend * scale,
+          other, down, theirs.meander * scale, theirs.bend * scale,
+        );
+      });
+      if (!hit) break;
+      scale *= 0.45;
+    }
+    return { meander: own.meander * scale, bend: own.bend * scale };
+  }
+
+  private mouth(from: RiverNode, to: RiverNode): { x: number; z: number } {
+    const flow = this.flow(to);
+    if (!this.downstream(to) && flow >= RIVER_MIN_FLOW) {
+      const radius = lakeRadius(flow);
+      const dx = to.x - from.x;
+      const dz = to.z - from.z;
+      const length = Math.hypot(dx, dz) || 1;
+      const scale = Math.max(0, length - radius) / length;
+      return { x: from.x + dx * scale, z: from.z + dz * scale };
+    }
+    return { x: to.x, z: to.z };
+  }
+
+  private curvesCross(
+    aFrom: RiverNode, aTo: RiverNode, aMeander: number, aBend: number,
+    bFrom: RiverNode, bTo: RiverNode, bMeander: number, bBend: number,
+  ): boolean {
+    const aEnd = this.mouth(aFrom, aTo);
+    const bEnd = this.mouth(bFrom, bTo);
+    const points = (ax: number, az: number, bx: number, bz: number, meander: number, bend: number) => {
+      const reach = { ax, az, bx, bz, aLevel: 0, bLevel: 0, aWidth: 0, bWidth: 0, meander, bend, lake: false };
+      return Array.from({ length: 9 }, (_, k) => {
+        const t = k / 8;
+        const length = Math.hypot(bx - ax, bz - az) || 1;
+        const offset = meanderOffset(reach, t);
+        return [
+          ax + (bx - ax) * t + offset * (bz - az) / length,
+          az + (bz - az) * t - offset * (bx - ax) / length,
+        ] as const;
+      });
+    };
+    const a = points(aFrom.x, aFrom.z, aEnd.x, aEnd.z, aMeander, aBend);
+    const b = points(bFrom.x, bFrom.z, bEnd.x, bEnd.z, bMeander, bBend);
+    const side = (px: number, pz: number, qx: number, qz: number, rx: number, rz: number) => (qx - px) * (rz - pz) - (qz - pz) * (rx - px);
+    for (let p = 0; p < 8; p += 1) {
+      for (let q = 0; q < 8; q += 1) {
+        const [a0, a1, b0, b1] = [a[p]!, a[p + 1]!, b[q]!, b[q + 1]!];
+        if (Math.hypot(a0[0] - b0[0], a0[1] - b0[1]) < 1 || Math.hypot(a1[0] - b1[0], a1[1] - b1[1]) < 1) continue;
+        if (side(a0[0], a0[1], a1[0], a1[1], b0[0], b0[1]) * side(a0[0], a0[1], a1[0], a1[1], b1[0], b1[1]) < 0
+          && side(b0[0], b0[1], b1[0], b1[1], a0[0], a0[1]) * side(b0[0], b0[1], b1[0], b1[1], a1[0], a1[1]) < 0) return true;
+      }
+    }
+    return false;
   }
 
   private slopeTo(from: RiverNode, to: RiverNode): number {

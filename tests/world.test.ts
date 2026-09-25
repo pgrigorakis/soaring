@@ -37,7 +37,7 @@ describe('deterministic world generation', () => {
     let originZ = -6 * 360;
     for (let z = -10; z <= -1; z += 1) {
       for (let x = -10; x <= -1; x += 1) {
-        if (world.treesInArea(x * 360, z * 360, 720, 36).length < 40) continue;
+        if (world.treesInArea(x * 360, z * 360, 720, 36).length < 50) continue;
         originX = x * 360;
         originZ = z * 360;
       }

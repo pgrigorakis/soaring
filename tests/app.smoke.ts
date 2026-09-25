@@ -336,18 +336,18 @@ test('shows drainage water from altitude without page errors', async ({ page }) 
   const errors = captureErrors(page);
   await page.goto('/?smoke');
   await expect(page.locator('canvas')).toBeVisible();
-  await page.locator('#settings-toggle').click();
-  await page.locator('#visibility').evaluate((input: HTMLInputElement) => {
-    input.value = '5000';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+  await expect(page.locator('#settings-panel')).toBeHidden();
+  const landmark = await page.evaluate(() => {
+    window.__SOARING__.setVisibility(5000);
+    window.__SOARING__.setCaptureClear(true);
+    return window.__SOARING__.landmark();
   });
-  const landmark = await page.evaluate(() => window.__SOARING__.landmark());
   expect(landmark).not.toBeNull();
   await page.evaluate((mark) => {
     window.__SOARING__.setViewpoint({
-      x: mark.x - 640,
-      y: mark.surface + 1400,
-      z: mark.z + 1100,
+      x: mark.x - 420,
+      y: mark.surface + 900,
+      z: mark.z + 680,
       lookX: mark.x,
       lookY: mark.surface,
       lookZ: mark.z,

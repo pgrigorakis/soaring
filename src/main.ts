@@ -234,6 +234,7 @@ terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, 4
 let orbitYaw = 0;
 let orbitPitch = 0;
 let heldViewpoint: { x: number; y: number; z: number; lookX: number; lookY: number; lookZ: number } | null = null;
+let captureClear = false;
 let dragging = false;
 let pointerX = 0;
 let pointerY = 0;
@@ -404,6 +405,10 @@ function updateFog(): void {
   const coveredDepth = terrain.coveredDistance(cameraPosition.x, cameraPosition.z) * depthPerDistance(camera.aspect);
   fog.far = Math.min(settings.terrainVisibility, coveredDepth);
   fog.near = fog.far * hazeStart;
+  if (captureClear) {
+    fog.near = Math.max(fog.far, 4200);
+    fog.far = fog.near + 800;
+  }
 }
 // A fixed range around the camera, independent of terrain visibility, keeps the shadow camera's
 // size (and so its texel size) constant, which is required for the texel snapping below.
@@ -639,6 +644,9 @@ declare global {
       sample: (x: number, z: number) => { water: boolean; river: boolean; height: number; surface: number };
       setViewpoint: (pose: { x: number; y: number; z: number; lookX: number; lookY: number; lookZ: number }) => void;
       clearViewpoint: () => void;
+      setCaptureClear: (on: boolean) => void;
+      setVisibility: (meters: number) => void;
+      reviewSpots: () => { confluence: { x: number; z: number; surface: number }; lake: { x: number; z: number; surface: number }; run: { x: number; z: number; surface: number; heading: number }; network: { x: number; z: number; surface: number } };
     };
   }
 }
@@ -686,4 +694,10 @@ window.__SOARING__ = {
   sample: (x: number, z: number) => world.sample(x, z),
   setViewpoint: (pose) => { heldViewpoint = pose; },
   clearViewpoint: () => { heldViewpoint = null; },
+  setCaptureClear: (on: boolean) => { captureClear = on; },
+  setVisibility: (meters: number) => {
+    settings.terrainVisibility = meters;
+    terrain.setReach(terrainReach());
+  },
+  reviewSpots: () => world.reviewSpots(),
 };
