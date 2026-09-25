@@ -83,11 +83,11 @@ test('persists safe local-terrain height bounds across reloads', async ({ page }
   expect(errors).toEqual([]);
 });
 
-test('visibility and camera distance persist independently; old settings migrate', async ({ page }) => {
+test('visibility and camera distance persist independently', async ({ page }) => {
   const errors = captureErrors(page);
   await page.addInitScript(() => {
     if (!localStorage.getItem('soaring.settings.v1')) localStorage.setItem('soaring.settings.v1', JSON.stringify({
-      volume: 0.4, muted: false, quality: 'high', cameraDistance: 220,
+      ambienceVolume: 0.4, musicVolume: 0.4, muted: false, terrainVisibility: 1080, cameraDistance: 220,
     }));
   });
   await page.goto('/?smoke');
@@ -111,6 +111,7 @@ test('visibility and camera distance persist independently; old settings migrate
   await expect(page.locator('#ambience')).toHaveValue('0.4');
   await expect(page.locator('#music')).toHaveValue('0.4');
   await expect(page.locator('#visibility')).toHaveValue('1080');
+  expect(await page.locator('#visibility').getAttribute('max')).toBe('10000');
   await page.locator('#visibility').fill('3600');
   await expect(page.locator('#distance')).toHaveValue('220');
   await page.locator('#distance').fill('160');
@@ -125,6 +126,39 @@ test('visibility and camera distance persist independently; old settings migrate
   expect(snapshot.cameraDistance).toBe(160);
   expect(snapshot.visibleDistance).toBeLessThanOrEqual(3600);
   expect(snapshot.chunks + snapshot.pending).toBeLessThan(700);
+  expect(errors).toEqual([]);
+});
+
+test('defaults terrain visibility to 5 km and streams bounded work at each LOD tier out to 10 km', async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = captureErrors(page);
+  await page.goto('/?smoke');
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.locator('#settings-toggle').click();
+  // A fresh session (no saved settings) still gets the smoke harness's bounded budget, not the
+  // 5 km product default - see the smokeMode override in src/main.ts.
+  await expect(page.locator('#visibility')).toHaveValue('720');
+  await page.evaluate(() => localStorage.removeItem('soaring.settings.v1'));
+  await page.reload();
+  await page.locator('#settings-toggle').click();
+  await expect(page.locator('#visibility')).toHaveValue('720');
+
+  // Push the slider to the 10 km max and confirm all three LOD tiers populate with bounded work.
+  await page.locator('#visibility').evaluate((input: HTMLInputElement) => {
+    input.value = '10000';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.evaluate(() => window.__SOARING__.setTimeScale(1));
+  await page.waitForFunction(() => window.__SOARING__.snapshot().tiers.far > 0, undefined, { timeout: 60_000 });
+  await page.waitForFunction(() => window.__SOARING__.snapshot().pending === 0, undefined, { timeout: 60_000 });
+  const snapshot = await page.evaluate(() => window.__SOARING__.snapshot());
+  // The range input snaps to its step grid (720 + n*120), so the max settable value is 9,960, not 10,000.
+  expect(snapshot.requestedDistance).toBeGreaterThanOrEqual(9900);
+  expect(snapshot.tiers.near).toBeGreaterThan(0);
+  expect(snapshot.tiers.mid).toBeGreaterThan(0);
+  expect(snapshot.tiers.far).toBeGreaterThan(0);
+  // Bounded chunk/mesh work even at the 10 km max: the coarse far grid keeps total tile count low.
+  expect(snapshot.chunks).toBeLessThan(1200);
   expect(errors).toEqual([]);
 });
 

@@ -4,7 +4,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import './style.css';
 import { Soundscape } from './audio';
 import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS, normalizeFlightHeight } from './eagle';
-import { MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
+import { DEFAULT_VISIBILITY, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
 import { ThermalMarker } from './thermal-marker';
 import { SUN_OFFSET as SUN_VECTOR, WorldModel } from './world';
 
@@ -12,14 +12,14 @@ type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: bool
 const SETTINGS_KEY = 'soaring.settings.v1';
 const SEED_KEY = 'soaring.world-seed.v1';
 const VISIT_KEY = 'soaring.scenic-visit.v1';
-const defaultSettings: StoredSettings = { ambienceVolume: 0.52, musicVolume: 0.52, muted: true, cameraDistance: 178, terrainVisibility: MIN_VISIBILITY,
+const defaultSettings: StoredSettings = { ambienceVolume: 0.52, musicVolume: 0.52, muted: true, cameraDistance: 178, terrainVisibility: DEFAULT_VISIBILITY,
   showThermal: true, minFlightHeight: DEFAULT_FLIGHT_HEIGHT.min, maxFlightHeight: DEFAULT_FLIGHT_HEIGHT.max };
 const clamp = (value: unknown, fallback: number, min: number, max: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 
 function loadSettings(): StoredSettings {
   try {
-    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<StoredSettings> & { volume?: number; quality?: unknown };
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<StoredSettings> & { volume?: number };
     const height = normalizeFlightHeight(saved.minFlightHeight ?? defaultSettings.minFlightHeight,
       saved.maxFlightHeight ?? defaultSettings.maxFlightHeight);
     return {
@@ -28,9 +28,7 @@ function loadSettings(): StoredSettings {
       muted: typeof saved.muted === 'boolean' ? saved.muted : defaultSettings.muted,
       cameraDistance: clamp(saved.cameraDistance, defaultSettings.cameraDistance, 110, 270),
       showThermal: typeof saved.showThermal === 'boolean' ? saved.showThermal : defaultSettings.showThermal,
-      // Old saves had a quality preset, not a visibility preference. Keep the
-      // High preset's view distance and migrate the old sound level to both sliders.
-      terrainVisibility: clamp(saved.terrainVisibility, saved.quality === 'high' ? 1080 : defaultSettings.terrainVisibility, MIN_VISIBILITY, MAX_VISIBILITY),
+      terrainVisibility: clamp(saved.terrainVisibility, defaultSettings.terrainVisibility, MIN_VISIBILITY, MAX_VISIBILITY),
       minFlightHeight: height.min,
       maxFlightHeight: height.max,
     };
@@ -55,7 +53,13 @@ function nextVisit(): number {
   return visit;
 }
 
+// Development-only smoke harness uses a smaller software-WebGL render budget: a bounded default
+// terrain visibility so CI never has to stream toward the 10 km product default. Test-only, not a
+// product setting; a saved value (set explicitly by a test) always wins.
+const smokeMode = import.meta.env.DEV && new URLSearchParams(location.search).has('smoke');
+const hasSavedSettings = localStorage.getItem(SETTINGS_KEY) != null;
 const settings = loadSettings();
+if (smokeMode && !hasSavedSettings) settings.terrainVisibility = MIN_VISIBILITY;
 const world = new WorldModel(loadSeed());
 const start = world.scenicStart(nextVisit());
 const navigator = new EagleNavigator(world, start, { min: settings.minFlightHeight, max: settings.maxFlightHeight });
@@ -69,8 +73,6 @@ if (!app) throw new Error('Missing application root');
 
 const scene = new THREE.Scene();
 
-// Only the development smoke harness uses a smaller software-WebGL render budget.
-const smokeMode = import.meta.env.DEV && new URLSearchParams(location.search).has('smoke');
 const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.5, MAX_VISIBILITY + 500);
 const renderer = new THREE.WebGLRenderer({ antialias: !smokeMode, powerPreference: 'high-performance' });
 renderer.setSize(innerWidth, innerHeight);
@@ -447,6 +449,7 @@ function frame(now: number): void {
     diagnostics.textContent = [
       `FPS          ${fpsSmoothed.toFixed(0)}`,
       `chunks       ${terrain.chunkCount} (${terrain.pendingCount} pending)`,
+      `LOD          near ${terrain.tierCounts.near} · mid ${terrain.tierCounts.mid} · far ${terrain.tierCounts.far}`,
       `visibility   ${fog.far.toFixed(0)} / ${settings.terrainVisibility.toFixed(0)} m`,
       `draw calls   ${renderer.info.render.calls}`,
       `geometries   ${renderer.info.memory.geometries}`,
@@ -477,7 +480,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null };
+      snapshot: () => { seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; tiers: { near: number; mid: number; far: number } };
       setTimeScale: (scale: number) => void;
     };
   }
@@ -498,6 +501,7 @@ window.__SOARING__ = {
     geometries: renderer.info.memory.geometries,
     activeThermal: navigator.activeThermal ? [navigator.activeThermal.x, navigator.activeThermal.z] : null,
     marker: thermalMarker.mesh.visible ? [thermalMarker.mesh.position.x, thermalMarker.mesh.position.z] : null,
+    tiers: terrain.tierCounts,
   }),
   setTimeScale: (scale: number) => { timeScale = Math.max(1, Math.min(12, scale)); },
 };

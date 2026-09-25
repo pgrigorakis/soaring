@@ -3,12 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { CHUNK_SIZE, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from '../src/terrain';
 import { WorldModel } from '../src/world';
 
+const FAR_CHUNK_SIZE = CHUNK_SIZE * 4;
+
 function expectLoadedWithin(scene: THREE.Scene, terrain: TerrainStream, x: number, z: number): void {
   const covered = terrain.coveredDistance(x, z);
   for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 90) {
     const px = x + Math.cos(angle) * (covered - 1);
     const pz = z + Math.sin(angle) * (covered - 1);
-    expect(scene.getObjectByName(`land ${Math.floor(px / CHUNK_SIZE)},${Math.floor(pz / CHUNK_SIZE)}`)).toBeDefined();
+    const fine = scene.getObjectByName(`land ${Math.floor(px / CHUNK_SIZE)},${Math.floor(pz / CHUNK_SIZE)}`);
+    const far = scene.getObjectByName(`land far ${Math.floor(px / FAR_CHUNK_SIZE)},${Math.floor(pz / FAR_CHUNK_SIZE)}`);
+    expect(fine ?? far).toBeDefined();
   }
 }
 

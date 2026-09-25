@@ -26,11 +26,18 @@ Sound is procedural and starts muted on every page load. If sound was previously
 
 ## Terrain visibility
 
-High graphics are the standard presentation. The terrain visibility slider ranges from 720 m to 3,600 m (five times the original default), independently of camera distance. Haze reaches only loaded terrain, even while new tiles stream in. Terrain loading is capped at the reach needed for a 16:9 window; wider windows can show a shorter haze distance than the selected value. Nearby terrain has detailed meshes, trees, and rocks; distant terrain uses simpler meshes and trees at the same positions. A fixed mid-afternoon sun (three.js `Sky` addon, physical Preetham model) casts shadows from terrain and trees, within a fixed 600 m range around the camera that fades out near its edge. Fog/haze color is sampled from the sky near the horizon rather than fixed, and a subtle `Lensflare` tracks the sun when it is on screen and unoccluded by terrain. Old High-preset settings start at 1,080 m; other old presets start at 720 m.
+High graphics are the standard presentation. The terrain visibility slider ranges from 720 m to 10,000 m, defaulting to 5,000 m, independently of camera distance. Haze reaches only loaded terrain, even while new tiles stream in. Terrain loading is capped at the reach needed for a 16:9 window; wider windows can show a shorter haze distance than the selected value.
+
+Three mesh levels of detail stream on concentric grids, sized so a coarser tile's edges always land on a finer tile's grid lines, and a downward skirt on every non-nearest tile hides the resulting resolution seam:
+- **near** (out to 1,080 m): full-density mesh, individual trees, and rocks.
+- **mid** (1,080 m–4,320 m): a lower-density mesh; out to 3,000 m it keeps simplified individual trees, then drops to terrain-color forest only (no per-tree geometry) to avoid pop-in right at the cutoff.
+- **far** (4,320 m–10,000 m): a coarser mesh on 4x larger tiles, terrain-color forest only.
+
+A fixed mid-afternoon sun (three.js `Sky` addon, physical Preetham model) casts shadows from terrain and trees, within a fixed 600 m range around the camera that fades out near its edge. Fog/haze color is sampled from the sky near the horizon rather than fixed, and a subtle `Lensflare` tracks the sun when it is on screen and unoccluded by terrain.
 
 ## Diagnostics and validation
 
-The hidden panel reports smoothed frame rate, loaded and pending chunks, current and selected visibility, draw calls, GPU geometry count, eagle behavior, terrain clearance, position, selected thermal, nearby thermal locations, and simulation speed.
+The hidden panel reports smoothed frame rate, loaded and pending chunks, loaded chunk counts per level of detail, current and selected visibility, draw calls, GPU geometry count, eagle behavior, terrain clearance, position, selected thermal, nearby thermal locations, and simulation speed.
 
 For an accelerated resource/stability check, run `window.__SOARING__.setTimeScale(n)` in the browser console. The scale is capped at 12×, and each frame runs bounded 0.1 s simulation substeps so the reported scale is the real one. `window.__SOARING__.snapshot()` exposes a small smoke-test snapshot. This supports practical traversal and resource checks without waiting one literal hour.
 
@@ -49,7 +56,7 @@ The product reliability target is one uninterrupted hour without intervention or
 ## Architecture
 
 - `src/world.ts` is the pure seed-based world model. Global-coordinate layered noise creates gradual hills, mountain regions, valleys, lake basins, and a hydrological river network: rivers follow steepest descent over the broad landform between jittered nodes of a 200 m grid, join into larger rivers without crossing, widen downstream from about 7 m to 38 m, and end in lakes or ponds. Terrain near a river is shaped into a channel, a gentle bank, a floodplain, and a valley that widen with the river; the water surface follows each river's descending level. A broad woodland field with sharp edges, grove-scale clumping, riverbank trees, and a slope limit, placed on a world-space tree grid, makes forests, meadows, and isolated trees continuous across chunk boundaries. It also scores terrain interest (relief, water, rock, forest edges), which drives scenic starts and the eagle's scenic targets, and places thermals deterministically on dry, open, sun-facing ground (never water).
-- `src/terrain.ts` turns the world model into recyclable Three.js chunks. Missing chunks are queued nearest first and built two per frame to avoid stalls. Shared materials and instanced vegetation keep GPU use bounded; distant chunks are disposed.
+- `src/terrain.ts` turns the world model into recyclable Three.js chunks across three mesh levels of detail (see Terrain visibility above). Missing chunks are queued nearest first and built two per frame to avoid stalls. Shared materials and instanced vegetation keep GPU use bounded; distant chunks are disposed.
 - `src/eagle.ts` separates the explicit navigation state machine from the visual model. The eagle glides toward interesting places, sinking as it goes, and flaps in short bursts only to climb: near the soft minimum-height floor, when terrain rises ahead, or while thermal-seeking. It never flaps while thermal-riding: it circles at 30–60 m, banked 20–35° toward the thermal, climbing 3–4 m/s as the circle drifts with the thermal, and leaves at maximum flight height or when the thermal weakens.
 - `src/main.ts` owns rendering, camera input, lighting/haze, persistence, controls, diagnostics, and lifecycle wiring. During thermal-riding the chase camera follows more loosely and yaws slower than the eagle so the bird moves around the frame; entry and exit ease rather than jerk.
 - `src/thermal-marker.ts` owns the reusable translucent marker for the eagle's active thermal.
