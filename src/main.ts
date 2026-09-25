@@ -124,28 +124,29 @@ sky.material.fragmentShader = sky.material.fragmentShader
     'vec3 retColor = pow( texColor, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) );',
     `vec3 dayColor = pow( texColor, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) ) * skyExposure;
 			float sunFacing = max(dot(direction, vSunDirection), 0.0);
-			float sunGlow = smoothstep(0.84, 0.995, sunFacing);
-			vec3 calmHorizon = mix(vec3(0.55, 0.34, 0.18), vec3(0.86, 0.46, 0.18), sunGlow);
-			dayColor = mix(dayColor, calmHorizon, clamp(goldenAmount, 0.0, 1.0));
-			float sunDisc = smoothstep(0.99915, 0.99965, sunFacing);
-			float sunAura = pow(sunFacing, 28.0);
-			dayColor += vec3(1.05, 0.52, 0.16) * (sunDisc * 1.6 + sunAura * 0.42) * clamp(goldenAmount, 0.0, 1.0);
-			float zenith = smoothstep(0.0, 0.55, direction.y);
-			vec3 noonBlue = dayColor * vec3(0.55, 0.78, 1.35) + vec3(0.02, 0.07, 0.22);
-			dayColor = mix(dayColor, noonBlue, clamp(blueAmount, 0.0, 1.0) * mix(0.62, 1.0, zenith));
-			float skyHorizon = pow(1.0 - clamp(direction.y, 0.0, 1.0), 4.0);
-			vec3 nightColor = vec3(0.006, 0.01, 0.03) + vec3(0.028, 0.036, 0.055) * skyHorizon;
+			float sunUp = smoothstep(0.0, 0.06, vSunDirection.y);
+			float sunDisc = smoothstep(0.99962, 0.99984, sunFacing);
+			float lowSky = 1.0 - smoothstep(0.0, 0.42, direction.y);
+			vec3 warmBand = vec3(0.78, 0.4, 0.22);
+			dayColor = mix(dayColor, warmBand, clamp(goldenAmount, 0.0, 1.0) * lowSky * 0.62);
+			dayColor = mix(dayColor, dayColor * vec3(0.58, 0.8, 1.32), clamp(blueAmount, 0.0, 1.0) * smoothstep(0.04, 0.5, direction.y) * 0.7);
+			dayColor += vec3(1.2, 0.55, 0.18) * sunDisc * 0.55 * sunUp;
+			float skyHorizon = pow(1.0 - clamp(direction.y, 0.0, 1.0), 3.0);
+			vec3 nightColor = vec3(0.004, 0.007, 0.026) + vec3(0.018, 0.026, 0.048) * skyHorizon;
 			vec3 retColor = mix(dayColor, nightColor, clamp(nightAmount, 0.0, 1.0));
-			vec3 starCell = floor(direction * 90.0);
+			float starGrid = 260.0;
+			vec3 starScaled = direction * starGrid;
+			vec3 starCell = floor(starScaled);
 			float starHash = fract(sin(dot(starCell, vec3(127.1, 311.7, 74.7))) * 43758.5453);
-			float star = step(0.988, starHash) * smoothstep(0.28, 0.02, length(fract(direction * 90.0) - 0.5));
-			star *= smoothstep(0.0, 0.12, direction.y);
-			retColor += vec3(1.15, 1.18, 1.25) * star * starAmount;
+			float starVary = fract(sin(dot(starCell, vec3(269.5, 183.3, 246.1))) * 12543.23);
+			float star = step(0.965, starHash) * smoothstep(mix(0.08, 0.2, starVary), 0.0, length(starScaled - starCell - 0.5));
+			star *= mix(0.22, 1.0, starVary * starVary) * smoothstep(0.02, 0.18, direction.y);
+			retColor += vec3(0.82, 0.88, 1.0) * star * starAmount * 1.6;
 			vec3 moonDir = normalize(moonPosition);
 			float moonDot = dot(direction, moonDir);
-			float moonDisc = smoothstep(0.99935, 0.99972, moonDot);
-			float moonHalo = smoothstep(0.9972, 0.9995, moonDot);
-			retColor += vec3(0.86, 0.91, 1.0) * (moonDisc * 3.4 + moonHalo * 0.1) * smoothstep(0.0, 0.04, moonDir.y);`,
+			float moonDisc = smoothstep(0.99942, 0.9997, moonDot);
+			float moonLimb = smoothstep(0.9986, 0.99945, moonDot);
+			retColor += vec3(0.93, 0.95, 1.0) * (moonDisc * 4.5 + moonLimb * 0.12) * smoothstep(0.02, 0.08, moonDir.y);`,
   );
 scene.add(sky);
 
@@ -251,7 +252,7 @@ renderer.domElement.addEventListener('pointerdown', (event) => {
 renderer.domElement.addEventListener('pointermove', (event) => {
   if (!dragging) return;
   orbitYaw -= (event.clientX - pointerX) * 0.005;
-  orbitPitch = Math.max(-0.3, Math.min(0.52, orbitPitch + (event.clientY - pointerY) * 0.0035));
+  orbitPitch = Math.max(-0.85, Math.min(0.52, orbitPitch + (event.clientY - pointerY) * 0.0035));
   pointerX = event.clientX;
   pointerY = event.clientY;
 });
@@ -397,10 +398,11 @@ document.querySelector('#new-world')?.addEventListener('click', () => {
 function saveSettings(): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
+let hazeStart = 0.82;
 function updateFog(): void {
   const coveredDepth = terrain.coveredDistance(cameraPosition.x, cameraPosition.z) * depthPerDistance(camera.aspect);
   fog.far = Math.min(settings.terrainVisibility, coveredDepth);
-  fog.near = fog.far * 0.5;
+  fog.near = fog.far * hazeStart;
 }
 // A fixed range around the camera, independent of terrain visibility, keeps the shadow camera's
 // size (and so its texel size) constant, which is required for the texel snapping below.
@@ -453,10 +455,11 @@ let diagnosticsElapsed = 0;
 // Real time, not the flight time scale, so a 15-minute day stays 15 minutes during accelerated tests.
 let skySeconds = 0.36 * DAY_SECONDS;
 let skyPaused = false;
-let skyLook: 'sun' | 'moon' | null = null;
+let skyLook: 'sun' | 'moon' | 'horizon' | null = null;
 let fogSampleAge = 999;
 const sunDir = new THREE.Vector3();
 const moonDir = new THREE.Vector3();
+const skyAim = new THREE.Vector3();
 const keyDir = new THREE.Vector3();
 const fogGoal = new THREE.Color(0x8faeb8);
 const veil = document.querySelector<HTMLElement>('#veil')!;
@@ -468,18 +471,19 @@ const smooth01 = (edge0: number, edge1: number, value: number): number => {
 function applyDaylight(body: Daylight, delta: number, forceFog: boolean): void {
   sunDir.set(body.sun.x, body.sun.y, body.sun.z);
   moonDir.set(body.moon.x, body.moon.y, body.moon.z);
-  const high = smooth01(0.02, 0.3, Math.max(0, body.sun.y));
+  const high = smooth01(0.12, 0.72, Math.max(0, body.sun.y));
   const day = 1 - body.night;
   sky.material.uniforms.sunPosition!.value.copy(sunDir).multiplyScalar(450000);
   sky.material.uniforms.moonPosition!.value.copy(moonDir);
-  sky.material.uniforms.turbidity!.value = 3.4 - high * 1.2;
-  sky.material.uniforms.rayleigh!.value = 2.8 + high * 0.6;
-  sky.material.uniforms.mieCoefficient!.value = 0.004 - high * 0.002;
-  sky.material.uniforms.mieDirectionalG!.value = 0.84 - high * 0.08;
-  sky.material.uniforms.skyExposure!.value = 0.26 - high * 0.04;
+  sky.material.uniforms.turbidity!.value = 9.5 - high * 8.2;
+  sky.material.uniforms.rayleigh!.value = 2.4 + high * 1.6;
+  sky.material.uniforms.mieCoefficient!.value = 0.016 - high * 0.0145;
+  sky.material.uniforms.mieDirectionalG!.value = 0.93 - high * 0.18;
+  sky.material.uniforms.skyExposure!.value = 0.16 + high * 0.04;
   sky.material.uniforms.nightAmount!.value = body.night;
-  sky.material.uniforms.goldenAmount!.value = smooth01(0.22, 0.0, Math.max(body.sun.y, 0));
-  sky.material.uniforms.blueAmount!.value = high * day;
+  sky.material.uniforms.goldenAmount!.value = 1 - high;
+  sky.material.uniforms.blueAmount!.value = high;
+  hazeStart = 0.4 + high * 0.5;
   sky.material.uniforms.starAmount!.value = smooth01(0.0, -0.12, body.sun.y);
   // Keep the sky box around the camera. The sun uniform is a direction, so moving the mesh
   // does not drag the sun; it only stops the box from being left behind on a long flight.
@@ -496,17 +500,19 @@ function applyDaylight(body: Daylight, delta: number, forceFog: boolean): void {
   hemisphere.intensity = 1.15 + day * 1.05;
   renderer.toneMappingExposure = 1.06 + body.night * 0.12;
 
-  const flare = smooth01(0, 0.1, body.sun.y);
-  flareGlowElement.color.setRGB(flare, flare * 0.94, flare * 0.72);
-  flareRingElement.color.setRGB(flare * 0.7, flare * 0.78, flare);
+  const flare = smooth01(0, 0.12, body.sun.y);
+  const low = 1 - high;
+  flareGlowElement.size = 42 + low * 16;
+  flareRingElement.size = 36;
+  flareGlowElement.color.setRGB(flare, flare * (0.72 + high * 0.22), flare * (0.38 + high * 0.4));
+  flareRingElement.color.setRGB(flare * 0.55, flare * 0.62, flare * 0.8);
   sunFlareAnchor.visible = flare > 0.01;
   if (sunFlareAnchor.visible) {
     sunFlareAnchor.position.copy(camera.position).addScaledVector(sunDir, camera.far * 0.82);
   }
 
-  const warm = body.sun.y > 0 ? 1 - smooth01(0.04, 0.4, body.sun.y) : 0;
-  veil.style.setProperty('--veil-top', `rgba(${Math.round(255 - body.night * 40)}, ${Math.round(228 - body.night * 90)}, ${Math.round(186 - body.night * 40)}, ${(0.04 + warm * 0.08).toFixed(3)})`);
-  veil.style.setProperty('--veil-bottom', `rgba(42, 70, 76, ${(0.08 * day).toFixed(3)})`);
+  veil.style.setProperty('--veil-top', 'rgba(0, 0, 0, 0)');
+  veil.style.setProperty('--veil-bottom', 'rgba(20, 32, 40, 0.03)');
 
   fogSampleAge += delta;
   if (forceFog || fogSampleAge > 0.35) {
@@ -534,30 +540,34 @@ function frame(now: number): void {
   soundscape.update(state.behavior, state.flapping);
 
   if (skyLook) {
-    const aim = currentDaylight()[skyLook];
-    // View azimuth is cameraHeading - orbitYaw. See the chase-camera offset below.
-    orbitYaw = wrapAngle(cameraHeading - Math.atan2(aim.x, aim.z));
-    orbitPitch = -0.28;
-  } else if (!dragging) {
-    const returnRate = 1 - Math.exp(-rawDelta * 0.42);
-    orbitYaw += (0 - orbitYaw) * returnRate;
-    orbitPitch += (0 - orbitPitch) * returnRate;
+    const sky = currentDaylight();
+    if (skyLook === 'horizon') skyAim.set(-sky.sun.z, 0.1, sky.sun.x).normalize();
+    else skyAim.set(sky[skyLook].x, sky[skyLook].y, sky[skyLook].z);
+    cameraPosition.set(state.x, state.y + 16, state.z).addScaledVector(skyAim, -36);
+    cameraPosition.y = Math.max(cameraPosition.y, world.sample(cameraPosition.x, cameraPosition.z).height + 8);
+    lookAt.copy(cameraPosition).addScaledVector(skyAim, 280);
+  } else {
+    if (!dragging) {
+      const returnRate = 1 - Math.exp(-rawDelta * 0.42);
+      orbitYaw += (0 - orbitYaw) * returnRate;
+      orbitPitch += (0 - orbitPitch) * returnRate;
+    }
+    // Thermal-riding: follow more loosely and yaw slower than the eagle so it moves around the frame.
+    rideBlend += ((state.behavior === 'thermal-riding' ? 1 : 0) - rideBlend) * (1 - Math.exp(-rawDelta * 0.65));
+    cameraHeading += wrapAngle(state.heading - cameraHeading) * (1 - Math.exp(-rawDelta * (2.6 - rideBlend * 2.1)));
+    const backward = new THREE.Vector3(-Math.sin(cameraHeading), 0, -Math.cos(cameraHeading));
+    const side = new THREE.Vector3(Math.cos(cameraHeading), 0, -Math.sin(cameraHeading));
+    const distance = settings.cameraDistance;
+    const desired = new THREE.Vector3(state.x, state.y, state.z)
+      .addScaledVector(backward, Math.cos(orbitYaw) * distance)
+      .addScaledVector(side, Math.sin(orbitYaw) * distance)
+      .add(new THREE.Vector3(0, distance * (0.31 + orbitPitch), 0));
+    cameraPosition.lerp(desired, 1 - Math.exp(-rawDelta * (2.1 - rideBlend * 1.35)));
+    cameraPosition.y = Math.max(cameraPosition.y, world.sample(cameraPosition.x, cameraPosition.z).height + 14);
+    const lookAhead = 38 - rideBlend * 22;
+    lookAt.set(state.x + Math.sin(cameraHeading) * lookAhead, state.y - 9 - orbitPitch * 24, state.z + Math.cos(cameraHeading) * lookAhead);
   }
-  // Thermal-riding: follow more loosely and yaw slower than the eagle so it moves around the frame.
-  rideBlend += ((state.behavior === 'thermal-riding' ? 1 : 0) - rideBlend) * (1 - Math.exp(-rawDelta * 0.65));
-  cameraHeading += wrapAngle(state.heading - cameraHeading) * (1 - Math.exp(-rawDelta * (2.6 - rideBlend * 2.1)));
-  const backward = new THREE.Vector3(-Math.sin(cameraHeading), 0, -Math.cos(cameraHeading));
-  const side = new THREE.Vector3(Math.cos(cameraHeading), 0, -Math.sin(cameraHeading));
-  const distance = settings.cameraDistance;
-  const desired = new THREE.Vector3(state.x, state.y, state.z)
-    .addScaledVector(backward, Math.cos(orbitYaw) * distance)
-    .addScaledVector(side, Math.sin(orbitYaw) * distance)
-    .add(new THREE.Vector3(0, distance * (0.31 + orbitPitch), 0));
-  cameraPosition.lerp(desired, 1 - Math.exp(-rawDelta * (2.1 - rideBlend * 1.35)));
-  cameraPosition.y = Math.max(cameraPosition.y, world.sample(cameraPosition.x, cameraPosition.z).height + 14);
   camera.position.copy(cameraPosition);
-  const lookAhead = 38 - rideBlend * 22;
-  lookAt.set(state.x + Math.sin(cameraHeading) * lookAhead, state.y - 9 - orbitPitch * 24, state.z + Math.cos(cameraHeading) * lookAhead);
   camera.lookAt(lookAt);
   terrain.update(cameraPosition.x, cameraPosition.z);
   updateFog();
@@ -620,7 +630,7 @@ declare global {
       snapshot: () => { seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number };
       setTimeScale: (scale: number) => void;
       setTimeOfDay: (phase: number) => void;
-      lookAtBody: (body: 'sun' | 'moon' | 'chase') => void;
+      lookAtBody: (body: 'sun' | 'moon' | 'horizon' | 'chase') => void;
     };
   }
 }
@@ -661,7 +671,7 @@ window.__SOARING__ = {
     skyPaused = true;
     fogSampleAge = 999;
   },
-  lookAtBody: (body: 'sun' | 'moon' | 'chase') => {
+  lookAtBody: (body: 'sun' | 'moon' | 'horizon' | 'chase') => {
     skyLook = body === 'chase' ? null : body;
   },
 };

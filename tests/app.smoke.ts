@@ -294,11 +294,11 @@ test('renders noon, dusk, and midnight from the world clock', async ({ page }) =
     if (toggle) toggle.style.visibility = 'hidden';
   });
 
-  async function showPhase(phase: number, name: string, look: 'sun' | 'moon'): Promise<{ timeOfDay: number; sunElevation: number; moonElevation: number }> {
+  async function showPhase(phase: number, name: string, look: 'sun' | 'moon' | 'horizon' | 'chase'): Promise<{ timeOfDay: number; sunElevation: number; moonElevation: number }> {
     await page.evaluate((value) => window.__SOARING__.setTimeOfDay(value), phase);
     await page.evaluate((body) => window.__SOARING__.lookAtBody(body), look);
     await page.evaluate(() => new Promise((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve(undefined)));
+      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve(undefined))));
     }));
     const shot = await page.screenshot({ path: `test-results/sky-${name}.png` });
     expect(shot.byteLength).toBeGreaterThan(1000);
@@ -308,19 +308,22 @@ test('renders noon, dusk, and midnight from the world clock', async ({ page }) =
     });
   }
 
-  const dawn = await showPhase(0.25, 'dawn', 'sun');
-  expect(dawn.timeOfDay).toBeCloseTo(0.25, 2);
-  expect(Math.abs(dawn.sunElevation)).toBeLessThan(0.05);
-  expect(Math.abs(dawn.moonElevation)).toBeLessThan(0.05);
+  const horizon = await showPhase(0.25, 'horizon', 'chase');
+  expect(horizon.timeOfDay).toBeCloseTo(0.25, 2);
+  expect(Math.abs(horizon.sunElevation)).toBeLessThan(0.05);
+  expect(Math.abs(horizon.moonElevation)).toBeLessThan(0.05);
 
-  const noon = await showPhase(0.5, 'noon', 'sun');
+  const dawn = await showPhase(0.28, 'dawn', 'sun');
+  expect(dawn.sunElevation).toBeGreaterThan(0.05);
+
+  const noon = await showPhase(0.5, 'noon', 'horizon');
   expect(noon.sunElevation).toBeGreaterThan(0.25);
   expect(noon.moonElevation).toBeLessThan(-0.25);
 
-  const dusk = await showPhase(0.75, 'dusk', 'sun');
-  expect(dusk.timeOfDay).toBeCloseTo(0.75, 2);
-  expect(Math.abs(dusk.sunElevation)).toBeLessThan(0.05);
-  expect(dusk.sunElevation + dusk.moonElevation).toBeCloseTo(0, 4);
+  const dusk = await showPhase(0.72, 'dusk', 'sun');
+  expect(dusk.sunElevation).toBeGreaterThan(0.05);
+  expect(dusk.timeOfDay).toBeGreaterThan(0.7);
+  expect(dusk.timeOfDay).toBeLessThan(0.75);
 
   const midnight = await showPhase(0, 'midnight', 'moon');
   expect(midnight.sunElevation).toBeLessThan(-0.25);

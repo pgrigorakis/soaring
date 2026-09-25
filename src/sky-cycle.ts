@@ -1,11 +1,8 @@
 /** One world clock. A full day is 15 minutes of real time, not simulation time. */
 export const DAY_SECONDS = 15 * 60;
 
-/**
- * Peak elevation. High enough for a distinct noon, low enough that the full moon
- * stays inside the trailing camera's view at midnight. Off zenith, so shadows stay stable.
- */
-const MAX_ELEVATION = 20 * Math.PI / 180;
+/** Peak elevation. High enough for a clear noon sky, and off zenith so shadows stay stable. */
+const MAX_ELEVATION = 52 * Math.PI / 180;
 const SUN_PEAK_INTENSITY = 3.6;
 const MOON_PEAK_INTENSITY = 1.7;
 
