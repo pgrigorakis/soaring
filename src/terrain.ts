@@ -301,7 +301,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
           const top = vertices[i]!;
           const base = top * 3;
           const bottom = positions.length / 3;
-          positions.push(positions[base]!, Math.min(positions[base + 1]! - 90, this.world.waterLevel - 60), positions[base + 2]!);
+          positions.push(positions[base]!, positions[base + 1]! - 140, positions[base + 2]!);
           normals.push(normals[base]!, normals[base + 1]!, normals[base + 2]!);
           colors.push(colors[base]!, colors[base + 1]!, colors[base + 2]!);
           if (i > 0) {

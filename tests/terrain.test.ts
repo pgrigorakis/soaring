@@ -79,16 +79,25 @@ describe('terrain streaming', () => {
 
   it('gives distant tiles the same trees and shadows as detailed tiles', () => {
     const scene = new THREE.Scene();
-    const terrain = new TerrainStream(scene, new WorldModel(80231), MAX_VISIBILITY);
-    terrain.update(CHUNK_SIZE * 0.5, CHUNK_SIZE * 0.5, Infinity);
-    const far = Array.from({ length: 7 }, (_, i) => scene.getObjectByName(`land 4,${i - 3}`)!)
-      .find((group) => treeCrowns(group) > 0)!;
+    const world = new WorldModel(80231);
+    const terrain = new TerrainStream(scene, world, MAX_VISIBILITY);
+    const spot = { x: 0, z: 0 };
+    for (let z = -6; z <= 6; z += 1) {
+      for (let x = -6; x <= 6; x += 1) {
+        if (world.treesInArea((x + 5) * CHUNK_SIZE, z * CHUNK_SIZE, CHUNK_SIZE, 29).length > 5) {
+          spot.x = x;
+          spot.z = z;
+        }
+      }
+    }
+    terrain.update((spot.x + 0.5) * CHUNK_SIZE, (spot.z + 0.5) * CHUNK_SIZE, Infinity);
+    const far = scene.getObjectByName(`land ${spot.x + 5},${spot.z}`)!;
     expect(far).toBeDefined();
     const farTrees = treeCrowns(far);
     expect(treeTrunks(far)).toBe(farTrees);
     far.traverse((object) => { if (object instanceof THREE.Mesh && !object.material.transparent) expect(object.castShadow).toBe(true); });
     const name = far.name;
-    terrain.update(CHUNK_SIZE * 1.5, CHUNK_SIZE * 0.5, Infinity);
+    terrain.update((spot.x + 1.5) * CHUNK_SIZE, (spot.z + 0.5) * CHUNK_SIZE, Infinity);
     const detailed = scene.getObjectByName(name)!;
     expect(detailed).not.toBe(far);
     expect(treeTrunks(detailed)).toBe(farTrees);
@@ -99,9 +108,14 @@ describe('terrain streaming', () => {
     const scene = new THREE.Scene();
     const world = new WorldModel(80231);
     const terrain = new TerrainStream(scene, world);
-    terrain.update(-4 * CHUNK_SIZE + 1, -CHUNK_SIZE + 1, 1);
-    const chunk = scene.getObjectByName('land -4,-1')!;
-    const trees = world.treesInArea(-4 * CHUNK_SIZE, -CHUNK_SIZE, CHUNK_SIZE, 29);
+    const forest = Array.from({ length: 225 }, (_, index) => {
+      const x = (index % 15) - 12;
+      const z = Math.floor(index / 15) - 6;
+      return { x, z, trees: world.treesInArea(x * CHUNK_SIZE, z * CHUNK_SIZE, CHUNK_SIZE, 29) };
+    }).find((cell) => cell.trees.length > 8)!;
+    terrain.update((forest.x + 0.5) * CHUNK_SIZE, (forest.z + 0.5) * CHUNK_SIZE, 1);
+    const chunk = scene.getObjectByName(`land ${forest.x},${forest.z}`)!;
+    const trees = forest.trees;
     const instances = chunk.children.filter((child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh);
     const trunks = instances.find((mesh) => mesh.geometry.type === 'CylinderGeometry')!;
     expect(trunks.count).toBe(trees.length);

@@ -331,6 +331,37 @@ test('renders noon, dusk, and midnight from the world clock', async ({ page }) =
   expect(errors).toEqual([]);
 });
 
+test('shows drainage water from altitude without page errors', async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = captureErrors(page);
+  await page.goto('/?smoke');
+  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('#settings-panel')).toBeHidden();
+  const landmark = await page.evaluate(() => {
+    window.__SOARING__.setTimeOfDay(0.5);
+    window.__SOARING__.setVisibility(5000);
+    window.__SOARING__.setCaptureClear(true);
+    return window.__SOARING__.landmark();
+  });
+  expect((await page.evaluate(() => window.__SOARING__.snapshot().sunElevation))).toBeGreaterThan(0.25);
+  expect(landmark).not.toBeNull();
+  await page.evaluate((mark) => {
+    window.__SOARING__.setViewpoint({
+      x: mark.x - 420,
+      y: mark.surface + 900,
+      z: mark.z + 680,
+      lookX: mark.x,
+      lookY: mark.surface,
+      lookZ: mark.z,
+    });
+  }, landmark!);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().tiers.far > 0, undefined, { timeout: 70_000 });
+  await page.screenshot({ path: 'test-results/hydrology-altitude.png' });
+  const seen = await page.evaluate((mark) => window.__SOARING__.sample(mark.x, mark.z), landmark!);
+  expect(seen.water).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('a blocked browser audio context keeps the mute control usable without page errors', async ({ page }) => {
   const errors = captureErrors(page);
   await page.addInitScript(() => {
