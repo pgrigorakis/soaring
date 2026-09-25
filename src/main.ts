@@ -190,8 +190,11 @@ let orbitPitch = 0;
 let dragging = false;
 let pointerX = 0;
 let pointerY = 0;
+const wrapAngle = (angle: number): number => Math.atan2(Math.sin(angle), Math.cos(angle));
 const cameraPosition = new THREE.Vector3(navigator.state.x, navigator.state.y + 70, navigator.state.z - settings.cameraDistance);
 const lookAt = new THREE.Vector3();
+let cameraHeading = navigator.state.heading;
+let rideBlend = 0;
 
 renderer.domElement.addEventListener('pointerdown', (event) => {
   dragging = true;
@@ -409,17 +412,21 @@ function frame(now: number): void {
     orbitYaw += (0 - orbitYaw) * returnRate;
     orbitPitch += (0 - orbitPitch) * returnRate;
   }
-  const backward = new THREE.Vector3(-Math.sin(state.heading), 0, -Math.cos(state.heading));
-  const side = new THREE.Vector3(Math.cos(state.heading), 0, -Math.sin(state.heading));
+  // Thermal-riding: follow more loosely and yaw slower than the eagle so it moves around the frame.
+  rideBlend += ((state.behavior === 'thermal-riding' ? 1 : 0) - rideBlend) * (1 - Math.exp(-rawDelta * 0.65));
+  cameraHeading += wrapAngle(state.heading - cameraHeading) * (1 - Math.exp(-rawDelta * (2.6 - rideBlend * 2.1)));
+  const backward = new THREE.Vector3(-Math.sin(cameraHeading), 0, -Math.cos(cameraHeading));
+  const side = new THREE.Vector3(Math.cos(cameraHeading), 0, -Math.sin(cameraHeading));
   const distance = settings.cameraDistance;
   const desired = new THREE.Vector3(state.x, state.y, state.z)
     .addScaledVector(backward, Math.cos(orbitYaw) * distance)
     .addScaledVector(side, Math.sin(orbitYaw) * distance)
     .add(new THREE.Vector3(0, distance * (0.31 + orbitPitch), 0));
-  cameraPosition.lerp(desired, 1 - Math.exp(-rawDelta * 2.1));
+  cameraPosition.lerp(desired, 1 - Math.exp(-rawDelta * (2.1 - rideBlend * 1.35)));
   cameraPosition.y = Math.max(cameraPosition.y, world.sample(cameraPosition.x, cameraPosition.z).height + 14);
   camera.position.copy(cameraPosition);
-  lookAt.set(state.x + Math.sin(state.heading) * 38, state.y - 9 - orbitPitch * 24, state.z + Math.cos(state.heading) * 38);
+  const lookAhead = 38 - rideBlend * 22;
+  lookAt.set(state.x + Math.sin(cameraHeading) * lookAhead, state.y - 9 - orbitPitch * 24, state.z + Math.cos(cameraHeading) * lookAhead);
   camera.lookAt(lookAt);
   terrain.update(cameraPosition.x, cameraPosition.z);
   updateFog();
@@ -470,7 +477,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; behavior: string; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null };
+      snapshot: () => { seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null };
       setTimeScale: (scale: number) => void;
     };
   }
@@ -484,6 +491,9 @@ window.__SOARING__ = {
     requestedDistance: settings.terrainVisibility,
     cameraDistance: settings.cameraDistance,
     behavior: navigator.state.behavior,
+    flapping: navigator.state.flapping,
+    bank: navigator.state.bank,
+    heading: navigator.state.heading,
     position: [navigator.state.x, navigator.state.y, navigator.state.z],
     geometries: renderer.info.memory.geometries,
     activeThermal: navigator.activeThermal ? [navigator.activeThermal.x, navigator.activeThermal.z] : null,
