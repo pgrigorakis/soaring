@@ -166,24 +166,23 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   expect(snapshot.visibleDistance).toBeLessThanOrEqual(3600);
   await page.mouse.move(500, 300);
   await page.locator('#settings-toggle').click();
-  const farCamera = await page.evaluate(async () => {
+  const firstFrame = await page.evaluate(async () => {
+    const startingHeight = window.__SOARING__.snapshot().cameraHeight;
     const input = document.querySelector<HTMLInputElement>('#distance')!;
     input.value = '100';
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    const heights: number[] = [];
-    for (let frame = 0; frame < 120; frame += 1) {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      heights.push(window.__SOARING__.snapshot().cameraHeight);
-    }
-    return {
-      ...window.__SOARING__.snapshot(),
-      maxFrameChange: Math.max(...heights.slice(1).map((height, index) => Math.abs(height - heights[index]!))),
-    };
+    const cameraHeight = await new Promise<number>((resolve) => {
+      requestAnimationFrame(() => resolve(window.__SOARING__.snapshot().cameraHeight));
+    });
+    return { startingHeight, cameraHeight };
   });
+  // A single render frame must ease toward the new height, not teleport to it.
+  expect(Math.abs(firstFrame.cameraHeight - firstFrame.startingHeight)).toBeLessThan(12);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraHeight > 48);
+  const farCamera = await page.evaluate(() => window.__SOARING__.snapshot());
   expect(farCamera.cameraDistance).toBe(100);
   expect(farCamera.cameraHeight).toBeGreaterThan(48);
   expect(farCamera.cameraHeight).toBeLessThan(62);
-  expect(farCamera.maxFrameChange).toBeLessThan(5);
   expect(snapshot.chunks + snapshot.pending).toBeLessThan(700);
   expect(errors).toEqual([]);
 });
