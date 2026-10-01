@@ -17,7 +17,7 @@ export type Tree = { x: number; y: number; z: number; kind: number; scale: numbe
 /** Fixed placement azimuth for sun-facing thermal scores. Not the moving sky sun. */
 export const SUN_OFFSET = { x: -420, y: 190, z: -300 } as const;
 const SUN_LENGTH = Math.hypot(SUN_OFFSET.x, SUN_OFFSET.y, SUN_OFFSET.z);
-const THERMAL_CELL = 1100;
+const THERMAL_CELL = 1800;
 const THERMAL_CANDIDATES = 5;
 export const WORLD_CACHE_LIMIT = 20_000;
 /**
@@ -693,6 +693,7 @@ export class WorldModel {
         best = { x, z, strength };
       }
     }
+    if (bestScore < 0.4) best = null;
     this.thermals.set(key, best);
     return best;
   }

@@ -10,14 +10,37 @@ function inRangeOf(world: WorldModel, x: number, z: number) {
   return world.nearbyThermals(x, z, 6).filter((thermal) => Math.hypot(thermal.x - x, thermal.z - z) <= THERMAL_MARKER_RANGE);
 }
 
+function thermalsInCells(world: WorldModel, radius: number) {
+  const thermals = [];
+  for (let cellZ = -radius; cellZ <= radius; cellZ += 1) {
+    for (let cellX = -radius; cellX <= radius; cellX += 1) {
+      const thermal = world.thermalAtCell(cellX, cellZ);
+      if (thermal) thermals.push(thermal);
+    }
+  }
+  return thermals;
+}
+
 describe('thermal markers within 3.5 km', () => {
+  it('keeps the visible thermal field near ten columns', () => {
+    const world = new WorldModel(448122);
+    const points = [[0, 0], [5000, 5000], [-5000, 7000], [10000, -9000], [-10000, -5000], [14000, 13000]] as const;
+    const counts = points.map(([x, z]) => world.thermalsWithin(x, z, THERMAL_MARKER_RANGE).length);
+    const average = counts.reduce((sum, count) => sum + count, 0) / counts.length;
+    expect(average).toBeGreaterThanOrEqual(7);
+    expect(average).toBeLessThanOrEqual(16);
+  });
+
   it('reuses one instanced column for every in-range thermal and hides the rest', () => {
     const scene = new THREE.Scene();
     const world = new WorldModel(448122);
     const marker = new ThermalMarker(scene, world);
-    const origin = world.thermalAtCell(0, 0)!;
-    const neighbor = world.thermalAtCell(1, 1)!;
-    const distant = world.thermalAtCell(8, 0)!;
+    const candidates = thermalsInCells(world, 12);
+    const origin = candidates.find((thermal) => candidates.some((other) => other !== thermal
+      && Math.hypot(other.x - thermal.x, other.z - thermal.z) <= THERMAL_MARKER_RANGE))!;
+    const neighbor = candidates.find((thermal) => thermal !== origin
+      && Math.hypot(thermal.x - origin.x, thermal.z - origin.z) <= THERMAL_MARKER_RANGE)!;
+    const distant = candidates.find((thermal) => Math.hypot(thermal.x - origin.x, thermal.z - origin.z) > THERMAL_MARKER_RANGE)!;
     expect(origin).toBeTruthy();
     expect(neighbor).toBeTruthy();
     expect(distant).toBeTruthy();
@@ -31,6 +54,7 @@ describe('thermal markers within 3.5 km', () => {
     expect(marker.count).toBe(0);
     expect(material.transparent).toBe(true);
     expect(material.depthWrite).toBe(false);
+    expect(material.uniforms.markerOpacity?.value).toBe(0.4);
     expect(geometry.parameters.openEnded).toBe(true);
 
     marker.update(origin, origin, true, 1);
