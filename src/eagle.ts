@@ -217,6 +217,7 @@ export class EagleNavigator {
   }
 
   private seekThermal(): void {
+    // Two 1.8 km cells give the eagle a 3.6 km thermal search reach.
     const thermals = this.world.nearbyThermals(this.state.x, this.state.z, 2);
     const aheadX = Math.sin(this.state.heading);
     const aheadZ = Math.cos(this.state.heading);

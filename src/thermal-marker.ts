@@ -5,9 +5,10 @@ const HEIGHT = 260;
 const RADIUS = 62;
 /** Eagle line-of-sight used by the Show thermal setting. */
 export const THERMAL_MARKER_RANGE = 3500;
+export const THERMAL_MARKER_OPACITY = 0.4;
 const FADE_BAND = 500;
-// 1.1 km cells: a 3.5 km disk fits in a 9×9 window, so one instanced mesh is enough.
-const CAPACITY = 81;
+// 1.8 km cells: a 3.5 km range fits inside a 5×5 scan window.
+const CAPACITY = 25;
 
 const scratch = new THREE.Matrix4();
 const scratchColor = new THREE.Color();
@@ -32,7 +33,11 @@ export class ThermalMarker {
   constructor(private readonly scene: THREE.Scene, private readonly world: WorldModel) {
     const geometry = new THREE.CylinderGeometry(RADIUS, RADIUS, HEIGHT, 40, 1, true);
     const material = new THREE.ShaderMaterial({
-      uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), time: this.time },
+      uniforms: {
+        ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
+        time: this.time,
+        markerOpacity: { value: THERMAL_MARKER_OPACITY },
+      },
       fog: true,
       transparent: true,
       depthWrite: false,
@@ -59,6 +64,7 @@ export class ThermalMarker {
       fragmentShader: `
         #include <fog_pars_fragment>
         uniform float time;
+        uniform float markerOpacity;
         varying vec2 vUv;
         varying float vFacing;
         varying float vActive;
@@ -75,7 +81,7 @@ export class ThermalMarker {
           float facing = smoothstep(0.0, mix(0.92, 0.4, near), abs(vFacing));
           float spark = near * 0.1 * pow(shimmer, 8.0);
           float base = mix(0.2, 0.05, near);
-          float alpha = vFade * rise * facing * (base + spark + near * 0.015 * shimmer);
+          float alpha = markerOpacity * vFade * rise * facing * (base + spark + near * 0.015 * shimmer);
           alpha *= mix(0.72, 1.0, vActive);
           vec3 calm = vec3(1.0, 0.46, 0.05);
           vec3 hot = mix(vec3(1.0, 0.12, 0.0), vec3(1.0, 0.32, 0.02), shimmer * near);

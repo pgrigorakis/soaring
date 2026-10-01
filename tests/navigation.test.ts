@@ -56,7 +56,11 @@ describe('autonomous eagle navigation', () => {
     }
   });
 
-  it.each([{ min: 50, max: 70 }, { min: 90, max: 145 }, { min: 65, max: 210 }])(
+  it.each([
+    { min: 50, max: 70, baselineFlappingTicks: 6552 },
+    { min: 90, max: 145, baselineFlappingTicks: 4449 },
+    { min: 65, max: 210, baselineFlappingTicks: 1298 },
+  ])(
     'never enters terrain and caps thermal-riding climb at the max in $min–$max m during a one-hour flight', (range) => {
       const world = new WorldModel(448122);
       const navigator = new EagleNavigator(world, world.scenicStart(2), range);
@@ -65,11 +69,13 @@ describe('autonomous eagle navigation', () => {
       let minimumClearance = Infinity;
       let seekingTurns = 0;
       let circleEntries = 0;
+      let flappingTicks = 0;
       for (let step = 0; step < 36_000; step += 1) {
         const before = navigator.state.behavior;
         const heading = navigator.state.heading;
         const state = navigator.update(0.1);
         behaviors.add(state.behavior);
+        if (state.flapping) flappingTicks += 1;
         const clearance = state.y - world.sample(state.x, state.z).height;
         minimumClearance = Math.min(minimumClearance, clearance);
         if (state.behavior === 'thermal-seeking' && Math.abs(state.heading - heading) > 0.001) seekingTurns += 1;
@@ -83,6 +89,8 @@ describe('autonomous eagle navigation', () => {
       expect(minimumClearance).toBeGreaterThanOrEqual(TERRAIN_SAFETY_MARGIN - 0.001);
       expect(seekingTurns).toBeGreaterThan(10);
       expect(circleEntries).toBeGreaterThan(0);
+      // Baselines are recorded from this seed on the original thermal grid.
+      expect(flappingTicks).toBeLessThanOrEqual(range.baselineFlappingTicks * 1.25);
       expect(Math.hypot(navigator.state.x - start.x, navigator.state.z - start.z)).toBeGreaterThan(700);
       expect(behaviors.has('thermal-seeking')).toBe(true);
       expect(behaviors.has('thermal-riding')).toBe(true);
