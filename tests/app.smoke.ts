@@ -139,24 +139,50 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   await expect(settingsToggle).toHaveAttribute('aria-expanded', 'true');
   await expect(settingsToggle).toHaveAccessibleName('Close settings');
   await expect(page.locator('#quality')).toHaveCount(0);
-  await expect(page.locator('#distance')).toHaveValue('220');
+  await expect(page.locator('#distance')).toHaveValue('100');
+  expect(await page.locator('#distance').getAttribute('min')).toBe('10');
+  expect(await page.locator('#distance').getAttribute('max')).toBe('100');
   await expect(page.locator('#ambience')).toHaveValue('0.4');
   await expect(page.locator('#music')).toHaveValue('0.4');
   await expect(page.locator('#visibility')).toHaveValue('1080');
   expect(await page.locator('#visibility').getAttribute('max')).toBe('5000');
   await page.locator('#visibility').fill('3600');
-  await expect(page.locator('#distance')).toHaveValue('220');
-  await page.locator('#distance').fill('160');
+  await expect(page.locator('#distance')).toHaveValue('100');
+  await page.locator('#distance').fill('10');
   await page.reload();
   await expect(page.locator('#visibility')).toHaveValue('3600');
-  await expect(page.locator('#distance')).toHaveValue('160');
+  await expect(page.locator('#distance')).toHaveValue('10');
+  await page.waitForFunction(() => {
+    const { cameraDistance, cameraHeight } = window.__SOARING__.snapshot();
+    return cameraDistance === 10 && cameraHeight > 0 && cameraHeight < 10;
+  });
   // Full far-field loading is covered by unit tests; here the stream only has to make bounded progress.
   const first = await page.evaluate(() => window.__SOARING__.snapshot());
   await page.waitForFunction((chunks) => window.__SOARING__.snapshot().chunks >= chunks + 20, first.chunks);
   const snapshot = await page.evaluate(() => window.__SOARING__.snapshot());
   expect(snapshot.requestedDistance).toBe(3600);
-  expect(snapshot.cameraDistance).toBe(160);
+  expect(snapshot.cameraDistance).toBe(10);
+  expect(snapshot.cameraHeight).toBeLessThan(10);
   expect(snapshot.visibleDistance).toBeLessThanOrEqual(3600);
+  await page.mouse.move(500, 300);
+  await page.locator('#settings-toggle').click();
+  const firstFrame = await page.evaluate(async () => {
+    const startingHeight = window.__SOARING__.snapshot().cameraHeight;
+    const input = document.querySelector<HTMLInputElement>('#distance')!;
+    input.value = '100';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const cameraHeight = await new Promise<number>((resolve) => {
+      requestAnimationFrame(() => resolve(window.__SOARING__.snapshot().cameraHeight));
+    });
+    return { startingHeight, cameraHeight };
+  });
+  // A single render frame must ease toward the new height, not teleport to it.
+  expect(Math.abs(firstFrame.cameraHeight - firstFrame.startingHeight)).toBeLessThan(12);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraHeight > 48);
+  const farCamera = await page.evaluate(() => window.__SOARING__.snapshot());
+  expect(farCamera.cameraDistance).toBe(100);
+  expect(farCamera.cameraHeight).toBeGreaterThan(48);
+  expect(farCamera.cameraHeight).toBeLessThan(62);
   expect(snapshot.chunks + snapshot.pending).toBeLessThan(700);
   expect(errors).toEqual([]);
 });

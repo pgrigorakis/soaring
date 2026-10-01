@@ -10,10 +10,14 @@ import { DAY_SECONDS, daylight, type Daylight } from './sky-cycle';
 import { WORLD_CACHE_LIMIT, WorldModel } from './world';
 
 type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
+const CAMERA_DISTANCE = { min: 10, max: 100, default: 100 } as const;
+const CAMERA_CLOSE_HEIGHT = 3;
+// The previous 178 m default sat 31% of its follow distance above the eagle.
+const CAMERA_FAR_HEIGHT = 178 * 0.31;
 const SETTINGS_KEY = 'soaring.settings.v1';
 const SEED_KEY = 'soaring.world-seed.v1';
 const VISIT_KEY = 'soaring.scenic-visit.v1';
-const defaultSettings: StoredSettings = { ambienceVolume: 0.52, musicVolume: 0.52, muted: true, cameraDistance: 178, terrainVisibility: DEFAULT_VISIBILITY,
+const defaultSettings: StoredSettings = { ambienceVolume: 0.52, musicVolume: 0.52, muted: true, cameraDistance: CAMERA_DISTANCE.default, terrainVisibility: DEFAULT_VISIBILITY,
   showThermal: true, minFlightHeight: DEFAULT_FLIGHT_HEIGHT.min, maxFlightHeight: DEFAULT_FLIGHT_HEIGHT.max };
 const clamp = (value: unknown, fallback: number, min: number, max: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
@@ -27,7 +31,7 @@ function loadSettings(): StoredSettings {
       ambienceVolume: clamp(saved.ambienceVolume, clamp(saved.volume, defaultSettings.ambienceVolume, 0, 1), 0, 1),
       musicVolume: clamp(saved.musicVolume, clamp(saved.volume, defaultSettings.musicVolume, 0, 1), 0, 1),
       muted: typeof saved.muted === 'boolean' ? saved.muted : defaultSettings.muted,
-      cameraDistance: clamp(saved.cameraDistance, defaultSettings.cameraDistance, 110, 270),
+      cameraDistance: clamp(saved.cameraDistance, defaultSettings.cameraDistance, CAMERA_DISTANCE.min, CAMERA_DISTANCE.max),
       showThermal: typeof saved.showThermal === 'boolean' ? saved.showThermal : defaultSettings.showThermal,
       terrainVisibility: clamp(saved.terrainVisibility, defaultSettings.terrainVisibility, MIN_VISIBILITY, MAX_VISIBILITY),
       minFlightHeight: height.min,
@@ -239,7 +243,11 @@ let dragging = false;
 let pointerX = 0;
 let pointerY = 0;
 const wrapAngle = (angle: number): number => Math.atan2(Math.sin(angle), Math.cos(angle));
-const cameraPosition = new THREE.Vector3(navigator.state.x, navigator.state.y + 70, navigator.state.z - settings.cameraDistance);
+function followCameraHeight(distance: number): number {
+  const progress = (distance - CAMERA_DISTANCE.min) / (CAMERA_DISTANCE.max - CAMERA_DISTANCE.min);
+  return CAMERA_CLOSE_HEIGHT + progress * (CAMERA_FAR_HEIGHT - CAMERA_CLOSE_HEIGHT);
+}
+const cameraPosition = new THREE.Vector3(navigator.state.x, navigator.state.y + followCameraHeight(settings.cameraDistance), navigator.state.z - settings.cameraDistance);
 const lookAt = new THREE.Vector3();
 let cameraHeading = navigator.state.heading;
 let rideBlend = 0;
@@ -280,7 +288,7 @@ app.insertAdjacentHTML('beforeend', `
       <label class="setting">Minimum flight height <output id="min-height-value">${settings.minFlightHeight} m</output><input id="min-height" type="range" min="${FLIGHT_HEIGHT_LIMITS.min}" max="${FLIGHT_HEIGHT_LIMITS.max - FLIGHT_HEIGHT_LIMITS.gap}" step="1" value="${settings.minFlightHeight}"></label>
       <label class="setting">Maximum flight height <output id="max-height-value">${settings.maxFlightHeight} m</output><input id="max-height" type="range" min="${FLIGHT_HEIGHT_LIMITS.min + FLIGHT_HEIGHT_LIMITS.gap}" max="${FLIGHT_HEIGHT_LIMITS.max}" step="1" value="${settings.maxFlightHeight}"></label>
       <p class="height-note">Height above local terrain · ${FLIGHT_HEIGHT_LIMITS.gap} m minimum range</p>
-      <label class="setting">Camera distance <output id="distance-value">${Math.round(settings.cameraDistance)} m</output><input id="distance" type="range" min="110" max="270" step="1" value="${settings.cameraDistance}"></label>
+      <label class="setting">Camera distance <output id="distance-value">${Math.round(settings.cameraDistance)} m</output><input id="distance" type="range" min="${CAMERA_DISTANCE.min}" max="${CAMERA_DISTANCE.max}" step="1" value="${settings.cameraDistance}"></label>
       <label class="setting"><button class="new-world" id="new-world" type="button">Generate a new world</button></label>
       <p class="audio-note" role="status">Sound starts muted. It is generated in your browser; no media is downloaded.</p>
     </section>
@@ -585,7 +593,7 @@ function frame(now: number): void {
     const desired = new THREE.Vector3(state.x, state.y, state.z)
       .addScaledVector(backward, Math.cos(orbitYaw) * distance)
       .addScaledVector(side, Math.sin(orbitYaw) * distance)
-      .add(new THREE.Vector3(0, distance * (0.31 + orbitPitch), 0));
+      .add(new THREE.Vector3(0, followCameraHeight(distance) + distance * orbitPitch, 0));
     cameraPosition.lerp(desired, 1 - Math.exp(-rawDelta * (2.1 - rideBlend * 1.35)));
     cameraPosition.y = Math.max(cameraPosition.y, world.sample(cameraPosition.x, cameraPosition.z).height + 14);
     const lookAhead = 38 - rideBlend * 22;
@@ -656,7 +664,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number };
+      snapshot: () => { seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number };
       setTimeScale: (scale: number) => void;
       setTimeOfDay: (phase: number) => void;
       lookAtBody: (body: 'sun' | 'moon' | 'horizon' | 'chase') => void;
@@ -682,6 +690,7 @@ window.__SOARING__ = {
       visibleDistance: fog.far,
       requestedDistance: settings.terrainVisibility,
       cameraDistance: settings.cameraDistance,
+      cameraHeight: cameraPosition.y - navigator.state.y,
       behavior: navigator.state.behavior,
       flapping: navigator.state.flapping,
       bank: navigator.state.bank,
