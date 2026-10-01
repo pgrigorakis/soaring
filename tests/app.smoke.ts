@@ -197,8 +197,7 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   expect(snapshot.cameraDistance).toBe(10);
   expect(snapshot.cameraHeight).toBeLessThan(10);
   expect(snapshot.visibleDistance).toBeLessThanOrEqual(3600);
-  await page.mouse.move(500, 300);
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   const firstFrame = await page.evaluate(async () => {
     const startingHeight = window.__SOARING__.snapshot().cameraHeight;
     const input = document.querySelector<HTMLInputElement>('#distance')!;
