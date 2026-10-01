@@ -36,8 +36,11 @@ test('renders high-detail terrain, streams, and supports camera controls', async
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Canvas has no layout box');
   await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.5);
+  await expect(canvas).toHaveCSS('cursor', 'grab');
   await page.mouse.down();
+  await expect(canvas).toHaveCSS('cursor', 'grabbing');
   await page.mouse.move(box.x + box.width * 0.72, box.y + box.height * 0.42, { steps: 6 });
+  await expect(canvas).toHaveCSS('cursor', 'grabbing');
   await page.mouse.up();
   expect(errors).toEqual([]);
 });
@@ -132,6 +135,11 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   await expect(controls).toHaveClass(/visible/);
   await expect(controls).not.toHaveClass(/visible/, { timeout: 5000 });
   const settingsToggle = page.locator('#settings-toggle');
+  await expect(settingsToggle).toBeHidden();
+  await expect(page.locator('body')).toHaveClass(/cursor-hidden/);
+  await page.mouse.move(box.x + box.width * 0.55 + 1, box.y + box.height * 0.5 + 1);
+  await expect(page.locator('body')).not.toHaveClass(/cursor-hidden/);
+  await expect(controls).toHaveClass(/visible/);
   await expect(settingsToggle).toBeVisible();
   await settingsToggle.click();
   await expect(controls).toHaveClass(/visible/);
@@ -184,6 +192,41 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   expect(farCamera.cameraHeight).toBeGreaterThan(48);
   expect(farCamera.cameraHeight).toBeLessThan(62);
   expect(snapshot.chunks + snapshot.pending).toBeLessThan(700);
+  expect(errors).toEqual([]);
+});
+
+test('fullscreen toggle and F keep the idle scene clear while settings and diagnostics still work', async ({ page }) => {
+  const errors = captureErrors(page);
+  await page.goto('/?smoke');
+  await page.locator('#settings-toggle').click();
+  const fullscreenToggle = page.locator('#fullscreen-toggle');
+  await expect(fullscreenToggle).toHaveText('Enter fullscreen');
+  await fullscreenToggle.click();
+  await page.waitForFunction(() => document.fullscreenElement?.id === 'app');
+  await expect(page.locator('#settings-panel')).toBeHidden();
+  await expect(page.locator('#intro')).toBeHidden();
+
+  await page.keyboard.press('d');
+  await expect(page.locator('#diagnostics')).toBeVisible();
+  await page.keyboard.press('d');
+  await expect(page.locator('#diagnostics')).toBeHidden();
+  await page.waitForFunction(() => document.body.classList.contains('cursor-hidden'), undefined, { timeout: 5000 });
+  await expect(page.locator('#controls')).not.toHaveClass(/visible/);
+  await expect(page.locator('#settings-toggle')).toBeHidden();
+
+  const canvas = page.locator('canvas');
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('Canvas has no layout box');
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.4);
+  await expect(page.locator('body')).not.toHaveClass(/cursor-hidden/);
+  await expect(page.locator('#settings-toggle')).toBeVisible();
+
+  await page.keyboard.press('f');
+  await page.waitForFunction(() => document.fullscreenElement === null);
+  await page.keyboard.press('f');
+  await page.waitForFunction(() => document.fullscreenElement?.id === 'app');
+  await page.keyboard.press('f');
+  await page.waitForFunction(() => document.fullscreenElement === null);
   expect(errors).toEqual([]);
 });
 
