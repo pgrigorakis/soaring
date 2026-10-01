@@ -19,6 +19,7 @@ export const SUN_OFFSET = { x: -420, y: 190, z: -300 } as const;
 const SUN_LENGTH = Math.hypot(SUN_OFFSET.x, SUN_OFFSET.y, SUN_OFFSET.z);
 const THERMAL_CELL = 1100;
 const THERMAL_CANDIDATES = 5;
+export const WORLD_CACHE_LIMIT = 20_000;
 /**
  * Drainage is decided on this lattice before the terrain is shaped.
  * Far tiles sample every 90 m, so a channel narrower than the far-grid diagonal
@@ -116,6 +117,23 @@ export function fbm(x: number, z: number, seed: number, octaves = 5): number {
 }
 
 const nodeKey = (i: number, j: number) => (i + 2 ** 20) * 2 ** 21 + j + 2 ** 20;
+
+function getLru<K, V>(cache: Map<K, V>, key: K): V | undefined {
+  const value = cache.get(key);
+  if (value === undefined) return undefined;
+  cache.delete(key);
+  cache.set(key, value);
+  return value;
+}
+
+function trimCache<K, V>(cache: Map<K, V>, maxEntries: number): void {
+  while (cache.size > maxEntries) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) return;
+    cache.delete(oldest);
+  }
+}
+
 const riverHalf = (flow: number) => MIN_RIVER_HALF_WIDTH
   + (MAX_RIVER_HALF_WIDTH - MIN_RIVER_HALF_WIDTH)
   * clamp01(Math.log(flow / RIVER_MIN_FLOW) / Math.log(RIVER_MAX_FLOW / RIVER_MIN_FLOW));
@@ -151,6 +169,8 @@ function smootherstep(edge0: number, edge1: number, value: number): number {
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
+export type WorldCacheSizes = { thermals: number; riverNodes: number; nearbyReaches: number };
+
 export class WorldModel {
   readonly seed: number;
   private readonly thermals = new Map<string, Thermal | null>();
@@ -159,6 +179,21 @@ export class WorldModel {
 
   constructor(seed: number) {
     this.seed = seed | 0;
+  }
+
+  /** Drop the least-recently-used entries from each cache until it meets the cap. */
+  trim(maxEntries: number): WorldCacheSizes {
+    if (!Number.isInteger(maxEntries) || maxEntries < 0) {
+      throw new RangeError('maxEntries must be a non-negative integer');
+    }
+    trimCache(this.thermals, maxEntries);
+    trimCache(this.riverNodes, maxEntries);
+    trimCache(this.nearbyReaches, maxEntries);
+    return {
+      thermals: this.thermals.size,
+      riverNodes: this.riverNodes.size,
+      nearbyReaches: this.nearbyReaches.size,
+    };
   }
 
   sample(x: number, z: number): LandscapeSample {
@@ -255,8 +290,8 @@ export class WorldModel {
     const ci = Math.floor(x / DRAINAGE_SPACING);
     const cj = Math.floor(z / DRAINAGE_SPACING);
     const key = nodeKey(ci, cj);
-    let reaches = this.nearbyReaches.get(key);
-    if (!reaches) {
+    let reaches = getLru(this.nearbyReaches, key);
+    if (reaches === undefined) {
       const margin = 4;
       reaches = this.reachesIn(
         (ci - margin) * DRAINAGE_SPACING,
@@ -421,8 +456,8 @@ export class WorldModel {
 
   private node(i: number, j: number): RiverNode {
     const key = nodeKey(i, j);
-    let node = this.riverNodes.get(key);
-    if (node) return node;
+    let node = getLru(this.riverNodes, key);
+    if (node !== undefined) return node;
     const x = (i + 0.5 + (hash2(i, j, this.seed + 163) - 0.5) * 0.42) * DRAINAGE_SPACING;
     const z = (j + 0.5 + (hash2(i, j, this.seed + 167) - 0.5) * 0.42) * DRAINAGE_SPACING;
     node = { i, j, x, z, elevation: this.relief(x, z).elevation };
@@ -641,7 +676,7 @@ export class WorldModel {
 
   thermalAtCell(cellX: number, cellZ: number): Thermal | null {
     const key = `${cellX},${cellZ}`;
-    const cached = this.thermals.get(key);
+    const cached = getLru(this.thermals, key);
     if (cached !== undefined) return cached;
     let best: Thermal | null = null;
     let bestScore = 0;

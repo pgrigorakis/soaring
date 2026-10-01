@@ -4,7 +4,7 @@ import {
   DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, GLIDE_SINK_RATE, normalizeFlightHeight,
   TERRAIN_SAFETY_MARGIN, THERMAL_BANK_RANGE, THERMAL_CLIMB_RANGE, THERMAL_RADIUS_RANGE,
 } from '../src/eagle';
-import { WorldModel } from '../src/world';
+import { WORLD_CACHE_LIMIT, WorldModel } from '../src/world';
 
 describe('autonomous eagle navigation', () => {
   it('finishes a thermal approach through the visible navigation path', () => {
@@ -41,6 +41,19 @@ describe('autonomous eagle navigation', () => {
     expect(closeApproaches).toBeGreaterThan(0);
     expect(entries).toBeGreaterThan(0);
     expect(closeRetargets).toBe(0);
+  });
+
+  it('keeps every world cache under its cap during a one-hour navigation flight', () => {
+    const world = new WorldModel(448122);
+    const navigator = new EagleNavigator(world, world.scenicStart(2));
+    for (let step = 0; step < 36_000; step += 1) {
+      navigator.update(0.1);
+      if ((step + 1) % 10 !== 0) continue;
+      const sizes = world.trim(WORLD_CACHE_LIMIT);
+      expect(sizes.thermals).toBeLessThanOrEqual(WORLD_CACHE_LIMIT);
+      expect(sizes.riverNodes).toBeLessThanOrEqual(WORLD_CACHE_LIMIT);
+      expect(sizes.nearbyReaches).toBeLessThanOrEqual(WORLD_CACHE_LIMIT);
+    }
   });
 
   it.each([{ min: 50, max: 70 }, { min: 90, max: 145 }, { min: 65, max: 210 }])(

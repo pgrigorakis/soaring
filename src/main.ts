@@ -7,7 +7,7 @@ import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS,
 import { DEFAULT_VISIBILITY, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
 import { THERMAL_MARKER_RANGE, ThermalMarker } from './thermal-marker';
 import { DAY_SECONDS, daylight, type Daylight } from './sky-cycle';
-import { WorldModel } from './world';
+import { WORLD_CACHE_LIMIT, WorldModel } from './world';
 
 type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
 const SETTINGS_KEY = 'soaring.settings.v1';
@@ -456,6 +456,7 @@ window.addEventListener('keydown', (event) => {
 
 let timeScale = 1;
 let lastTime = performance.now();
+let cacheTrimElapsed = 0;
 let fpsSmoothed = 60;
 let diagnosticsElapsed = 0;
 // Real time, not the flight time scale, so a 15-minute day stays 15 minutes during accelerated tests.
@@ -590,6 +591,11 @@ function frame(now: number): void {
   keyLight.position.copy(keyDir).multiplyScalar(SHADOW_EXTENT + 300).add(keyLight.target.position);
   keyLight.target.updateMatrixWorld();
 
+  cacheTrimElapsed += rawDelta;
+  if (cacheTrimElapsed >= 1) {
+    cacheTrimElapsed -= 1;
+    world.trim(WORLD_CACHE_LIMIT);
+  }
   renderer.render(scene, camera);
   fpsSmoothed += ((rawDelta > 0 ? 1 / rawDelta : 60) - fpsSmoothed) * 0.05;
   diagnosticsElapsed += rawDelta;
