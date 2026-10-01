@@ -211,20 +211,14 @@ test('fades thermal clouds out after their thermal leaves range', async ({ page 
   const fades = await page.evaluate(({ x, z }) => {
     window.__SOARING__.setCloudOrigin!({ x: x + 10_000, z: z + 10_000 });
     const values: number[] = [];
-    return new Promise<number[]>((resolve) => {
-      const start = performance.now();
-      const sample = () => {
-        const fade = window.__SOARING__.snapshot().clouds
-          .find((cloud) => cloud[3] === x && cloud[4] === z)?.[5] ?? 0;
-        values.push(fade);
-        if (fade === 0 || performance.now() - start >= 6_000) {
-          resolve(values);
-          return;
-        }
-        requestAnimationFrame(sample);
-      };
-      requestAnimationFrame(sample);
-    });
+    for (let step = 0; step < 50; step += 1) {
+      window.__SOARING__.advanceCloudSimulation!(0.1);
+      const fade = window.__SOARING__.snapshot().clouds
+        .find((cloud) => cloud[3] === x && cloud[4] === z)?.[5] ?? 0;
+      values.push(fade);
+      if (fade === 0) break;
+    }
+    return values;
   }, target);
   expect(fades.at(-1)).toBe(0);
   const visibleFades = fades.filter((fade) => fade > 0);

@@ -840,6 +840,7 @@ declare global {
     __SOARING__: {
       snapshot: () => { renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; drawCalls: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; clouds: number[][]; wind: number[]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean };
       advanceSimulation?: (seconds: number) => void;
+      advanceCloudSimulation?: (seconds: number) => void;
       setTimeScale: (scale: number) => void;
       setCloudOrigin?: (origin: { x: number; z: number } | null) => void;
       setTimeOfDay: (phase: number) => void;
@@ -861,6 +862,13 @@ window.__SOARING__ = {
       if (!Number.isFinite(seconds) || seconds < 0 || seconds > 300) throw new RangeError('Expected 0–300 simulated seconds');
       const substeps = Math.ceil(seconds / 0.1);
       for (let step = 0; step < substeps; step += 1) updateFlight(seconds / substeps, performance.now());
+    },
+    advanceCloudSimulation: (seconds: number) => {
+      if (!Number.isFinite(seconds) || seconds < 0 || seconds > 300) throw new RangeError('Expected 0–300 simulated seconds');
+      const substeps = Math.ceil(seconds / 0.1);
+      for (let step = 0; step < substeps; step += 1) {
+        thermalClouds.update(cloudOriginOverride ?? navigator.state, settings.maxFlightHeight, skySeconds, seconds / substeps, currentWind, fog.color);
+      }
     },
   } : {}),
   snapshot: () => {
