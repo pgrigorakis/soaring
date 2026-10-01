@@ -3,11 +3,13 @@ import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import './style.css';
 import { Soundscape } from './audio';
+import { ThermalClouds } from './clouds';
 import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS, normalizeFlightHeight } from './eagle';
 import { DEFAULT_VISIBILITY, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
 import { THERMAL_MARKER_RANGE, ThermalMarker } from './thermal-marker';
 import { AuroraSchedule, auroraAmount, DAY_SECONDS, daylight, nightCycle, type Daylight } from './sky-cycle';
 import { WORLD_CACHE_LIMIT, WorldModel } from './world';
+import { globalWind, type WindVector } from './wind';
 
 type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; lowPower: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
 const CAMERA_DISTANCE = { min: 10, max: 100, default: 100 } as const;
@@ -255,6 +257,7 @@ function terrainReach(): number {
 }
 const terrain = new TerrainStream(scene, world, terrainReach());
 const thermalMarker = new ThermalMarker(scene, world);
+const thermalClouds = new ThermalClouds(scene, world);
 function applyRenderQuality(): void {
   const pixelRatio = pixelRatioForStep();
   if (renderer.getPixelRatio() !== pixelRatio) renderer.setPixelRatio(pixelRatio);
@@ -621,6 +624,8 @@ document.addEventListener('visibilitychange', () => {
 });
 // Real time, not the flight time scale, so a 15-minute day stays 15 minutes during accelerated tests.
 let skySeconds = 0.36 * DAY_SECONDS;
+let currentWind: WindVector = globalWind(world.seed, skySeconds);
+let cloudOriginOverride: { x: number; z: number } | null = null;
 let skyPaused = false;
 let skyLook: 'sun' | 'moon' | 'horizon' | null = null;
 let fogSampleAge = 999;
@@ -761,6 +766,8 @@ function frame(now: number): void {
   if (!skyPaused) skySeconds += rawDelta;
   const body = currentDaylight();
   applyDaylight(body, rawDelta, false);
+  currentWind = globalWind(world.seed, skySeconds);
+  thermalClouds.update(cloudOriginOverride ?? state, settings.maxFlightHeight, skySeconds, rawDelta, currentWind, fog.color);
 
   keyLight.target.position.set(camera.position.x, world.sample(camera.position.x, camera.position.z).height, camera.position.z);
   updateShadowBasis(keyDir);
@@ -802,6 +809,8 @@ function frame(now: number): void {
       `position     ${state.x.toFixed(0)}, ${state.z.toFixed(0)}`,
       `thermal      ${navigator.activeThermal ? `${navigator.activeThermal.x.toFixed(0)}, ${navigator.activeThermal.z.toFixed(0)}` : 'none selected'}`,
       `markers      ${thermalMarker.count} within ${THERMAL_MARKER_RANGE} m`,
+      `clouds       ${thermalClouds.placements().filter((cloud) => cloud.fade > 0).length} pooled`,
+      `wind         ${currentWind.x.toFixed(1)}, ${currentWind.z.toFixed(1)} m/s`,
       `nearby       ${nearby}`,
       `time of day  ${body.phase.toFixed(3)} ${body.dominant}`,
       `time scale   ${timeScale.toFixed(1)}×`,
@@ -822,15 +831,17 @@ window.addEventListener('beforeunload', () => {
   lensflare.dispose();
   fogTarget.dispose();
   thermalMarker.dispose();
+  thermalClouds.dispose();
   terrain.dispose();
 });
 
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean };
+      snapshot: () => { renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; drawCalls: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; clouds: number[][]; wind: number[]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean };
       advanceSimulation?: (seconds: number) => void;
       setTimeScale: (scale: number) => void;
+      setCloudOrigin?: (origin: { x: number; z: number } | null) => void;
       setTimeOfDay: (phase: number) => void;
       lookAtBody: (body: 'sun' | 'moon' | 'horizon' | 'chase') => void;
       landmark: () => { x: number; z: number; surface: number; lake: boolean } | null;
@@ -845,6 +856,7 @@ declare global {
 }
 window.__SOARING__ = {
   ...(smokeMode ? {
+    setCloudOrigin: (origin: { x: number; z: number } | null) => { cloudOriginOverride = origin; },
     advanceSimulation: (seconds: number) => {
       if (!Number.isFinite(seconds) || seconds < 0 || seconds > 300) throw new RangeError('Expected 0–300 simulated seconds');
       const substeps = Math.ceil(seconds / 0.1);
@@ -877,10 +889,13 @@ window.__SOARING__ = {
       heading: navigator.state.heading,
       position: [navigator.state.x, navigator.state.y, navigator.state.z],
       geometries: renderer.info.memory.geometries,
+      drawCalls: renderer.info.render.calls,
       activeThermal: navigator.activeThermal ? [navigator.activeThermal.x, navigator.activeThermal.z] : null,
       marker: activeMarker ? [activeMarker.x, activeMarker.z] : null,
       markerRange: THERMAL_MARKER_RANGE,
       markers: placed.map((marker) => [marker.x, marker.z, marker.active ? 1 : 0]),
+      clouds: thermalClouds.placements().map((cloud) => [cloud.x, cloud.y, cloud.z, cloud.thermalX, cloud.thermalZ, cloud.fade]),
+      wind: [currentWind.x, currentWind.z],
       // Wider than the marker window so smoke tests can see thermals the marker must exclude.
       thermalCandidates: world.nearbyThermals(navigator.state.x, navigator.state.z, 6).map((thermal) => [thermal.x, thermal.z]),
       tiers: terrain.tierCounts,

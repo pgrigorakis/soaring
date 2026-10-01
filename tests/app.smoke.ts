@@ -170,6 +170,53 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
   expect(errors).toEqual([]);
 });
 
+test('renders pooled cumulus above nearby thermals', async ({ page }) => {
+  const errors = captureErrors(page);
+  await page.goto('/?smoke');
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.waitForFunction(() => window.__SOARING__.snapshot().clouds.some((cloud) => cloud[5]! >= 0.95), undefined, { timeout: 20_000 });
+  const result = await page.evaluate(() => {
+    const snapshot = window.__SOARING__.snapshot();
+    const settings = JSON.parse(localStorage.getItem('soaring.settings.v1') ?? '{}') as { maxFlightHeight?: number };
+    const maxFlightHeight = settings.maxFlightHeight ?? 210;
+    return {
+      snapshot,
+      maxFlightHeight,
+      clouds: snapshot.clouds.filter((cloud) => cloud[5]! >= 0.95).map((cloud) => ({
+        cloud,
+        ground: window.__SOARING__.sample(cloud[3]!, cloud[4]!).height,
+      })),
+    };
+  });
+  expect(result.clouds.length).toBeGreaterThan(0);
+  for (const { cloud, ground } of result.clouds) {
+    expect(Math.hypot(cloud[3]! - result.snapshot.position[0]!, cloud[4]! - result.snapshot.position[2]!))
+      .toBeLessThanOrEqual(result.snapshot.markerRange);
+    expect(Math.hypot(cloud[0]! - cloud[3]!, cloud[2]! - cloud[4]!)).toBeLessThan(20);
+    expect(cloud[1]).toBeCloseTo(ground + result.maxFlightHeight + 55, 1);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('fades thermal clouds out after their thermal leaves range', async ({ page }) => {
+  await page.goto('/?smoke');
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.waitForFunction(() => window.__SOARING__.snapshot().clouds.some((cloud) => cloud[5]! >= 0.95), undefined, { timeout: 20_000 });
+  const target = await page.evaluate(() => {
+    const cloud = window.__SOARING__.snapshot().clouds.find((candidate) => candidate[5]! >= 0.95)!;
+    return { x: cloud[3]!, z: cloud[4]! };
+  });
+  await page.evaluate(({ x, z }) => window.__SOARING__.setCloudOrigin!({ x, z }), target);
+  await page.waitForFunction(({ x, z }) => window.__SOARING__.snapshot().clouds.some((cloud) => cloud[3] === x && cloud[4] === z && cloud[5]! >= 0.95), target);
+  await page.evaluate(({ x, z }) => window.__SOARING__.setCloudOrigin!({ x: x + 10_000, z: z + 10_000 }), target);
+  await page.waitForTimeout(2_000);
+  const halfway = await page.evaluate(({ x, z }) => window.__SOARING__.snapshot().clouds
+    .find((cloud) => cloud[3] === x && cloud[4] === z)?.[5], target);
+  expect(halfway).toBeGreaterThan(0.3);
+  expect(halfway).toBeLessThan(0.7);
+  await page.waitForFunction(({ x, z }) => !window.__SOARING__.snapshot().clouds.some((cloud) => cloud[3] === x && cloud[4] === z), target, { timeout: 6_000 });
+});
+
 test('persists safe local-terrain height bounds across reloads', async ({ page }) => {
   const errors = captureErrors(page);
   await page.goto('/?smoke');
