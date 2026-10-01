@@ -14,6 +14,32 @@ function captureErrors(page: Page): string[] {
   return errors;
 }
 
+async function revealSettingsControl(page: Page): Promise<void> {
+  const canvas = page.locator('canvas');
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('Canvas has no layout box');
+  await page.mouse.move(box.x + box.width * 0.45, box.y + box.height * 0.5);
+  await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.5);
+  await expect(page.locator('#controls')).toHaveClass(/visible/);
+  await expect(page.locator('#settings-toggle')).toBeVisible();
+}
+
+async function openSettings(page: Page): Promise<void> {
+  const canvas = page.locator('canvas');
+  const canvasBox = await canvas.boundingBox();
+  if (!canvasBox) throw new Error('Canvas has no layout box');
+  const toggle = page.locator('#settings-toggle');
+  const target = await toggle.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+  });
+  await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+  await page.mouse.move(target.x, target.y);
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(page.locator('#settings-panel')).toBeVisible();
+}
+
 test('renders high-detail terrain, streams, and supports camera controls', async ({ page }) => {
   const errors = captureErrors(page);
   // Development-only smoke mode reduces software-WebGL pixel work and disables shadows.
@@ -36,8 +62,11 @@ test('renders high-detail terrain, streams, and supports camera controls', async
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Canvas has no layout box');
   await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.5);
+  await expect(canvas).toHaveCSS('cursor', 'grab');
   await page.mouse.down();
+  await expect(canvas).toHaveCSS('cursor', 'grabbing');
   await page.mouse.move(box.x + box.width * 0.72, box.y + box.height * 0.42, { steps: 6 });
+  await expect(canvas).toHaveCSS('cursor', 'grabbing');
   await page.mouse.up();
   expect(errors).toEqual([]);
 });
@@ -69,7 +98,7 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
   await page.goto('/?smoke');
   await expect(page.locator('canvas')).toBeVisible();
   const setting = page.getByRole('checkbox', { name: 'Show thermal' });
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   await expect(setting).toBeChecked();
   await page.evaluate(() => window.__SOARING__.setTimeScale(12));
   await page.waitForFunction(() => window.__SOARING__.snapshot().activeThermal !== null, undefined, { timeout: 25_000 });
@@ -80,7 +109,7 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).marker).toBeNull();
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).markers).toEqual([]);
   await page.reload();
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   await expect(setting).not.toBeChecked();
   await page.evaluate(() => window.__SOARING__.setTimeScale(12));
   await page.waitForFunction(() => window.__SOARING__.snapshot().activeThermal !== null, undefined, { timeout: 25_000 });
@@ -96,7 +125,7 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
 test('persists safe local-terrain height bounds across reloads', async ({ page }) => {
   const errors = captureErrors(page);
   await page.goto('/?smoke');
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   await page.locator('#min-height').evaluate((input: HTMLInputElement) => {
     input.value = '90';
     input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -132,8 +161,12 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   await expect(controls).toHaveClass(/visible/);
   await expect(controls).not.toHaveClass(/visible/, { timeout: 5000 });
   const settingsToggle = page.locator('#settings-toggle');
+  await expect(settingsToggle).toBeHidden();
+  await expect(page.locator('body')).toHaveClass(/cursor-hidden/);
+  await openSettings(page);
+  await expect(page.locator('body')).not.toHaveClass(/cursor-hidden/);
+  await expect(controls).toHaveClass(/visible/);
   await expect(settingsToggle).toBeVisible();
-  await settingsToggle.click();
   await expect(controls).toHaveClass(/visible/);
   await expect(page.locator('#settings-panel')).toBeVisible();
   await expect(settingsToggle).toHaveAttribute('aria-expanded', 'true');
@@ -164,8 +197,7 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   expect(snapshot.cameraDistance).toBe(10);
   expect(snapshot.cameraHeight).toBeLessThan(10);
   expect(snapshot.visibleDistance).toBeLessThanOrEqual(3600);
-  await page.mouse.move(500, 300);
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   const firstFrame = await page.evaluate(async () => {
     const startingHeight = window.__SOARING__.snapshot().cameraHeight;
     const input = document.querySelector<HTMLInputElement>('#distance')!;
@@ -187,18 +219,53 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   expect(errors).toEqual([]);
 });
 
+test('fullscreen toggle and F keep the idle scene clear while settings and diagnostics still work', async ({ page }) => {
+  const errors = captureErrors(page);
+  await page.goto('/?smoke');
+  await openSettings(page);
+  const fullscreenToggle = page.locator('#fullscreen-toggle');
+  await expect(fullscreenToggle).toHaveText('Enter fullscreen');
+  await fullscreenToggle.click();
+  await page.waitForFunction(() => document.fullscreenElement?.id === 'app');
+  await expect(page.locator('#settings-panel')).toBeHidden();
+  await expect(page.locator('#intro')).toBeHidden();
+
+  await page.keyboard.press('d');
+  await expect(page.locator('#diagnostics')).toBeVisible();
+  await page.keyboard.press('d');
+  await expect(page.locator('#diagnostics')).toBeHidden();
+  await page.waitForFunction(() => document.body.classList.contains('cursor-hidden'), undefined, { timeout: 5000 });
+  await expect(page.locator('#controls')).not.toHaveClass(/visible/);
+  await expect(page.locator('#settings-toggle')).toBeHidden();
+
+  const canvas = page.locator('canvas');
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('Canvas has no layout box');
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.4);
+  await expect(page.locator('body')).not.toHaveClass(/cursor-hidden/);
+  await expect(page.locator('#settings-toggle')).toBeVisible();
+
+  await page.keyboard.press('f');
+  await page.waitForFunction(() => document.fullscreenElement === null);
+  await page.keyboard.press('f');
+  await page.waitForFunction(() => document.fullscreenElement?.id === 'app');
+  await page.keyboard.press('f');
+  await page.waitForFunction(() => document.fullscreenElement === null);
+  expect(errors).toEqual([]);
+});
+
 test('defaults terrain visibility to 5 km and streams bounded work at each LOD tier out to the 5 km max', async ({ page }) => {
   test.setTimeout(90_000);
   const errors = captureErrors(page);
   await page.goto('/?smoke');
   await expect(page.locator('canvas')).toBeVisible();
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   // A fresh session (no saved settings) still gets the smoke harness's bounded budget, not the
   // 5 km product default - see the smokeMode override in src/main.ts.
   await expect(page.locator('#visibility')).toHaveValue('720');
   await page.evaluate(() => localStorage.removeItem('soaring.settings.v1'));
   await page.reload();
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   await expect(page.locator('#visibility')).toHaveValue('720');
 
   // Push the slider to the 5 km max and confirm all three LOD tiers populate with bounded work.
@@ -226,7 +293,7 @@ test('defaults terrain visibility to 5 km and streams bounded work at each LOD t
 
 test('settings stay scrollable within short desktop and mobile viewports', async ({ page }) => {
   await page.goto('/?smoke');
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   const panel = page.locator('#settings-panel');
   expect(await panel.evaluate((element) => element.scrollHeight)).toBe(await panel.evaluate((element) => element.clientHeight));
 
@@ -251,7 +318,7 @@ test('migrates prior volume, saves independent controls, and preserves mute on r
     if (!localStorage.getItem('soaring.settings.v1')) localStorage.setItem('soaring.settings.v1', JSON.stringify({ volume: 0.37, muted: true }));
   });
   await page.goto('/?smoke');
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   await expect(page.locator('#ambience')).toHaveValue('0.37');
   await expect(page.locator('#music')).toHaveValue('0.37');
   await page.locator('#ambience').fill('0.2');
@@ -264,7 +331,7 @@ test('migrates prior volume, saves independent controls, and preserves mute on r
   expect(settings).toMatchObject({ ambienceVolume: 0.2, musicVolume: 0.8, muted: false });
   await page.reload();
   await expect(page.locator('#mute')).toHaveText('Muted');
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   await expect(page.locator('#ambience')).toHaveValue('0.2');
   await expect(page.locator('#music')).toHaveValue('0.8');
   await expect(page.locator('#mute')).toHaveText('On');
@@ -293,6 +360,7 @@ test('the first mute gesture and a pending audio start respect the saved mute ch
     };
   });
   await page.goto('/?smoke');
+  await revealSettingsControl(page);
   await page.locator('#settings-toggle').focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#settings-panel')).toBeVisible();
@@ -302,7 +370,7 @@ test('the first mute gesture and a pending audio start respect the saved mute ch
 
   await page.evaluate(() => localStorage.setItem('soaring.settings.v1', JSON.stringify({ muted: false })));
   await page.reload();
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   await page.waitForFunction(() => typeof (window as Window & { releaseAudioResume?: () => Promise<void> }).releaseAudioResume === 'function');
   await page.locator('#mute').click();
   await expect(page.locator('#mute')).toHaveText('Muted');
@@ -352,7 +420,7 @@ test('suspends hidden audio and bounds the first visible simulation step', async
   });
   await page.goto('/?smoke');
   await expect(page.locator('canvas')).toBeVisible();
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   const mute = page.locator('#mute');
   await mute.click();
   await expect(mute).toHaveText('On');
@@ -502,7 +570,7 @@ test('a blocked browser audio context keeps the mute control usable without page
     Object.defineProperty(window, 'AudioContext', { value: class { constructor() { throw new Error('Audio unavailable'); } } });
   });
   await page.goto('/?smoke');
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   await page.locator('#mute').click();
   await expect(page.locator('#mute')).toHaveText('Muted');
   await expect(page.locator('.audio-note')).toContainText('Audio could not start');

@@ -290,6 +290,7 @@ app.insertAdjacentHTML('beforeend', `
   <div class="controls visible" id="controls">
     <section class="settings-panel" id="settings-panel" aria-label="Settings">
       <h1>Soaring</h1>
+      <label class="setting">Fullscreen <button id="fullscreen-toggle" type="button" aria-pressed="false">Enter fullscreen</button></label>
       <label class="setting">Sound <button class="mute-button" id="mute" type="button">Muted</button></label>
       <label class="setting">Ambience <output id="ambience-value">${Math.round(settings.ambienceVolume * 100)}%</output><input id="ambience" type="range" min="0" max="1" step="0.01" value="${settings.ambienceVolume}"></label>
       <label class="setting">Music <output id="music-value">${Math.round(settings.musicVolume * 100)}%</output><input id="music" type="range" min="0" max="1" step="0.01" value="${settings.musicVolume}"></label>
@@ -310,6 +311,7 @@ app.insertAdjacentHTML('beforeend', `
 const controls = document.querySelector<HTMLElement>('#controls')!;
 const panel = document.querySelector<HTMLElement>('#settings-panel')!;
 const toggle = document.querySelector<HTMLButtonElement>('#settings-toggle')!;
+const fullscreenToggle = document.querySelector<HTMLButtonElement>('#fullscreen-toggle')!;
 const muteButton = document.querySelector<HTMLButtonElement>('#mute')!;
 const ambienceInput = document.querySelector<HTMLInputElement>('#ambience')!;
 const ambienceValue = document.querySelector<HTMLOutputElement>('#ambience-value')!;
@@ -328,22 +330,52 @@ const maxHeightValue = document.querySelector<HTMLOutputElement>('#max-height-va
 const diagnostics = document.querySelector<HTMLElement>('#diagnostics')!;
 
 let controlsTimer = 0;
+let cursorTimer = 0;
 function showControls(): void {
   controls.classList.add('visible');
   window.clearTimeout(controlsTimer);
   controlsTimer = window.setTimeout(() => {
     if (!panel.classList.contains('open')) controls.classList.remove('visible');
-  }, 2700);
+  }, 3000);
 }
-window.addEventListener('pointermove', showControls, { passive: true });
+function showPointerActivity(): void {
+  document.body.classList.remove('cursor-hidden');
+  window.clearTimeout(cursorTimer);
+  cursorTimer = window.setTimeout(() => document.body.classList.add('cursor-hidden'), 3000);
+  showControls();
+}
+window.addEventListener('pointermove', showPointerActivity, { passive: true });
 window.addEventListener('keydown', showControls);
 showControls();
+cursorTimer = window.setTimeout(() => document.body.classList.add('cursor-hidden'), 3000);
 window.setTimeout(() => document.querySelector('#intro')?.classList.add('hidden'), 7000);
 
-toggle.addEventListener('click', () => {
-  const open = panel.classList.toggle('open');
+function setSettingsOpen(open: boolean): void {
+  panel.classList.toggle('open', open);
   toggle.setAttribute('aria-expanded', String(open));
   toggle.setAttribute('aria-label', open ? 'Close settings' : 'Open settings');
+}
+toggle.addEventListener('click', () => {
+  setSettingsOpen(!panel.classList.contains('open'));
+  showControls();
+});
+function updateFullscreenToggle(): void {
+  const isFullscreen = document.fullscreenElement === app;
+  fullscreenToggle.textContent = isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen';
+  fullscreenToggle.setAttribute('aria-pressed', String(isFullscreen));
+  if (isFullscreen) setSettingsOpen(false);
+}
+async function toggleFullscreen(): Promise<void> {
+  try {
+    if (document.fullscreenElement === app) await document.exitFullscreen();
+    else if (!document.fullscreenElement && app) await app.requestFullscreen();
+  } catch {
+    // The browser may deny fullscreen requests, for example when the page is embedded.
+  }
+}
+document.addEventListener('fullscreenchange', updateFullscreenToggle);
+fullscreenToggle.addEventListener('click', () => {
+  void toggleFullscreen();
   showControls();
 });
 let muteRevision = 0;
@@ -466,7 +498,16 @@ function snapToShadowGrid(point: THREE.Vector3): void {
 
 let diagnosticsVisible = false;
 window.addEventListener('keydown', (event) => {
-  if (event.key.toLowerCase() !== 'd' || event.repeat) return;
+  if (event.repeat) return;
+  const key = event.key.toLowerCase();
+  if (key === 'f') {
+    if (event.ctrlKey || event.metaKey || event.altKey
+      || (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, [contenteditable="true"]'))) return;
+    event.preventDefault();
+    void toggleFullscreen();
+    return;
+  }
+  if (key !== 'd') return;
   diagnosticsVisible = !diagnosticsVisible;
   diagnostics.classList.toggle('visible', diagnosticsVisible);
   diagnostics.setAttribute('aria-hidden', String(!diagnosticsVisible));

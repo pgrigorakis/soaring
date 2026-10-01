@@ -10,6 +10,7 @@ html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 body { user-select: none; }
 canvas { display: block; width: 100%; height: 100%; cursor: grab; outline: none; }
 canvas.dragging { cursor: grabbing; }
+body.cursor-hidden, body.cursor-hidden * { cursor: none !important; }
 
 #veil {
   position: fixed;
@@ -28,6 +29,9 @@ canvas.dragging { cursor: grabbing; }
   pointer-events: none;
 }
 .controls.visible, .controls:focus-within { opacity: 1; pointer-events: auto; }
+.controls.visible ~ .settings-toggle, .controls:focus-within ~ .settings-toggle {
+  opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s;
+}
 
 .settings-toggle {
   position: fixed;
@@ -44,7 +48,10 @@ canvas.dragging { cursor: grabbing; }
   box-shadow: 0 8px 30px rgba(11, 23, 24, .18);
   backdrop-filter: blur(12px);
   cursor: pointer;
-  pointer-events: auto;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 900ms ease, visibility 0s linear 900ms;
 }
 
 .settings-panel {
@@ -112,6 +119,7 @@ canvas.dragging { cursor: grabbing; }
   pointer-events: none;
 }
 .intro.hidden { opacity: 0; }
+#app:fullscreen .intro { display: none; }
 
 @media (max-width: 700px) {
   .controls { right: 60px; top: 12px; }
