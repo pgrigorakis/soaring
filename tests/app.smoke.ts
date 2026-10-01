@@ -411,8 +411,9 @@ test('suspends hidden audio and bounds the first visible simulation step', async
   expect(errors).toEqual([]);
 });
 
-test('renders noon, dusk, and midnight from the world clock', async ({ page }) => {
+test('renders daytime, aurora, and midnight sky states', async ({ page }) => {
   const errors = captureErrors(page);
+  await page.addInitScript(() => localStorage.setItem('soaring.world-seed.v1', '5'));
   await page.goto('/?smoke');
   await expect(page.locator('canvas')).toBeVisible();
   await page.evaluate(() => {
@@ -421,7 +422,7 @@ test('renders noon, dusk, and midnight from the world clock', async ({ page }) =
     if (toggle) toggle.style.visibility = 'hidden';
   });
 
-  async function showPhase(phase: number, name: string, look: 'sun' | 'moon' | 'horizon' | 'chase'): Promise<{ timeOfDay: number; sunElevation: number; moonElevation: number }> {
+  async function showPhase(phase: number, name: string, look: 'sun' | 'moon' | 'horizon' | 'chase'): Promise<{ timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number }> {
     await page.evaluate((value) => window.__SOARING__.setTimeOfDay(value), phase);
     await page.evaluate((body) => window.__SOARING__.lookAtBody(body), look);
     await page.evaluate(() => new Promise((resolve) => {
@@ -431,7 +432,7 @@ test('renders noon, dusk, and midnight from the world clock', async ({ page }) =
     expect(shot.byteLength).toBeGreaterThan(1000);
     return page.evaluate(() => {
       const snapshot = window.__SOARING__.snapshot();
-      return { timeOfDay: snapshot.timeOfDay, sunElevation: snapshot.sunElevation, moonElevation: snapshot.moonElevation };
+      return { timeOfDay: snapshot.timeOfDay, sunElevation: snapshot.sunElevation, moonElevation: snapshot.moonElevation, auroraAmount: snapshot.auroraAmount };
     });
   }
 
@@ -446,15 +447,21 @@ test('renders noon, dusk, and midnight from the world clock', async ({ page }) =
   const noon = await showPhase(0.5, 'noon', 'horizon');
   expect(noon.sunElevation).toBeGreaterThan(0.25);
   expect(noon.moonElevation).toBeLessThan(-0.25);
+  expect(noon.auroraAmount).toBe(0);
 
   const dusk = await showPhase(0.72, 'dusk', 'sun');
   expect(dusk.sunElevation).toBeGreaterThan(0.05);
   expect(dusk.timeOfDay).toBeGreaterThan(0.7);
   expect(dusk.timeOfDay).toBeLessThan(0.75);
 
-  const midnight = await showPhase(0, 'midnight', 'moon');
+  const evening = await showPhase(0.8, 'aurora', 'horizon');
+  expect(evening.auroraAmount).toBeGreaterThan(0);
+
+  const midnight = await showPhase(1, 'midnight', 'horizon');
+  expect(midnight.timeOfDay).toBeCloseTo(0, 2);
   expect(midnight.sunElevation).toBeLessThan(-0.25);
   expect(midnight.moonElevation).toBeGreaterThan(0.25);
+  expect(midnight.auroraAmount).toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });
 

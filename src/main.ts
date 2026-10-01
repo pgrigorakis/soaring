@@ -6,7 +6,7 @@ import { Soundscape } from './audio';
 import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS, normalizeFlightHeight } from './eagle';
 import { DEFAULT_VISIBILITY, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
 import { THERMAL_MARKER_RANGE, ThermalMarker } from './thermal-marker';
-import { DAY_SECONDS, daylight, type Daylight } from './sky-cycle';
+import { AuroraSchedule, auroraAmount, DAY_SECONDS, daylight, nightCycle, type Daylight } from './sky-cycle';
 import { WORLD_CACHE_LIMIT, WorldModel } from './world';
 
 type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
@@ -66,6 +66,7 @@ const hasSavedSettings = localStorage.getItem(SETTINGS_KEY) != null;
 const settings = loadSettings();
 if (smokeMode && !hasSavedSettings) settings.terrainVisibility = MIN_VISIBILITY;
 const world = new WorldModel(loadSeed());
+const auroraSchedule = new AuroraSchedule(world.seed);
 const start = world.scenicStart(nextVisit());
 const navigator = new EagleNavigator(world, start, { min: settings.minFlightHeight, max: settings.maxFlightHeight });
 const eagle = new EagleView();
@@ -118,11 +119,12 @@ sky.material.uniforms.nightAmount = { value: 0 };
 sky.material.uniforms.goldenAmount = { value: 0 };
 sky.material.uniforms.blueAmount = { value: 0 };
 sky.material.uniforms.starAmount = { value: 0 };
+sky.material.uniforms.auroraAmount = { value: 0 };
 sky.material.uniforms.moonPosition = { value: new THREE.Vector3(0, -1, 0) };
 sky.material.fragmentShader = sky.material.fragmentShader
   .replace(
     'uniform float mieDirectionalG;',
-    'uniform float mieDirectionalG;\nuniform float skyExposure;\nuniform float nightAmount;\nuniform float goldenAmount;\nuniform float blueAmount;\nuniform float starAmount;\nuniform vec3 moonPosition;',
+    'uniform float mieDirectionalG;\nuniform float skyExposure;\nuniform float nightAmount;\nuniform float goldenAmount;\nuniform float blueAmount;\nuniform float starAmount;\nuniform float auroraAmount;\nuniform vec3 moonPosition;',
   )
   .replace(
     'vec3 retColor = pow( texColor, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) );',
@@ -138,6 +140,14 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			float skyHorizon = pow(1.0 - clamp(direction.y, 0.0, 1.0), 3.0);
 			vec3 nightColor = vec3(0.004, 0.007, 0.026) + vec3(0.018, 0.026, 0.048) * skyHorizon;
 			vec3 retColor = mix(dayColor, nightColor, clamp(nightAmount, 0.0, 1.0));
+			if (auroraAmount > 0.001) {
+				float auroraCenter = 0.22 + 0.035 * sin(direction.x * 10.0 + direction.z * 3.0);
+				float auroraBand = 1.0 - smoothstep(0.015, 0.09, abs(direction.y - auroraCenter));
+				float auroraFold = 0.5 + 0.5 * sin(direction.x * 30.0 + direction.z * 11.0 + sin(direction.z * 9.0) * 2.0);
+				float auroraCurtain = auroraBand * (0.24 + 0.76 * auroraFold);
+				vec3 auroraColor = mix(vec3(0.04, 0.58, 0.24), vec3(0.12, 0.55, 0.82), smoothstep(0.2, 0.34, direction.y));
+				retColor += auroraColor * auroraCurtain * auroraAmount;
+			}
 			float starGrid = 260.0;
 			vec3 starScaled = direction * starGrid;
 			vec3 starCell = floor(starScaled);
@@ -513,6 +523,8 @@ function applyDaylight(body: Daylight, delta: number, forceFog: boolean): void {
   sky.material.uniforms.blueAmount!.value = high;
   hazeStart = 0.4 + high * 0.5;
   sky.material.uniforms.starAmount!.value = smooth01(0.0, -0.12, body.sun.y);
+  sky.material.uniforms.auroraAmount!.value = auroraAmount(body,
+    auroraSchedule.hasAurora(nightCycle(skySeconds)));
   // Keep the sky box around the camera. The sun uniform is a direction, so moving the mesh
   // does not drag the sun; it only stops the box from being left behind on a long flight.
   sky.position.copy(camera.position);
@@ -664,7 +676,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number };
+      snapshot: () => { seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number };
       setTimeScale: (scale: number) => void;
       setTimeOfDay: (phase: number) => void;
       lookAtBody: (body: 'sun' | 'moon' | 'horizon' | 'chase') => void;
@@ -707,12 +719,12 @@ window.__SOARING__ = {
       timeOfDay: body.phase,
       sunElevation: body.sun.y,
       moonElevation: body.moon.y,
+      auroraAmount: auroraAmount(body, auroraSchedule.hasAurora(nightCycle(skySeconds))),
     };
   },
   setTimeScale: (scale: number) => { timeScale = Math.max(1, Math.min(12, scale)); },
   setTimeOfDay: (phase: number) => {
-    const wrapped = ((phase % 1) + 1) % 1;
-    skySeconds = wrapped * DAY_SECONDS;
+    skySeconds = phase * DAY_SECONDS;
     skyPaused = true;
     fogSampleAge = 999;
   },

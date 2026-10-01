@@ -1,9 +1,41 @@
 import { describe, expect, it } from 'vitest';
-import { DAY_SECONDS, daylight, type Vec3 } from '../src/sky-cycle';
+import { AuroraSchedule, DAY_SECONDS, auroraAmount, daylight, type Vec3 } from '../src/sky-cycle';
 
 function dot(a: Vec3, b: Vec3): number {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
+
+describe('seeded aurora schedule', () => {
+  it('keeps aurora nights at least three cycles apart and repeats for the same seed', () => {
+    const first = new AuroraSchedule(1234);
+    const nights = Array.from({ length: 500 }, (_, cycle) => first.hasAurora(cycle));
+    const auroraCycles = nights.flatMap((aurora, cycle) => aurora ? [cycle] : []);
+
+    expect(auroraCycles.length).toBeGreaterThan(0);
+    for (let index = 1; index < auroraCycles.length; index += 1) {
+      expect(auroraCycles[index]! - auroraCycles[index - 1]!).toBeGreaterThanOrEqual(3);
+    }
+    const repeat = new AuroraSchedule(1234);
+    expect(Array.from({ length: 500 }, (_, cycle) => repeat.hasAurora(cycle))).toEqual(nights);
+  });
+
+  it('fades auroras through the night and never shows them during daylight', () => {
+    const schedule = new AuroraSchedule(1234);
+    const cycle = Array.from({ length: 500 }, (_, day) => day).find((day) => schedule.hasAurora(day));
+    expect(cycle).toBeDefined();
+
+    for (let step = 0; step <= 200; step += 1) {
+      const phase = step / 200;
+      const body = daylight((cycle! + phase) * DAY_SECONDS);
+      const amount = auroraAmount(body, true);
+      if (body.sun.y >= 0) expect(amount).toBe(0);
+      if (phase === 0.5) expect(amount).toBe(0);
+    }
+    expect(auroraAmount(daylight(cycle! * DAY_SECONDS), true)).toBeGreaterThan(0);
+    expect(auroraAmount(daylight((cycle! + 0.75) * DAY_SECONDS), true)).toBe(0);
+    expect(auroraAmount(daylight(cycle! * DAY_SECONDS), false)).toBe(0);
+  });
+});
 
 describe('world clock sun and moon', () => {
   it('maps a 15-minute day onto opposite world-fixed bodies', () => {
