@@ -93,14 +93,14 @@ const renderer = new THREE.WebGLRenderer({ antialias: !smokeMode, powerPreferenc
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(pixelRatioForStep());
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.toneMappingExposure = 1.00;
 renderer.shadowMap.enabled = !smokeMode && !settings.lowPower;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.domElement.setAttribute('aria-label', 'Autonomous golden eagle flying above a temperate wilderness');
 app.append(renderer.domElement);
 
-const hemisphere = new THREE.HemisphereLight(0xd9e6e1, 0x596448, 2.25);
+const hemisphere = new THREE.HemisphereLight(0xcfe3f0, 0x5e7a3a, 2.25);
 scene.add(hemisphere);
 // One shadow caster. Its direction follows whichever body is higher. Both intensities are zero
 // on the horizon, so the direction can flip there without a visible shadow pop.
@@ -173,17 +173,23 @@ sky.material.fragmentShader = sky.material.fragmentShader
   );
 scene.add(sky);
 
-// three.js always renders offscreen targets with NoToneMapping, so reproduce the on-screen ACES curve here.
-function acesFilmicToneMap(color: THREE.Color, exposure: number): THREE.Color {
-  const rrtAndOdtFit = (v: number) => (v * (v + 0.0245786) - 0.000090537) / (v * (0.983729 * v + 0.43295) + 0.238081);
-  const scale = exposure / 0.6;
-  const ix = rrtAndOdtFit((0.59719 * color.r + 0.35458 * color.g + 0.04823 * color.b) * scale);
-  const iy = rrtAndOdtFit((0.076 * color.r + 0.90834 * color.g + 0.01566 * color.b) * scale);
-  const iz = rrtAndOdtFit((0.0284 * color.r + 0.13383 * color.g + 0.83777 * color.b) * scale);
+// three.js always renders offscreen targets with NoToneMapping, so reproduce the on-screen Neutral curve here.
+function neutralToneMap(color: THREE.Color, exposure: number): THREE.Color {
+  color.multiplyScalar(exposure);
+  const minimum = Math.min(color.r, color.g, color.b);
+  const offset = minimum < 0.08 ? minimum - 6.25 * minimum * minimum : 0.04;
+  color.addScalar(-offset);
+  const peak = Math.max(color.r, color.g, color.b);
+  const startCompression = 0.8 - 0.04;
+  if (peak < startCompression) return color;
+  const compression = 1 - startCompression;
+  const newPeak = 1 - compression * compression / (peak + compression - startCompression);
+  color.multiplyScalar(newPeak / peak);
+  const desaturation = 1 - 1 / (0.15 * (peak - newPeak) + 1);
   return color.setRGB(
-    THREE.MathUtils.clamp(1.60475 * ix - 0.53108 * iy - 0.07367 * iz, 0, 1),
-    THREE.MathUtils.clamp(-0.10208 * ix + 1.10813 * iy - 0.00605 * iz, 0, 1),
-    THREE.MathUtils.clamp(-0.00327 * ix - 0.07276 * iy + 1.07602 * iz, 0, 1),
+    THREE.MathUtils.lerp(color.r, newPeak, desaturation),
+    THREE.MathUtils.lerp(color.g, newPeak, desaturation),
+    THREE.MathUtils.lerp(color.b, newPeak, desaturation),
   );
 }
 
@@ -208,7 +214,7 @@ function sampleHorizonColor(): THREE.Color {
   renderer.readRenderTargetPixels(fogTarget, 0, 0, 1, 1, fogPixel);
   renderer.setRenderTarget(null);
   fogSample.setRGB(fogPixel[0]! / 255, fogPixel[1]! / 255, fogPixel[2]! / 255);
-  return acesFilmicToneMap(fogSample, renderer.toneMappingExposure);
+  return neutralToneMap(fogSample, renderer.toneMappingExposure);
 }
 const fog = new THREE.Fog(0x8faeb8, MIN_VISIBILITY * 0.5, MIN_VISIBILITY);
 scene.fog = fog;
@@ -642,7 +648,7 @@ function applyDaylight(body: Daylight, delta: number, forceFog: boolean): void {
   const day = 1 - body.night;
   sky.material.uniforms.sunPosition!.value.copy(sunDir).multiplyScalar(450000);
   sky.material.uniforms.moonPosition!.value.copy(moonDir);
-  sky.material.uniforms.turbidity!.value = 9.5 - high * 8.2;
+  sky.material.uniforms.turbidity!.value = 9.5 - high * 8.5;
   sky.material.uniforms.rayleigh!.value = 2.4 + high * 1.6;
   sky.material.uniforms.mieCoefficient!.value = 0.016 - high * 0.0145;
   sky.material.uniforms.mieDirectionalG!.value = 0.93 - high * 0.18;
@@ -667,7 +673,7 @@ function applyDaylight(body: Daylight, delta: number, forceFog: boolean): void {
   hemisphere.color.setRGB(0.16 + day * 0.68, 0.2 + day * 0.68, 0.36 + day * 0.5);
   hemisphere.groundColor.setRGB(0.08 + day * 0.27, 0.09 + day * 0.3, 0.08 + day * 0.2);
   hemisphere.intensity = 1.15 + day * 1.05;
-  renderer.toneMappingExposure = 1.06 + body.night * 0.12;
+  renderer.toneMappingExposure = 1.00 + body.night * 0.12;
 
   const flare = smooth01(0, 0.12, body.sun.y);
   const low = 1 - high;
