@@ -25,8 +25,19 @@ async function revealSettingsControl(page: Page): Promise<void> {
 }
 
 async function openSettings(page: Page): Promise<void> {
-  await revealSettingsControl(page);
-  await page.locator('#settings-toggle').click();
+  const canvas = page.locator('canvas');
+  const canvasBox = await canvas.boundingBox();
+  if (!canvasBox) throw new Error('Canvas has no layout box');
+  const toggle = page.locator('#settings-toggle');
+  const target = await toggle.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+  });
+  await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+  await page.mouse.move(target.x, target.y);
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(page.locator('#settings-panel')).toBeVisible();
 }
 
 test('renders high-detail terrain, streams, and supports camera controls', async ({ page }) => {
@@ -152,11 +163,10 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   const settingsToggle = page.locator('#settings-toggle');
   await expect(settingsToggle).toBeHidden();
   await expect(page.locator('body')).toHaveClass(/cursor-hidden/);
-  await page.mouse.move(box.x + box.width * 0.55 + 1, box.y + box.height * 0.5 + 1);
+  await openSettings(page);
   await expect(page.locator('body')).not.toHaveClass(/cursor-hidden/);
   await expect(controls).toHaveClass(/visible/);
   await expect(settingsToggle).toBeVisible();
-  await settingsToggle.click();
   await expect(controls).toHaveClass(/visible/);
   await expect(page.locator('#settings-panel')).toBeVisible();
   await expect(settingsToggle).toHaveAttribute('aria-expanded', 'true');
