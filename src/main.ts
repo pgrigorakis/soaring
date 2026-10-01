@@ -144,7 +144,9 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			float lowSky = 1.0 - smoothstep(0.0, 0.42, direction.y);
 			vec3 warmBand = vec3(0.78, 0.4, 0.22);
 			dayColor = mix(dayColor, warmBand, clamp(goldenAmount, 0.0, 1.0) * lowSky * 0.62);
-			dayColor = mix(dayColor, dayColor * vec3(0.58, 0.8, 1.32), clamp(blueAmount, 0.0, 1.0) * smoothstep(0.04, 0.5, direction.y) * 0.7);
+			float zenith = smoothstep(0.0, 0.55, direction.y);
+			vec3 noonBlue = dayColor * vec3(0.55, 0.78, 1.35) + vec3(0.02, 0.07, 0.22);
+			dayColor = mix(dayColor, noonBlue, clamp(blueAmount, 0.0, 1.0) * mix(0.62, 1.0, zenith));
 			dayColor += vec3(1.2, 0.55, 0.18) * sunDisc * 0.55 * sunUp;
 			float skyHorizon = pow(1.0 - clamp(direction.y, 0.0, 1.0), 3.0);
 			vec3 nightColor = vec3(0.004, 0.007, 0.026) + vec3(0.018, 0.026, 0.048) * skyHorizon;
@@ -650,9 +652,9 @@ function applyDaylight(body: Daylight, delta: number, forceFog: boolean): void {
   sky.material.uniforms.moonPosition!.value.copy(moonDir);
   sky.material.uniforms.turbidity!.value = 9.5 - high * 8.5;
   sky.material.uniforms.rayleigh!.value = 2.4 + high * 1.6;
-  sky.material.uniforms.mieCoefficient!.value = 0.016 - high * 0.0145;
+  sky.material.uniforms.mieCoefficient!.value = 0.016 - high * 0.015;
   sky.material.uniforms.mieDirectionalG!.value = 0.93 - high * 0.18;
-  sky.material.uniforms.skyExposure!.value = 0.16 + high * 0.04;
+  sky.material.uniforms.skyExposure!.value = 0.16 + high * 0.06;
   sky.material.uniforms.nightAmount!.value = body.night;
   sky.material.uniforms.goldenAmount!.value = 1 - high;
   sky.material.uniforms.blueAmount!.value = high;
