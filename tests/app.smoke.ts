@@ -82,7 +82,7 @@ test('renders high-detail terrain, streams, and supports camera controls', async
   await page.evaluate(() => window.__SOARING__.setTimeScale(8));
   await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0);
   const before = await page.evaluate(() => window.__SOARING__.snapshot());
-  await page.waitForTimeout(1500);
+  await page.evaluate(() => window.__SOARING__.advanceSimulation!(12));
   const after = await page.evaluate(() => window.__SOARING__.snapshot());
   expect(Math.hypot(after.position[0]! - before.position[0]!, after.position[2]! - before.position[2]!)).toBeGreaterThan(8);
   expect(after.chunks).toBeLessThanOrEqual(49);
@@ -102,6 +102,18 @@ test('renders high-detail terrain, streams, and supports camera controls', async
   await page.mouse.up();
   expect(errors).toEqual([]);
 });
+
+async function advanceToThermal(page: Page): Promise<void> {
+  // Exercise the real navigator in the same bounded steps as the frame loop. The old
+  // 25 s × 12 budget meant 300 simulated seconds only when rendering kept up.
+  const active = await page.evaluate(() => {
+    for (let step = 0; step < 3000 && window.__SOARING__.snapshot().activeThermal === null; step += 1) {
+      window.__SOARING__.advanceSimulation!(0.1);
+    }
+    return window.__SOARING__.snapshot().activeThermal;
+  });
+  expect(active).not.toBeNull();
+}
 
 function expectMarkersInRange(snapshot: {
   position: number[];
@@ -132,8 +144,7 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
   const setting = page.getByRole('checkbox', { name: 'Show thermal' });
   await openSettings(page);
   await expect(setting).toBeChecked();
-  await page.evaluate(() => window.__SOARING__.setTimeScale(12));
-  await page.waitForFunction(() => window.__SOARING__.snapshot().activeThermal !== null, undefined, { timeout: 25_000 });
+  await advanceToThermal(page);
   const active = await page.evaluate(() => window.__SOARING__.snapshot());
   expectMarkersInRange(active);
   expect(active.marker).toEqual(active.activeThermal);
@@ -143,8 +154,7 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
   await page.reload();
   await openSettings(page);
   await expect(setting).not.toBeChecked();
-  await page.evaluate(() => window.__SOARING__.setTimeScale(12));
-  await page.waitForFunction(() => window.__SOARING__.snapshot().activeThermal !== null, undefined, { timeout: 25_000 });
+  await advanceToThermal(page);
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).marker).toBeNull();
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).markers).toEqual([]);
   await setting.check();
@@ -523,11 +533,12 @@ test('renders daytime, aurora, and midnight sky states', async ({ page }) => {
   });
 
   async function showPhase(phase: number, name: string, look: 'sun' | 'moon' | 'horizon' | 'chase'): Promise<{ timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number }> {
-    await page.evaluate((value) => window.__SOARING__.setTimeOfDay(value), phase);
-    await page.evaluate((body) => window.__SOARING__.lookAtBody(body), look);
-    await page.evaluate(() => new Promise((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve(undefined))));
-    }));
+    const rendered = await page.evaluate(({ phase, look }) => {
+      window.__SOARING__.setTimeOfDay(phase);
+      window.__SOARING__.lookAtBody(look);
+      return window.__SOARING__.snapshot().renderedFrames;
+    }, { phase, look });
+    await page.waitForFunction((before) => window.__SOARING__.snapshot().renderedFrames > before, rendered);
     const shot = await page.screenshot({ path: `test-results/sky-${name}.png` });
     expect(shot.byteLength).toBeGreaterThan(1000);
     return page.evaluate(() => {

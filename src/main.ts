@@ -622,17 +622,24 @@ function measureSmoke<T>(name: string, work: () => T): T {
   return result;
 }
 
-function frame(now: number): void {
-  const rawDelta = Math.min(0.1, (now - lastTime) / 1000);
-  lastTime = now;
-  const delta = clampNextSimulationDelta ? Math.min(rawDelta * timeScale, 0.1) : rawDelta * timeScale;
-  clampNextSimulationDelta = false;
+function updateFlight(delta: number, now: number): void {
   const substeps = Math.ceil(delta / 0.1);
   let state = navigator.state;
   for (let step = 0; step < substeps; step += 1) state = navigator.update(delta / substeps);
   eagle.update(state, delta);
   thermalMarker.update(state, navigator.activeThermal, settings.showThermal, now / 1000);
   soundscape.update(state.behavior, state.flapping);
+}
+
+let renderedFrames = 0;
+let smokeFrameIndex = 0;
+function frame(now: number): void {
+  const rawDelta = Math.min(0.1, (now - lastTime) / 1000);
+  lastTime = now;
+  const delta = clampNextSimulationDelta ? Math.min(rawDelta * timeScale, 0.1) : rawDelta * timeScale;
+  clampNextSimulationDelta = false;
+  updateFlight(delta, now);
+  const state = navigator.state;
 
   if (skyLook) {
     const sky = currentDaylight();
@@ -684,7 +691,12 @@ function frame(now: number): void {
     cacheTrimElapsed -= 1;
     world.trim(WORLD_CACHE_LIMIT);
   }
-  measureSmoke('render', () => renderer.render(scene, camera));
+  // Keep input, streaming and simulation responsive between costly software-WebGL draws.
+  // The scene and shaders stay real; only the dev-only smoke render cadence changes.
+  if (!smokeMode || smokeFrameIndex++ % 4 === 0) {
+    measureSmoke('render', () => renderer.render(scene, camera));
+    renderedFrames += 1;
+  }
   fpsSmoothed += ((rawDelta > 0 ? 1 / rawDelta : 60) - fpsSmoothed) * 0.05;
   diagnosticsElapsed += rawDelta;
   if (diagnosticsVisible && diagnosticsElapsed > 0.22) {
@@ -730,7 +742,8 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { frameTiming: typeof smokeFrameTiming; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number };
+      snapshot: () => { renderedFrames: number; frameTiming: typeof smokeFrameTiming; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number };
+      advanceSimulation?: (seconds: number) => void;
       setTimeScale: (scale: number) => void;
       setTimeOfDay: (phase: number) => void;
       lookAtBody: (body: 'sun' | 'moon' | 'horizon' | 'chase') => void;
@@ -745,11 +758,19 @@ declare global {
   }
 }
 window.__SOARING__ = {
+  ...(smokeMode ? {
+    advanceSimulation: (seconds: number) => {
+      if (!Number.isFinite(seconds) || seconds < 0 || seconds > 300) throw new RangeError('Expected 0–300 simulated seconds');
+      const substeps = Math.ceil(seconds / 0.1);
+      for (let step = 0; step < substeps; step += 1) updateFlight(seconds / substeps, performance.now());
+    },
+  } : {}),
   snapshot: () => {
     const placed = thermalMarker.placements();
     const activeMarker = placed.find((marker) => marker.active);
     const body = currentDaylight();
     return {
+      renderedFrames,
       frameTiming: smokeFrameTiming,
       seed: world.seed,
       chunks: terrain.chunkCount,
