@@ -7,6 +7,38 @@ type TestWindow = Window & {
   __visibilityCapture?: { completed: boolean; snapshot: ReturnType<typeof window.__SOARING__.snapshot> | null };
 };
 
+// Record frame starvation independently of the simulation's clamped clock.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const gaps: number[] = [];
+    const tasks: number[] = [];
+    let previous = performance.now();
+    const sample = (now: number) => {
+      gaps.push(now - previous);
+      previous = now;
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+    new PerformanceObserver((list) => {
+      tasks.push(...list.getEntries().map((entry) => entry.duration));
+    }).observe({ type: 'longtask', buffered: true });
+    Object.assign(window, { __smokeTiming: { gaps, tasks } });
+  });
+});
+
+test.afterEach(async ({ page }, testInfo) => {
+  if (page.isClosed()) return;
+  const timing = await page.evaluate(() => {
+    const measured = (window as Window & { __smokeTiming?: { gaps: number[]; tasks: number[] } }).__smokeTiming;
+    const canvas = document.querySelector('canvas');
+    const gl = canvas?.getContext('webgl2');
+    const debug = gl?.getExtension('WEBGL_debug_renderer_info');
+    return { ...measured, renderer: debug ? gl?.getParameter(debug.UNMASKED_RENDERER_WEBGL) : null,
+      snapshot: window.__SOARING__?.snapshot() };
+  });
+  await testInfo.attach('frame-timing', { body: JSON.stringify(timing), contentType: 'application/json' });
+});
+
 function captureErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
