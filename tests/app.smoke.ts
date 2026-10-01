@@ -1,4 +1,11 @@
+import { writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
+
+type TestWindow = Window & {
+  __trackedAudioContext?: AudioContext;
+  __setPageVisibility?: (state: 'hidden' | 'visible') => void;
+  __visibilityCapture?: { completed: boolean; snapshot: ReturnType<typeof window.__SOARING__.snapshot> | null };
+};
 
 function captureErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -281,6 +288,100 @@ test('the first mute gesture and a pending audio start respect the saved mute ch
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1')!).muted)).toBe(true);
   await page.locator('#mute').click();
   await expect(page.locator('#mute')).toHaveText('On');
+  expect(errors).toEqual([]);
+});
+
+test('suspends hidden audio and bounds the first visible simulation step', async ({ page }) => {
+  const errors = captureErrors(page);
+  await page.addInitScript(() => {
+    const nativeAudioContext = window.AudioContext;
+    window.AudioContext = new Proxy(nativeAudioContext, {
+      construct(target, args) {
+        const context = Reflect.construct(target, args) as AudioContext;
+        (window as TestWindow).__trackedAudioContext = context;
+        return context;
+      },
+    });
+
+    let hidden = false;
+    const heldFrames: FrameRequestCallback[] = [];
+    const nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (callback) => {
+      if (hidden) {
+        heldFrames.push(callback);
+        return heldFrames.length;
+      }
+      return nativeRequestAnimationFrame((time) => {
+        if (hidden) heldFrames.push(callback);
+        else callback(time);
+      });
+    };
+    (window as TestWindow).__setPageVisibility = (state) => {
+      hidden = state === 'hidden';
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => hidden ? 'hidden' : 'visible' });
+      document.dispatchEvent(new Event('visibilitychange'));
+      if (!hidden) heldFrames.splice(0).forEach((callback) => window.requestAnimationFrame(callback));
+    };
+  });
+  await page.goto('/?smoke');
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.locator('#settings-toggle').click();
+  const mute = page.locator('#mute');
+  await mute.click();
+  await expect(mute).toHaveText('On');
+  await page.waitForFunction(() => (window as TestWindow).__trackedAudioContext?.state === 'running');
+  await page.evaluate(() => window.__SOARING__.setTimeScale(12));
+
+  const setVisibility = (state: 'hidden' | 'visible') =>
+    page.evaluate((visibility) => (window as TestWindow).__setPageVisibility!(visibility), state);
+  await setVisibility('hidden');
+  await expect.poll(() => page.evaluate(() => document.hidden)).toBe(true);
+  await page.waitForFunction(() => (window as TestWindow).__trackedAudioContext?.state === 'suspended', undefined, { polling: 100 });
+  const before = await page.evaluate(() => window.__SOARING__.snapshot());
+  await page.evaluate(() => {
+    const testWindow = window as TestWindow;
+    testWindow.__visibilityCapture = { completed: false, snapshot: null };
+    requestAnimationFrame(() => {
+      testWindow.__visibilityCapture = { completed: true, snapshot: window.__SOARING__.snapshot() };
+    });
+  });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  expect(await page.evaluate(() => (window as TestWindow).__visibilityCapture?.completed)).toBe(false);
+
+  await setVisibility('visible');
+  await page.waitForFunction(() => (window as TestWindow).__visibilityCapture?.completed, undefined, { polling: 100 });
+  const after = await page.evaluate(() => (window as TestWindow).__visibilityCapture!.snapshot!);
+  expect(Math.hypot(after.position[0]! - before.position[0]!, after.position[2]! - before.position[2]!)).toBeLessThan(6);
+  expect(after.chunks - before.chunks).toBeLessThanOrEqual(2);
+  await page.waitForFunction(() => (window as TestWindow).__trackedAudioContext?.state === 'running');
+  const resumedAudioState = await page.evaluate(() => (window as TestWindow).__trackedAudioContext?.state);
+
+  await mute.click();
+  await expect(mute).toHaveText('Muted');
+  await setVisibility('hidden');
+  await page.waitForFunction(() => (window as TestWindow).__trackedAudioContext?.state === 'suspended', undefined, { polling: 100 });
+  await page.evaluate(() => {
+    const testWindow = window as TestWindow;
+    testWindow.__visibilityCapture = { completed: false, snapshot: null };
+    requestAnimationFrame(() => {
+      testWindow.__visibilityCapture = { completed: true, snapshot: window.__SOARING__.snapshot() };
+    });
+  });
+  await setVisibility('visible');
+  await page.waitForFunction(() => (window as TestWindow).__visibilityCapture?.completed, undefined, { polling: 100 });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const mutedAudioState = await page.evaluate(() => (window as TestWindow).__trackedAudioContext?.state);
+  const persistedMute = await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1')!).muted);
+  expect(mutedAudioState).toBe('suspended');
+  expect(persistedMute).toBe(true);
+  await writeFile('test-results/visibility-lifecycle.json', JSON.stringify({
+    before: { position: before.position, chunks: before.chunks, pending: before.pending },
+    after: { position: after.position, chunks: after.chunks, pending: after.pending },
+    resumedAudioState,
+    mutedAudioState,
+    persistedMute,
+  }, null, 2));
   expect(errors).toEqual([]);
 });
 

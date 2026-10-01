@@ -457,6 +457,19 @@ window.addEventListener('keydown', (event) => {
 let timeScale = 1;
 let lastTime = performance.now();
 let cacheTrimElapsed = 0;
+let clampNextSimulationDelta = false;
+let soundWasEnabledBeforeHidden = false;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    soundWasEnabledBeforeHidden = !soundscape.isMuted;
+    soundscape.suspendForPageHide();
+    return;
+  }
+  lastTime = performance.now();
+  clampNextSimulationDelta = true;
+  if (soundWasEnabledBeforeHidden) soundscape.resumeForPageShow();
+  soundWasEnabledBeforeHidden = false;
+});
 let fpsSmoothed = 60;
 let diagnosticsElapsed = 0;
 // Real time, not the flight time scale, so a 15-minute day stays 15 minutes during accelerated tests.
@@ -538,7 +551,8 @@ function currentDaylight(): Daylight {
 function frame(now: number): void {
   const rawDelta = Math.min(0.1, (now - lastTime) / 1000);
   lastTime = now;
-  const delta = rawDelta * timeScale;
+  const delta = clampNextSimulationDelta ? Math.min(rawDelta * timeScale, 0.1) : rawDelta * timeScale;
+  clampNextSimulationDelta = false;
   const substeps = Math.ceil(delta / 0.1);
   let state = navigator.state;
   for (let step = 0; step < substeps; step += 1) state = navigator.update(delta / substeps);
