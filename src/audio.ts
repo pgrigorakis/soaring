@@ -59,6 +59,16 @@ export class Soundscape {
     return true;
   }
 
+  suspendForPageHide(): void {
+    if (!this.context || this.context.state === 'closed') return;
+    void this.context.suspend().catch(() => {});
+  }
+
+  resumeForPageShow(): void {
+    if (!this.context || this.muted || this.context.state === 'closed') return;
+    void this.context.resume().catch(() => {});
+  }
+
   setAmbienceVolume(volume: number): void {
     this.ambienceVolume = volume;
     this.applyVolume();
