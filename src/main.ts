@@ -58,9 +58,9 @@ function nextVisit(): number {
   return visit;
 }
 
-// Development-only smoke harness uses a smaller software-WebGL render budget: a bounded default
-// terrain visibility so CI never has to stream toward the 5 km product default. Test-only, not a
-// product setting; a saved value (set explicitly by a test) always wins.
+// Development-only smoke harness uses a smaller software-WebGL render budget and bounded
+// terrain visibility for fresh storage. Saved settings still take the normal migration path,
+// including the 5 km product default when a legacy record has no visibility value.
 const smokeMode = import.meta.env.DEV && new URLSearchParams(location.search).has('smoke');
 const hasSavedSettings = localStorage.getItem(SETTINGS_KEY) != null;
 const settings = loadSettings();
@@ -609,19 +609,6 @@ function currentDaylight(): Daylight {
   return daylight(skySeconds);
 }
 
-const smokeFrameTiming: Record<string, { count: number; total: number; max: number }> = {};
-function measureSmoke<T>(name: string, work: () => T): T {
-  if (!smokeMode) return work();
-  const start = performance.now();
-  const result = work();
-  const elapsed = performance.now() - start;
-  const timing = smokeFrameTiming[name] ??= { count: 0, total: 0, max: 0 };
-  timing.count += 1;
-  timing.total += elapsed;
-  timing.max = Math.max(timing.max, elapsed);
-  return result;
-}
-
 function updateFlight(delta: number, now: number): void {
   const substeps = Math.ceil(delta / 0.1);
   let state = navigator.state;
@@ -674,11 +661,11 @@ function frame(now: number): void {
   }
   camera.position.copy(cameraPosition);
   camera.lookAt(lookAt);
-  measureSmoke('terrain', () => terrain.update(cameraPosition.x, cameraPosition.z));
+  terrain.update(cameraPosition.x, cameraPosition.z);
   updateFog();
   if (!skyPaused) skySeconds += rawDelta;
   const body = currentDaylight();
-  measureSmoke('daylight', () => applyDaylight(body, rawDelta, false));
+  applyDaylight(body, rawDelta, false);
 
   keyLight.target.position.set(camera.position.x, world.sample(camera.position.x, camera.position.z).height, camera.position.z);
   updateShadowBasis(keyDir);
@@ -694,7 +681,7 @@ function frame(now: number): void {
   // Keep input, streaming and simulation responsive between costly software-WebGL draws.
   // The scene and shaders stay real; only the dev-only smoke render cadence changes.
   if (!smokeMode || smokeFrameIndex++ % 4 === 0) {
-    measureSmoke('render', () => renderer.render(scene, camera));
+    renderer.render(scene, camera);
     renderedFrames += 1;
   }
   fpsSmoothed += ((rawDelta > 0 ? 1 / rawDelta : 60) - fpsSmoothed) * 0.05;
@@ -742,7 +729,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { renderedFrames: number; frameTiming: typeof smokeFrameTiming; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number };
+      snapshot: () => { renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number };
       advanceSimulation?: (seconds: number) => void;
       setTimeScale: (scale: number) => void;
       setTimeOfDay: (phase: number) => void;
@@ -771,7 +758,6 @@ window.__SOARING__ = {
     const body = currentDaylight();
     return {
       renderedFrames,
-      frameTiming: smokeFrameTiming,
       seed: world.seed,
       chunks: terrain.chunkCount,
       pending: terrain.pendingCount,
