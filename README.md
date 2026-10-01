@@ -19,7 +19,7 @@ Open `http://127.0.0.1:4173`. Production output is created with `npm run build`.
 
 - Drag on the landscape to orbit the camera. Release to let it return slowly to the trailing view.
 - Move the pointer to reveal the settings control.
-- Settings provide an overall sound mute, independent ambience (wind and wing flaps) and music volume sliders, terrain visibility, minimum and maximum flight height above local terrain, camera distance, a persistent Show thermal toggle, and a new-world action. Show thermal marks every thermal within 3.5 km of the eagle; the selected thermal stays hotter. Height bounds persist across reloads; the eagle selects its own height and route within them.
+- Settings provide an overall sound mute, independent ambience (wind and wing flaps) and music volume sliders, terrain visibility, minimum and maximum flight height above local terrain, camera distance from 10 m to 100 m (lower at closer settings), a persistent Show thermal toggle, and a new-world action. Show thermal marks every thermal within 3.5 km of the eagle; the selected thermal stays hotter. Height bounds persist across reloads; the eagle selects its own height and route within them.
 - Press `D` to show or hide diagnostics.
 
 Sound is procedural and starts muted on every page load. If sound was previously enabled, a pointer gesture can resume it; pressing Sound to mute instead keeps it muted. If the browser cannot start audio, sound stays muted and the control can retry. The two volume settings persist independently; existing single-volume preferences initialize both sliders. Settings and the world seed live in `localStorage`. A reload keeps the seed but increments a scenic-visit index, so it starts elsewhere in the same world.
