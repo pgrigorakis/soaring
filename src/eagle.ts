@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { hash2, Thermal, WorldModel } from './world';
+import { fbm, hash2, Thermal, WorldModel } from './world';
 
 export type EagleBehavior = 'gliding' | 'thermal-seeking' | 'thermal-riding';
 
@@ -15,6 +15,12 @@ export type EagleState = {
 
 const wrapAngle = (angle: number): number => Math.atan2(Math.sin(angle), Math.cos(angle));
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+const COMPASS_SEED = 431;
+
+function fbm1d(x: number, seed: number): number {
+  // At a 300 s input scale, two octaves keep the shortest swing near 150 s.
+  return fbm(x, 0, seed, 2);
+}
 
 export type FlightHeightRange = { min: number; max: number };
 export const FLIGHT_HEIGHT_LIMITS = { min: 50, max: 240, gap: 20 } as const;
@@ -58,6 +64,7 @@ export class EagleNavigator {
   private readonly world: WorldModel;
   private behaviorTime = 0;
   private totalTime = 0;
+  private readonly seedAngle: number;
   private target = { x: 0, z: 0 };
   private thermal: Thermal | null = null;
   private scenicIndex = 0;
@@ -72,6 +79,7 @@ export class EagleNavigator {
 
   constructor(world: WorldModel, start: { x: number; z: number; heading: number }, heightRange = DEFAULT_FLIGHT_HEIGHT) {
     this.world = world;
+    this.seedAngle = hash2(0, 0, world.seed + COMPASS_SEED) * Math.PI * 2;
     this.heightRange = normalizeFlightHeight(heightRange.min, heightRange.max);
     const ground = world.sample(start.x, start.z).height;
     this.state = { x: start.x, y: ground + clamp(105, this.heightRange.min, this.heightRange.max), z: start.z, heading: start.heading, bank: 0, behavior: 'gliding', flapping: false };
@@ -252,6 +260,7 @@ export class EagleNavigator {
 
   private chooseScenicTarget(): void {
     this.scenicIndex += 1;
+    const bearing = this.seedAngle + fbm1d(this.totalTime / 300, this.world.seed + COMPASS_SEED) * Math.PI;
     let bestScore = -Infinity;
     for (let candidate = 0; candidate < 6; candidate += 1) {
       const variation = (hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.x / 400), this.world.seed + 419) - 0.5) * 1.35;
@@ -259,7 +268,7 @@ export class EagleNavigator {
       const heading = this.state.heading + variation;
       const x = this.state.x + Math.sin(heading) * distance;
       const z = this.state.z + Math.cos(heading) * distance;
-      const score = this.world.interest(x, z);
+      const score = this.world.interest(x, z) + 0.25 * Math.cos(heading - bearing);
       if (score <= bestScore) continue;
       bestScore = score;
       this.target = { x, z };
