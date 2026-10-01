@@ -37,7 +37,7 @@ export class TerrainStream {
   // Fades the shadow to fully lit near the fixed shadow camera's edge, in place of a hard cutoff.
   private readonly shadowFadeRange = { value: new THREE.Vector2() };
   private readonly waterMaterial = new THREE.MeshStandardMaterial({
-    color: 0x477d8b,
+    color: 0x2a8fa8,
     roughness: 0.38,
     metalness: 0.05,
     transparent: true,
@@ -45,13 +45,13 @@ export class TerrainStream {
     side: THREE.DoubleSide,
     depthWrite: false,
   });
-  private readonly trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x584634, roughness: 1 });
+  private readonly trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1 });
   private readonly foliageMaterials = [
-    new THREE.MeshStandardMaterial({ color: 0x31563b, roughness: 1, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: 0x426846, roughness: 1, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: 0x56734a, roughness: 1, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0x1f5a34, roughness: 1, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0x2e7a3e, roughness: 1, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0x5c9443, roughness: 1, flatShading: true }),
   ];
-  private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x77776d, roughness: 1, flatShading: true });
+  private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x857e72, roughness: 1, flatShading: true });
   private readonly trunkGeometry = new THREE.CylinderGeometry(0.8, 1.35, 9, 5);
   private readonly crownGeometries = [
     new THREE.ConeGeometry(5.5, 12, 7), // layered conifer
@@ -277,12 +277,14 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
           heightAt(xIndex, zIndex - 1) - heightAt(xIndex, zIndex + 1),
         ).normalize();
         normals.push(normal.x, normal.y, normal.z);
-        if (sample.water) color.set(0x586957);
-        else if (sample.rock > 0.67) color.set(0x77766c).lerp(new THREE.Color(0x8a8374), sample.rock - 0.67);
-        else if (sample.forest > 0.55) color.set(0x456345);
-        else color.set(0x718258).lerp(new THREE.Color(0x8c925f), 1 - sample.moisture);
-        const tint = (hash2(Math.round(x), Math.round(z), this.world.seed + 313) - 0.5) * 0.055;
-        color.offsetHSL(0, 0, tint);
+        if (sample.water) color.set(0x2f6e6a);
+        else if (sample.rock > 0.67) color.set(0x8a8174).lerp(new THREE.Color(0xafa28a), sample.rock - 0.67);
+        else if (sample.forest > 0.55) color.set(0x2f6b3a);
+        else color.set(0x6fa03c).lerp(new THREE.Color(0xb3b04a), 1 - sample.moisture);
+        const hueJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 311) - 0.5) * 0.03;
+        const saturationJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 312) - 0.5) * 0.12;
+        const lightnessJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 313) - 0.5) * 0.06;
+        color.offsetHSL(hueJitter, saturationJitter, lightnessJitter);
         colors.push(color.r, color.g, color.b);
       }
     }
