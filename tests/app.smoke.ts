@@ -421,7 +421,7 @@ test('suspends hidden audio and bounds the first visible simulation step', async
   });
   await page.goto('/?smoke');
   await expect(page.locator('canvas')).toBeVisible();
-  await page.locator('#settings-toggle').click();
+  await openSettings(page);
   const mute = page.locator('#mute');
   await mute.click();
   await expect(mute).toHaveText('On');
