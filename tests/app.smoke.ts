@@ -267,6 +267,54 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   expect(errors).toEqual([]);
 });
 
+test('low-power mode persists, uses its work budget, and focus always caps at 30 fps', async ({ page }) => {
+  test.setTimeout(30_000);
+  const errors = captureErrors(page);
+  await page.goto('/?smoke');
+  await openSettings(page);
+  const lowPower = page.getByRole('checkbox', { name: 'Low power' });
+  await expect(lowPower).not.toBeChecked();
+
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).frameCap).toBeNull();
+  const beforeBlur = await page.evaluate(() => window.__SOARING__.snapshot());
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).frameCap).toBe(30);
+  await page.waitForFunction((frames) => window.__SOARING__.snapshot().renderedFrames > frames, beforeBlur.renderedFrames);
+  const afterBlur = await page.evaluate(() => window.__SOARING__.snapshot());
+  expect(Math.hypot(afterBlur.position[0]! - beforeBlur.position[0]!, afterBlur.position[2]! - beforeBlur.position[2]!)).toBeLessThan(10);
+  const beforeFocus = afterBlur;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).frameCap).toBeNull();
+  await page.waitForFunction((frames) => window.__SOARING__.snapshot().renderedFrames > frames, beforeFocus.renderedFrames);
+  const afterFocus = await page.evaluate(() => window.__SOARING__.snapshot());
+  expect(Math.hypot(afterFocus.position[0]! - beforeFocus.position[0]!, afterFocus.position[2]! - beforeFocus.position[2]!)).toBeLessThan(10);
+
+  await lowPower.check();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1')!).lowPower)).toBe(true);
+  const previousRender = await page.evaluate(() => window.__SOARING__.snapshot().renderedFrames);
+  await page.waitForFunction((frames) => window.__SOARING__.snapshot().renderedFrames > frames, previousRender);
+  const enabled = await page.evaluate(() => window.__SOARING__.snapshot());
+  expect(enabled.lastChunkBuilds).toBeLessThanOrEqual(1);
+  expect(enabled.lowPower).toBe(true);
+  expect(enabled.frameCap).toBe(30);
+  expect(enabled.chunkBuildBudget).toBe(1);
+  await page.keyboard.press('d');
+  await expect(page.locator('#diagnostics')).toContainText('cap          30 fps');
+  await expect(page.locator('#diagnostics')).toContainText('quality step');
+
+  await page.reload();
+  await openSettings(page);
+  await expect(lowPower).toBeChecked();
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).lowPower).toBe(true);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().qualityStep === 3, undefined, { timeout: 15_000 });
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).frameCap).toBe(30);
+  await lowPower.uncheck();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1')!).lowPower)).toBe(false);
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).chunkBuildBudget).toBe(2);
+  expect(errors).toEqual([]);
+});
+
 test('fullscreen toggle and F keep the idle scene clear while settings and diagnostics still work', async ({ page }) => {
   const errors = captureErrors(page);
   await page.goto('/?smoke');

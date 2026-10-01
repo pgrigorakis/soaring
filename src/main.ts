@@ -9,7 +9,7 @@ import { THERMAL_MARKER_RANGE, ThermalMarker } from './thermal-marker';
 import { AuroraSchedule, auroraAmount, DAY_SECONDS, daylight, nightCycle, type Daylight } from './sky-cycle';
 import { WORLD_CACHE_LIMIT, WorldModel } from './world';
 
-type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
+type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; lowPower: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
 const CAMERA_DISTANCE = { min: 10, max: 100, default: 100 } as const;
 const CAMERA_CLOSE_HEIGHT = 3;
 // The previous 178 m default sat 31% of its follow distance above the eagle.
@@ -17,7 +17,7 @@ const CAMERA_FAR_HEIGHT = 178 * 0.31;
 const SETTINGS_KEY = 'soaring.settings.v1';
 const SEED_KEY = 'soaring.world-seed.v1';
 const VISIT_KEY = 'soaring.scenic-visit.v1';
-const defaultSettings: StoredSettings = { ambienceVolume: 0.52, musicVolume: 0.52, muted: true, cameraDistance: CAMERA_DISTANCE.default, terrainVisibility: DEFAULT_VISIBILITY,
+const defaultSettings: StoredSettings = { ambienceVolume: 0.52, musicVolume: 0.52, muted: true, lowPower: false, cameraDistance: CAMERA_DISTANCE.default, terrainVisibility: DEFAULT_VISIBILITY,
   showThermal: true, minFlightHeight: DEFAULT_FLIGHT_HEIGHT.min, maxFlightHeight: DEFAULT_FLIGHT_HEIGHT.max };
 const clamp = (value: unknown, fallback: number, min: number, max: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
@@ -31,6 +31,7 @@ function loadSettings(): StoredSettings {
       ambienceVolume: clamp(saved.ambienceVolume, clamp(saved.volume, defaultSettings.ambienceVolume, 0, 1), 0, 1),
       musicVolume: clamp(saved.musicVolume, clamp(saved.volume, defaultSettings.musicVolume, 0, 1), 0, 1),
       muted: typeof saved.muted === 'boolean' ? saved.muted : defaultSettings.muted,
+      lowPower: typeof saved.lowPower === 'boolean' ? saved.lowPower : defaultSettings.lowPower,
       cameraDistance: clamp(saved.cameraDistance, defaultSettings.cameraDistance, CAMERA_DISTANCE.min, CAMERA_DISTANCE.max),
       showThermal: typeof saved.showThermal === 'boolean' ? saved.showThermal : defaultSettings.showThermal,
       terrainVisibility: clamp(saved.terrainVisibility, defaultSettings.terrainVisibility, MIN_VISIBILITY, MAX_VISIBILITY),
@@ -64,7 +65,15 @@ function nextVisit(): number {
 const smokeMode = import.meta.env.DEV && new URLSearchParams(location.search).has('smoke');
 const hasSavedSettings = localStorage.getItem(SETTINGS_KEY) != null;
 const settings = loadSettings();
+let qualityStep = 0;
+const QUALITY_PIXEL_RATIOS = [1.75, 1.25, 1.0] as const;
 if (smokeMode && !hasSavedSettings) settings.terrainVisibility = MIN_VISIBILITY;
+
+function pixelRatioForStep(step = qualityStep): number {
+  if (smokeMode) return 0.25;
+  if (settings.lowPower) return 1.0;
+  return Math.min(devicePixelRatio, QUALITY_PIXEL_RATIOS[Math.min(step, QUALITY_PIXEL_RATIOS.length - 1)]!);
+}
 const world = new WorldModel(loadSeed());
 const auroraSchedule = new AuroraSchedule(world.seed);
 const start = world.scenicStart(nextVisit());
@@ -82,11 +91,11 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.5, MAX_VISIBILITY + 500);
 const renderer = new THREE.WebGLRenderer({ antialias: !smokeMode, powerPreference: 'high-performance' });
 renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(smokeMode ? 0.25 : Math.min(devicePixelRatio, 1.75));
+renderer.setPixelRatio(pixelRatioForStep());
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.08;
-renderer.shadowMap.enabled = !smokeMode;
+renderer.shadowMap.enabled = !smokeMode && !settings.lowPower;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.domElement.setAttribute('aria-label', 'Autonomous golden eagle flying above a temperate wilderness');
 app.append(renderer.domElement);
@@ -96,7 +105,7 @@ scene.add(hemisphere);
 // One shadow caster. Its direction follows whichever body is higher. Both intensities are zero
 // on the horizon, so the direction can flip there without a visible shadow pop.
 const keyLight = new THREE.DirectionalLight(0xffe1ab, 3.6);
-keyLight.castShadow = !smokeMode;
+keyLight.castShadow = !smokeMode && !settings.lowPower;
 keyLight.shadow.camera.near = 1;
 keyLight.shadow.bias = -0.0005;
 keyLight.shadow.normalBias = 0.8;
@@ -238,12 +247,23 @@ function depthPerDistance(aspect: number): number {
   const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   return 1 / Math.hypot(1, tanHalfFov * Math.hypot(1, aspect));
 }
+function effectiveTerrainVisibility(): number {
+  return qualityStep >= 3 ? Math.min(settings.terrainVisibility, 3500) : settings.terrainVisibility;
+}
 function terrainReach(): number {
-  return settings.terrainVisibility / depthPerDistance(Math.min(camera.aspect, MAX_REACH_ASPECT));
+  return effectiveTerrainVisibility() / depthPerDistance(Math.min(camera.aspect, MAX_REACH_ASPECT));
 }
 const terrain = new TerrainStream(scene, world, terrainReach());
 const thermalMarker = new ThermalMarker(scene, world);
-terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, 49);
+function applyRenderQuality(): void {
+  const pixelRatio = pixelRatioForStep();
+  if (renderer.getPixelRatio() !== pixelRatio) renderer.setPixelRatio(pixelRatio);
+  const shadowsEnabled = !smokeMode && !settings.lowPower;
+  renderer.shadowMap.enabled = shadowsEnabled;
+  keyLight.castShadow = shadowsEnabled;
+  terrain.setReach(terrainReach());
+}
+let lastChunkBuilds = terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, settings.lowPower ? 1 : 49);
 
 let orbitYaw = 0;
 let orbitPitch = 0;
@@ -295,6 +315,7 @@ app.insertAdjacentHTML('beforeend', `
       <label class="setting">Ambience <output id="ambience-value">${Math.round(settings.ambienceVolume * 100)}%</output><input id="ambience" type="range" min="0" max="1" step="0.01" value="${settings.ambienceVolume}"></label>
       <label class="setting">Music <output id="music-value">${Math.round(settings.musicVolume * 100)}%</output><input id="music" type="range" min="0" max="1" step="0.01" value="${settings.musicVolume}"></label>
       <label class="setting">Terrain visibility <output id="visibility-value">${Math.round(settings.terrainVisibility)} m</output><input id="visibility" type="range" min="${MIN_VISIBILITY}" max="${MAX_VISIBILITY}" step="120" value="${settings.terrainVisibility}"></label>
+      <label class="setting">Low power <input id="low-power" type="checkbox" ${settings.lowPower ? 'checked' : ''}></label>
       <label class="setting">Show thermal <input id="show-thermal" type="checkbox" ${settings.showThermal ? 'checked' : ''}></label>
       <label class="setting">Minimum flight height <output id="min-height-value">${settings.minFlightHeight} m</output><input id="min-height" type="range" min="${FLIGHT_HEIGHT_LIMITS.min}" max="${FLIGHT_HEIGHT_LIMITS.max - FLIGHT_HEIGHT_LIMITS.gap}" step="1" value="${settings.minFlightHeight}"></label>
       <label class="setting">Maximum flight height <output id="max-height-value">${settings.maxFlightHeight} m</output><input id="max-height" type="range" min="${FLIGHT_HEIGHT_LIMITS.min + FLIGHT_HEIGHT_LIMITS.gap}" max="${FLIGHT_HEIGHT_LIMITS.max}" step="1" value="${settings.maxFlightHeight}"></label>
@@ -320,6 +341,7 @@ const musicValue = document.querySelector<HTMLOutputElement>('#music-value')!;
 const audioNote = document.querySelector<HTMLElement>('.audio-note')!;
 const visibilityInput = document.querySelector<HTMLInputElement>('#visibility')!;
 const visibilityValue = document.querySelector<HTMLOutputElement>('#visibility-value')!;
+const lowPowerInput = document.querySelector<HTMLInputElement>('#low-power')!;
 const showThermalInput = document.querySelector<HTMLInputElement>('#show-thermal')!;
 const distanceInput = document.querySelector<HTMLInputElement>('#distance')!;
 const distanceValue = document.querySelector<HTMLOutputElement>('#distance-value')!;
@@ -411,7 +433,15 @@ musicInput.addEventListener('input', () => {
 visibilityInput.addEventListener('input', () => {
   settings.terrainVisibility = Number(visibilityInput.value);
   visibilityValue.value = `${Math.round(settings.terrainVisibility)} m`;
-  terrain.setReach(terrainReach());
+  qualityStep = 0;
+  resetQualityTimers();
+  applyRenderQuality();
+  saveSettings();
+});
+lowPowerInput.addEventListener('change', () => {
+  settings.lowPower = lowPowerInput.checked;
+  resetQualityTimers();
+  applyRenderQuality();
   saveSettings();
 });
 showThermalInput.addEventListener('change', () => {
@@ -515,22 +545,80 @@ window.addEventListener('keydown', (event) => {
 
 let timeScale = 1;
 let lastTime = performance.now();
+let lastProcessedFrame: number | null = null;
+let windowFocused = document.hasFocus() && !document.hidden;
 let cacheTrimElapsed = 0;
 let clampNextSimulationDelta = false;
 let soundWasEnabledBeforeHidden = false;
+let fpsSmoothed = 60;
+let diagnosticsElapsed = 0;
+let lowFrameRateSeconds = 0;
+let headroomSeconds = 0;
+function resetQualityTimers(): void {
+  lowFrameRateSeconds = 0;
+  headroomSeconds = 0;
+}
+function currentFrameCap(): 30 | null {
+  return settings.lowPower || !windowFocused ? 30 : null;
+}
+function setWindowFocused(focused: boolean): void {
+  if (windowFocused === focused) return;
+  windowFocused = focused;
+  resetQualityTimers();
+}
+function nextQualityStep(): number {
+  if (settings.lowPower) return 3;
+  const currentRatio = pixelRatioForStep();
+  for (let step = qualityStep + 1; step < QUALITY_PIXEL_RATIOS.length; step += 1) {
+    if (pixelRatioForStep(step) < currentRatio) return step;
+  }
+  return 3;
+}
+function previousQualityStep(): number {
+  if (qualityStep === 3) return 2;
+  const currentRatio = pixelRatioForStep();
+  for (let step = qualityStep - 1; step >= 0; step -= 1) {
+    if (pixelRatioForStep(step) > currentRatio) return step;
+  }
+  return 0;
+}
+function updateAdaptiveQuality(elapsed: number): void {
+  if (fpsSmoothed < 40) {
+    headroomSeconds = 0;
+    if (qualityStep >= 3) return;
+    lowFrameRateSeconds += elapsed;
+    if (lowFrameRateSeconds >= 10) {
+      lowFrameRateSeconds = 0;
+      qualityStep = nextQualityStep();
+      applyRenderQuality();
+    }
+    return;
+  }
+  lowFrameRateSeconds = 0;
+  if (qualityStep === 0) return;
+  headroomSeconds += elapsed;
+  if (headroomSeconds >= 60) {
+    headroomSeconds = 0;
+    qualityStep = previousQualityStep();
+    applyRenderQuality();
+  }
+}
+window.addEventListener('blur', () => setWindowFocused(false));
+window.addEventListener('focus', () => setWindowFocused(true));
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
+    setWindowFocused(false);
     soundWasEnabledBeforeHidden = !soundscape.isMuted;
     soundscape.suspendForPageHide();
     return;
   }
+  setWindowFocused(document.hasFocus());
   lastTime = performance.now();
+  lastProcessedFrame = null;
   clampNextSimulationDelta = true;
   if (soundWasEnabledBeforeHidden) soundscape.resumeForPageShow();
   soundWasEnabledBeforeHidden = false;
 });
-let fpsSmoothed = 60;
-let diagnosticsElapsed = 0;
 // Real time, not the flight time scale, so a 15-minute day stays 15 minutes during accelerated tests.
 let skySeconds = 0.36 * DAY_SECONDS;
 let skyPaused = false;
@@ -621,8 +709,15 @@ function updateFlight(delta: number, now: number): void {
 let renderedFrames = 0;
 let smokeFrameIndex = 0;
 function frame(now: number): void {
-  const rawDelta = Math.min(0.1, (now - lastTime) / 1000);
+  const cap = currentFrameCap();
+  if (cap !== null && lastProcessedFrame !== null && now - lastProcessedFrame < 1000 / cap) {
+    requestAnimationFrame(frame);
+    return;
+  }
+  const elapsed = Math.max(0, (now - lastTime) / 1000);
+  const rawDelta = Math.min(0.1, elapsed);
   lastTime = now;
+  lastProcessedFrame = now;
   const delta = clampNextSimulationDelta ? Math.min(rawDelta * timeScale, 0.1) : rawDelta * timeScale;
   clampNextSimulationDelta = false;
   updateFlight(delta, now);
@@ -661,7 +756,7 @@ function frame(now: number): void {
   }
   camera.position.copy(cameraPosition);
   camera.lookAt(lookAt);
-  terrain.update(cameraPosition.x, cameraPosition.z);
+  lastChunkBuilds = terrain.update(cameraPosition.x, cameraPosition.z, settings.lowPower ? 1 : 2);
   updateFog();
   if (!skyPaused) skySeconds += rawDelta;
   const body = currentDaylight();
@@ -684,7 +779,9 @@ function frame(now: number): void {
     renderer.render(scene, camera);
     renderedFrames += 1;
   }
-  fpsSmoothed += ((rawDelta > 0 ? 1 / rawDelta : 60) - fpsSmoothed) * 0.05;
+  const measuredFps = elapsed > 0 ? 1 / elapsed : 60;
+  fpsSmoothed += (measuredFps - fpsSmoothed) * (1 - Math.exp(-elapsed / 0.5));
+  updateAdaptiveQuality(elapsed);
   diagnosticsElapsed += rawDelta;
   if (diagnosticsVisible && diagnosticsElapsed > 0.22) {
     diagnosticsElapsed = 0;
@@ -695,7 +792,9 @@ function frame(now: number): void {
       `FPS          ${fpsSmoothed.toFixed(0)}`,
       `chunks       ${terrain.chunkCount} (${terrain.pendingCount} pending)`,
       `LOD          near ${terrain.tierCounts.near} · mid ${terrain.tierCounts.mid} · far ${terrain.tierCounts.far}`,
-      `visibility   ${fog.far.toFixed(0)} / ${settings.terrainVisibility.toFixed(0)} m`,
+      `visibility   ${fog.far.toFixed(0)} / ${effectiveTerrainVisibility().toFixed(0)} m`,
+      `cap          ${currentFrameCap() === null ? 'uncapped' : `${currentFrameCap()} fps`}`,
+      `quality step ${qualityStep}/3 · pixel ${renderer.getPixelRatio().toFixed(2)}`,
       `draw calls   ${renderer.info.render.calls}`,
       `geometries   ${renderer.info.memory.geometries}`,
       `behavior     ${state.behavior}${state.flapping ? ' (flapping)' : ''}`,
@@ -729,7 +828,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number };
+      snapshot: () => { renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean };
       advanceSimulation?: (seconds: number) => void;
       setTimeScale: (scale: number) => void;
       setTimeOfDay: (phase: number) => void;
@@ -761,9 +860,16 @@ window.__SOARING__ = {
       seed: world.seed,
       chunks: terrain.chunkCount,
       pending: terrain.pendingCount,
+      lastChunkBuilds,
       visibleDistance: fog.far,
       requestedDistance: settings.terrainVisibility,
       cameraDistance: settings.cameraDistance,
+      frameCap: currentFrameCap(),
+      lowPower: settings.lowPower,
+      chunkBuildBudget: settings.lowPower ? 1 : 2,
+      qualityStep,
+      pixelRatio: renderer.getPixelRatio(),
+      shadowsEnabled: renderer.shadowMap.enabled,
       cameraHeight: cameraPosition.y - navigator.state.y,
       behavior: navigator.state.behavior,
       flapping: navigator.state.flapping,

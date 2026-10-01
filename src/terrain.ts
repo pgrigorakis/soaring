@@ -126,19 +126,21 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
 
   get pendingCount(): number { return this.pending.length; }
 
-  update(x: number, z: number, buildBudget = 2): void {
+  update(x: number, z: number, buildBudget = 2): number {
     this.rawX = x;
     this.rawZ = z;
     const centerX = Math.floor(x / CHUNK_SIZE);
     const centerZ = Math.floor(z / CHUNK_SIZE);
     if (centerX !== this.centerX || centerZ !== this.centerZ) this.recenter(centerX, centerZ);
-    for (let built = 0; built < buildBudget && this.pending.length > 0; built += 1) {
+    let built = 0;
+    for (; built < buildBudget && this.pending.length > 0; built += 1) {
       const next = this.pending.shift()!;
       const old = this.chunks.get(next.key);
       const chunk = this.createChunk(next);
       if (old) { this.scene.remove(old.group); old.dispose(); }
       this.chunks.set(next.key, chunk);
     }
+    return built;
   }
 
   private recenter(centerX: number, centerZ: number): void {
