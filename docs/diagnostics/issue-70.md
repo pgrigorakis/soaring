@@ -26,7 +26,7 @@ Changed only smoke pixel ratio from 0.75 to 0.25. [Run 36897916494](https://gith
 
 - Development-only `?smoke` uses 0.25 pixel ratio and draws the real scene once per four animation frames. Navigation, camera easing, terrain streaming and input still run on every animation frame. Production rendering is unchanged.
 - Development-only smoke `advanceSimulation(seconds)` runs the real navigator and flight/marker/audio updates in bounded 0.1-second steps. Thermal tests advance until the real active thermal exists, within the original 300-simulated-second budget. They still check every in-range marker, active marker identity, out-of-range exclusion, persistence and re-enabling. No thermal state is injected.
-- The flight movement check advances the original 12-simulated-second interval instead of sleeping 1.5 real seconds at scale 8.
+- The flight movement check advances the original 12-simulated-second interval instead of sleeping 1.5 real seconds at scale 8. It then waits for a post-advance draw, zero pending tiles and full 720 m visibility before checking scene resources.
 - Sky screenshots wait for an actual completed scene draw after changing sky/camera state, rather than assuming three animation frames include a draw.
 - All existing tests and outcome assertions remain. The hidden/visible lifecycle test still checks real animation-frame timing and bounded first-visible simulation/streaming work; it does not use fast-forward.
 - CI retains failure traces/screenshots and per-test/frame timings for 14 days. No retries or increased timeouts were added. `workflow_dispatch` allows independent repeat validation of a branch without empty commits.
@@ -34,6 +34,8 @@ Changed only smoke pixel ratio from 0.75 to 0.25. [Run 36897916494](https://gith
 First fixed [run 36899852963](https://github.com/pgrigorakis/soaring/actions/runs/36899852963) passed all 13 tests in 122.1 seconds: 66% less than the 360.1-second captured baseline, 73% less than the 456.5-second instrumented baseline, and 58% less than the passing pixel-only run. Camera/visibility dropped to 15.3 seconds, volume migration to 12.1 seconds, pending audio start to 9.8 seconds, and thermal tracking to 11.8 seconds. These are suite times, excluding dependency/browser installation. The fixed run retained full traces, so the improvement is not from disabling trace recording.
 
 Local validation: all 50 existing unit tests, type checking and production build passed; all 13 browser smoke tests passed in 37.7 seconds. The thermal regression was run red before implementing the hook, then green using the real navigator. CI screenshots were inspected: the expected sky, eagle and terrain still render; smoke's reduced resolution is deliberately not a production visual-quality benchmark.
+
+The first ten independent dispatches passed nine suites; [run 36901200084](https://github.com/pgrigorakis/soaring/actions/runs/36901200084) exposed a new fast-forward synchronization race, not a timeout: the movement test saw temporary loaded haze of 715.57 m rather than 720 m. Flight had advanced before camera/terrain streaming caught up. Its trace and screenshot were retained. The fix waits for the exact full-coverage state and a real draw before taking the snapshot; the original exact 720 m assertion and all resource bounds remain. The final consecutive validation batch follows this correction, rather than counting only the successful runs from the first batch.
 
 ## Evidence and repeatability
 

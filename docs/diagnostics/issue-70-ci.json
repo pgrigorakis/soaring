@@ -3089,5 +3089,600 @@
       "app.smoke.ts-defaults-terr-ab999-OD-tier-out-to-the-5-km-max": "e53009bbf56b7bba00af1d05d7d543dfca0ecdcdb2ec200c269dd6c814c73030",
       "app.smoke.ts-suspends-hidd-9177d-rst-visible-simulation-step": "0f0a783c78874557d9b20a3b19de854baaa928a6bb352c91e00a877018ca3cbe"
     }
+  },
+  {
+    "url": "https://github.com/pgrigorakis/soaring/actions/runs/36901200084",
+    "label": "first validation batch: post-fast-forward loading haze race",
+    "stats": {
+      "startTime": "2026-10-01T17:42:42.089Z",
+      "duration": 121897.138,
+      "expected": 12,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "tests": [
+      {
+        "name": "renders high-detail terrain, streams, and supports camera controls",
+        "status": "failed",
+        "durationMs": 5490,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "frames": 62,
+        "frameGapMs": {
+          "median": 41.65000000000005,
+          "p95": 133.39999999999964,
+          "max": 1750
+        },
+        "snapshot": {
+          "renderedFrames": 12,
+          "seed": 395422883,
+          "chunks": 45,
+          "pending": 0,
+          "visibleDistance": 720,
+          "requestedDistance": 720,
+          "cameraDistance": 100,
+          "cameraHeight": 44.091422586252975,
+          "behavior": "gliding",
+          "flapping": true,
+          "bank": -1.7795758722457614e-12,
+          "heading": 2.714440246527757,
+          "position": [
+            606.2874927555757,
+            240.09888513420537,
+            -4975.4528027127035
+          ],
+          "geometries": 59,
+          "activeThermal": null,
+          "marker": null,
+          "markerRange": 3500,
+          "tiers": {
+            "near": 45,
+            "mid": 0,
+            "far": 0
+          },
+          "timeOfDay": 0.3616635555555558,
+          "sunElevation": 0.5528538967344712,
+          "moonElevation": -0.5528538967344712,
+          "auroraAmount": 0
+        }
+      },
+      {
+        "name": "tracks the active thermal and persists the visibility setting",
+        "status": "passed",
+        "durationMs": 10889,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "frames": 53,
+        "frameGapMs": {
+          "median": 66.6,
+          "p95": 166.69999999999982,
+          "max": 1483.3
+        },
+        "snapshot": {
+          "renderedFrames": 13,
+          "seed": -1212445990,
+          "chunks": 42,
+          "pending": 3,
+          "visibleDistance": 720,
+          "requestedDistance": 720,
+          "cameraDistance": 100,
+          "cameraHeight": 55.183221887437156,
+          "behavior": "thermal-seeking",
+          "flapping": false,
+          "bank": 0.0437188612005419,
+          "heading": 3.0329118691609884,
+          "position": [
+            4829.400710530342,
+            147.74172753027094,
+            -162.0384322019317
+          ],
+          "geometries": 61,
+          "activeThermal": [
+            4868.774539625644,
+            -434.5065862834454
+          ],
+          "marker": [
+            4868.774539625644,
+            -434.5065862834454
+          ],
+          "markerRange": 3500,
+          "tiers": {
+            "near": 42,
+            "mid": 0,
+            "far": 0
+          },
+          "timeOfDay": 0.36248155555555595,
+          "sunElevation": 0.5558127881486086,
+          "moonElevation": -0.5558127881486086,
+          "auroraAmount": 0
+        }
+      },
+      {
+        "name": "persists safe local-terrain height bounds across reloads",
+        "status": "passed",
+        "durationMs": 10045,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "frames": 19,
+        "frameGapMs": {
+          "median": 50.09999999999991,
+          "p95": 1766.6,
+          "max": 1766.6
+        },
+        "snapshot": {
+          "renderedFrames": 4,
+          "seed": 1734913285,
+          "chunks": 44,
+          "pending": 1,
+          "visibleDistance": 720,
+          "requestedDistance": 720,
+          "cameraDistance": 100,
+          "cameraHeight": 55.56373823160379,
+          "behavior": "gliding",
+          "flapping": false,
+          "bank": -0.0054292534770453895,
+          "heading": 1.3387749589059128,
+          "position": [
+            -3758.686099365855,
+            284.0512283080965,
+            -2633.1289388032287
+          ],
+          "geometries": 51,
+          "activeThermal": null,
+          "marker": null,
+          "markerRange": 3500,
+          "tiers": {
+            "near": 44,
+            "mid": 0,
+            "far": 0
+          },
+          "timeOfDay": 0.35995555555555564,
+          "sunElevation": 0.5466115088670019,
+          "moonElevation": -0.5466115088670019,
+          "auroraAmount": 0
+        }
+      },
+      {
+        "name": "visibility and camera distance persist independently",
+        "status": "passed",
+        "durationMs": 15277,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "frames": 85,
+        "frameGapMs": {
+          "median": 16.700000000000273,
+          "p95": 116.60000000000036,
+          "max": 1183.2
+        },
+        "snapshot": {
+          "renderedFrames": 21,
+          "seed": -248454326,
+          "chunks": 209,
+          "pending": 348,
+          "visibleDistance": 1956.3692377932475,
+          "requestedDistance": 3600,
+          "cameraDistance": 100,
+          "cameraHeight": 49.45354481879312,
+          "behavior": "gliding",
+          "flapping": false,
+          "bank": -0.029563790614539318,
+          "heading": -0.3150191640958212,
+          "position": [
+            -5002.3487883130465,
+            180.20781691966636,
+            827.9677815953922
+          ],
+          "geometries": 112,
+          "activeThermal": null,
+          "marker": null,
+          "markerRange": 3500,
+          "tiers": {
+            "near": 61,
+            "mid": 148,
+            "far": 0
+          },
+          "timeOfDay": 0.36270077777777815,
+          "sunElevation": 0.5566023782701172,
+          "moonElevation": -0.5566023782701172,
+          "auroraAmount": 0
+        }
+      },
+      {
+        "name": "fullscreen toggle and F keep the idle scene clear while settings and diagnostics still work",
+        "status": "passed",
+        "durationMs": 8434,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "frames": 187,
+        "frameGapMs": {
+          "median": 16.69999999999999,
+          "p95": 99.89999999999964,
+          "max": 1566.5
+        },
+        "snapshot": {
+          "renderedFrames": 44,
+          "seed": 161362565,
+          "chunks": 45,
+          "pending": 0,
+          "visibleDistance": 720,
+          "requestedDistance": 720,
+          "cameraDistance": 100,
+          "cameraHeight": 55.62985730493361,
+          "behavior": "gliding",
+          "flapping": false,
+          "bank": 0.003691336241246384,
+          "heading": 2.598478869600337,
+          "position": [
+            3555.653272904318,
+            203.53405752776828,
+            2308.406519787238
+          ],
+          "geometries": 69,
+          "activeThermal": null,
+          "marker": null,
+          "markerRange": 3500,
+          "tiers": {
+            "near": 45,
+            "mid": 0,
+            "far": 0
+          },
+          "timeOfDay": 0.365107333333334,
+          "sunElevation": 0.5651760076065778,
+          "moonElevation": -0.5651760076065778,
+          "auroraAmount": 0
+        }
+      },
+      {
+        "name": "defaults terrain visibility to 5 km and streams bounded work at each LOD tier out to the 5 km max",
+        "status": "passed",
+        "durationMs": 11945,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "frames": 106,
+        "frameGapMs": {
+          "median": 33.30000000000018,
+          "p95": 166.70000000000073,
+          "max": 1566.6
+        },
+        "snapshot": {
+          "renderedFrames": 26,
+          "seed": -948261032,
+          "chunks": 205,
+          "pending": 392,
+          "visibleDistance": 1776.0291951064055,
+          "requestedDistance": 4920,
+          "cameraDistance": 100,
+          "cameraHeight": 55.62259102885213,
+          "behavior": "gliding",
+          "flapping": false,
+          "bank": 0.004167869635605609,
+          "heading": -2.524244661941987,
+          "position": [
+            -269.6962323973332,
+            130.18505034017173,
+            5130.903891526261
+          ],
+          "geometries": 114,
+          "activeThermal": null,
+          "marker": null,
+          "markerRange": 3500,
+          "tiers": {
+            "near": 61,
+            "mid": 143,
+            "far": 1
+          },
+          "timeOfDay": 0.36428644444444486,
+          "sunElevation": 0.5622709267887844,
+          "moonElevation": -0.5622709267887844,
+          "auroraAmount": 0
+        }
+      },
+      {
+        "name": "settings stay scrollable within short desktop and mobile viewports",
+        "status": "passed",
+        "durationMs": 3206,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "frames": 50,
+        "frameGapMs": {
+          "median": 16.700000000000006,
+          "p95": 66.59999999999991,
+          "max": 1483.2
+        },
+        "snapshot": {
+          "renderedFrames": 10,
+          "seed": -857728798,
+          "chunks": 45,
+          "pending": 0,
+          "visibleDistance": 720,
+          "requestedDistance": 720,
+          "cameraDistance": 100,
+          "cameraHeight": 55.59076994058299,
+          "behavior": "gliding",
+          "flapping": false,
+          "bank": 0.0015929049471405036,
+          "heading": 0.07086211065016022,
+          "position": [
+            -3490.6120322571714,
+            151.72500112534064,
+            -1732.5224979073907
+          ],
+          "geometries": 45,
+          "activeThermal": null,
+          "marker": null,
+          "markerRange": 3500,
+          "tiers": {
+            "near": 45,
+            "mid": 0,
+            "far": 0
+          },
+          "timeOfDay": 0.36017333333333335,
+          "sunElevation": 0.5474122624077168,
+          "moonElevation": -0.5474122624077168,
+          "auroraAmount": 0
+        }
+      },
+      {
+        "name": "migrates prior volume, saves independent controls, and preserves mute on reload",
+        "status": "passed",
+        "durationMs": 12199,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "frames": 9,
+        "frameGapMs": {
+          "median": 49.90000000000009,
+          "p95": 1583.3000000000002,
+          "max": 1583.3000000000002
+        },
+        "snapshot": {
+          "renderedFrames": 2,
+          "seed": -696481789,
+          "chunks": 65,
+          "pending": 535,
+          "visibleDistance": 986.2389908036512,
+          "requestedDistance": 5000,
+          "cameraDistance": 100,
+          "cameraHeight": 55.45995918350425,
+          "behavior": "gliding",
+          "flapping": false,
+          "bank": 0.060494472494419214,
+          "heading": 0.47219150887582606,
+          "position": [
+            -4969.929919369919,
+            137.9011393837214,
+            -2496.269603278911
+          ],
+          "geometries": 56,
+          "activeThermal": null,
+          "marker": null,
+          "markerRange": 3500,
+          "tiers": {
+            "near": 61,
+            "mid": 4,
+            "far": 0
+          },
+          "timeOfDay": 0.3594384444444445,
+          "sunElevation": 0.5447044900754984,
+          "moonElevation": -0.5447044900754984,
+          "auroraAmount": 0
+        }
+      },
+      {
+        "name": "the first mute gesture and a pending audio start respect the saved mute choice",
+        "status": "passed",
+        "durationMs": 8932,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "frames": 50,
+        "frameGapMs": {
+          "median": 26.69999999999113,
+          "p95": 150,
+          "max": 1666.6000000000001
+        },
+        "snapshot": {
+          "renderedFrames": 12,
+          "seed": 1854659647,
+          "chunks": 134,
+          "pending": 463,
+          "visibleDistance": 1445.7491023622065,
+          "requestedDistance": 5000,
+          "cameraDistance": 100,
+          "cameraHeight": 55.61491366410735,
+          "behavior": "gliding",
+          "flapping": false,
+          "bank": -0.08888410416552715,
+          "heading": -0.876009803440777,
+          "position": [
+            -3390.9730054031515,
+            131.6140053509398,
+            3956.083034828957
+          ],
+          "geometries": 116,
+          "activeThermal": null,
+          "marker": null,
+          "markerRange": 3500,
+          "tiers": {
+            "near": 61,
+            "mid": 73,
+            "far": 0
+          },
+          "timeOfDay": 0.3611563333333335,
+          "sunElevation": 0.5510091559125598,
+          "moonElevation": -0.5510091559125598,
+          "auroraAmount": 0
+        }
+      },
+      {
+        "name": "suspends hidden audio and bounds the first visible simulation step",
+        "status": "passed",
+        "durationMs": 5289,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "frames": 57,
+        "frameGapMs": {
+          "median": 33.30000000000018,
+          "p95": 150,
+          "max": 1699.9
+        },
+        "snapshot": {
+          "renderedFrames": 12,
+          "seed": -621898681,
+          "chunks": 45,
+          "pending": 0,
+          "visibleDistance": 720,
+          "requestedDistance": 720,
+          "cameraDistance": 100,
+          "cameraHeight": 58.90214506594333,
+          "behavior": "gliding",
+          "flapping": false,
+          "bank": 0.00014432031068909473,
+          "heading": 2.877953333076647,
+          "position": [
+            2767.479402138347,
+            138.73921148313917,
+            -2897.337597091724
+          ],
+          "geometries": 66,
+          "activeThermal": null,
+          "marker": null,
+          "markerRange": 3500,
+          "tiers": {
+            "near": 45,
+            "mid": 0,
+            "far": 0
+          },
+          "timeOfDay": 0.3611490000000001,
+          "sunElevation": 0.5509824288449301,
+          "moonElevation": -0.5509824288449301,
+          "auroraAmount": 0
+        }
+      },
+      {
+        "name": "renders daytime, aurora, and midnight sky states",
+        "status": "passed",
+        "durationMs": 6182,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "frames": 88,
+        "frameGapMs": {
+          "median": 16.70000000000001,
+          "p95": 199.9000000000001,
+          "max": 1549.9
+        },
+        "snapshot": {
+          "renderedFrames": 19,
+          "seed": 5,
+          "chunks": 45,
+          "pending": 0,
+          "visibleDistance": 720,
+          "requestedDistance": 720,
+          "cameraDistance": 100,
+          "cameraHeight": 10.228271398128896,
+          "behavior": "gliding",
+          "flapping": false,
+          "bank": 0.027182253682812112,
+          "heading": -1.86184506799304,
+          "position": [
+            -2590.5899341321065,
+            151.56828471619693,
+            2755.0934695702845
+          ],
+          "geometries": 88,
+          "activeThermal": null,
+          "marker": null,
+          "markerRange": 3500,
+          "tiers": {
+            "near": 45,
+            "mid": 0,
+            "far": 0
+          },
+          "timeOfDay": 0,
+          "sunElevation": -0.788010753606722,
+          "moonElevation": 0.788010753606722,
+          "auroraAmount": 1
+        }
+      },
+      {
+        "name": "shows drainage water from altitude without page errors",
+        "status": "passed",
+        "durationMs": 15776,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "frames": 148,
+        "frameGapMs": {
+          "median": 33.399999999999636,
+          "p95": 283.2999999999993,
+          "max": 1799.9
+        },
+        "snapshot": {
+          "renderedFrames": 34,
+          "seed": -1739425816,
+          "chunks": 246,
+          "pending": 363,
+          "visibleDistance": 5000,
+          "requestedDistance": 5000,
+          "cameraDistance": 100,
+          "cameraHeight": 791.2603624961032,
+          "behavior": "gliding",
+          "flapping": false,
+          "bank": -0.000510937732081579,
+          "heading": -2.3241886781585945,
+          "position": [
+            4063.974943691087,
+            110.01642035253005,
+            -941.9846604678538
+          ],
+          "geometries": 125,
+          "activeThermal": null,
+          "marker": null,
+          "markerRange": 3500,
+          "tiers": {
+            "near": 72,
+            "mid": 173,
+            "far": 1
+          },
+          "timeOfDay": 0.5,
+          "sunElevation": 0.788010753606722,
+          "moonElevation": -0.788010753606722,
+          "auroraAmount": 0
+        }
+      },
+      {
+        "name": "a blocked browser audio context keeps the mute control usable without page errors",
+        "status": "passed",
+        "durationMs": 3694,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "frames": 31,
+        "frameGapMs": {
+          "median": 16.69999999999999,
+          "p95": 183.30000000000018,
+          "max": 1650
+        },
+        "snapshot": {
+          "renderedFrames": 5,
+          "seed": 1258074316,
+          "chunks": 45,
+          "pending": 0,
+          "visibleDistance": 720,
+          "requestedDistance": 720,
+          "cameraDistance": 100,
+          "cameraHeight": 55.54210374250165,
+          "behavior": "gliding",
+          "flapping": false,
+          "bank": 0.25577262425548386,
+          "heading": -0.19492646248798604,
+          "position": [
+            -3381.1371271272933,
+            127.91788527949707,
+            2063.746318475514
+          ],
+          "geometries": 55,
+          "activeThermal": null,
+          "marker": null,
+          "markerRange": 3500,
+          "tiers": {
+            "near": 45,
+            "mid": 0,
+            "far": 0
+          },
+          "timeOfDay": 0.3597356666666667,
+          "sunElevation": 0.5458015649546011,
+          "moonElevation": -0.5458015649546011,
+          "auroraAmount": 0
+        }
+      }
+    ],
+    "traceSHA256": {
+      "app.smoke.ts-renders-high--37911-nd-supports-camera-controls": "1ce0d5201332c7292b96bb952668b7170384e517fdb4531d906f58b6bf7407a5"
+    }
   }
 ]

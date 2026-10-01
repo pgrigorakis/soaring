@@ -83,8 +83,12 @@ test('renders high-detail terrain, streams, and supports camera controls', async
   await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0);
   const before = await page.evaluate(() => window.__SOARING__.snapshot());
   await page.evaluate(() => window.__SOARING__.advanceSimulation!(12));
-  // Observe a real streamed/rendered frame after flight advances, not stale scene counters.
-  await page.waitForFunction((rendered) => window.__SOARING__.snapshot().renderedFrames > rendered, before.renderedFrames);
+  // Flight can cross a tile boundary. Wait for real streaming and a post-advance
+  // draw before checking the full 720 m coverage, not a transient loading haze.
+  await page.waitForFunction((rendered) => {
+    const snapshot = window.__SOARING__.snapshot();
+    return snapshot.renderedFrames > rendered && snapshot.pending === 0 && snapshot.visibleDistance === 720;
+  }, before.renderedFrames);
   const after = await page.evaluate(() => window.__SOARING__.snapshot());
   expect(Math.hypot(after.position[0]! - before.position[0]!, after.position[2]! - before.position[2]!)).toBeGreaterThan(8);
   expect(after.chunks).toBeLessThanOrEqual(49);
