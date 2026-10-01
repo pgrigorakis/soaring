@@ -5,9 +5,15 @@ export const DAY_SECONDS = 15 * 60;
 const MAX_ELEVATION = 52 * Math.PI / 180;
 const SUN_PEAK_INTENSITY = 3.6;
 const MOON_PEAK_INTENSITY = 1.7;
+const AURORA_PROBABILITY = 0.2;
 
 export type Vec3 = { x: number; y: number; z: number };
 export type RGB = { r: number; g: number; b: number };
+
+/** Index by dusk so one seeded choice spans sunset, midnight, and dawn. */
+export function nightCycle(seconds: number): number {
+  return Math.floor(seconds / DAY_SECONDS + 0.25);
+}
 
 export type Daylight = {
   /** 0 midnight, 0.25 dawn, 0.5 noon, 0.75 dusk. */
@@ -37,12 +43,48 @@ function smoothstep(edge0: number, edge1: number, value: number): number {
   return t * t * (3 - 2 * t);
 }
 
+function seededNightValue(seed: number, cycle: number): number {
+  let hash = (Math.imul(cycle + 1, 0x9e3779b1) ^ seed) | 0;
+  hash = Math.imul(hash ^ (hash >>> 16), 0x21f0aaad);
+  hash = Math.imul(hash ^ (hash >>> 15), 0x735a2d97);
+  hash ^= hash >>> 15;
+  return (hash >>> 0) / 4294967296;
+}
+
+/** Seeded aurora nights. An aurora blocks the next two complete day/night cycles. */
+export class AuroraSchedule {
+  private readonly nights: boolean[] = [];
+
+  constructor(private readonly seed: number) {}
+
+  hasAurora(cycle: number): boolean {
+    const target = Math.floor(cycle);
+    if (!Number.isSafeInteger(target) || target < 0) return false;
+
+    while (this.nights.length <= target) {
+      const nextCycle = this.nights.length;
+      const coolingDown = this.nights[nextCycle - 1] || this.nights[nextCycle - 2];
+      this.nights.push(!coolingDown && seededNightValue(this.seed, nextCycle) < AURORA_PROBABILITY);
+    }
+    return this.nights[target]!;
+  }
+}
+
 /** Zero at and below the horizon, so a body can take the shadow light before it contributes. */
 function directionalIntensity(elevation: number, peak: number): number {
   if (elevation <= 0) return 0;
   const t = Math.min(1, elevation / Math.sin(MAX_ELEVATION));
   const rise = t * t * (3 - 2 * t);
   return peak * rise;
+}
+
+/** Aurora intensity for a scheduled night, with smooth dusk/dawn fades and a strict daylight cutoff. */
+export function auroraAmount(body: Daylight, scheduled: boolean): number {
+  if (!scheduled || body.night <= 0) return 0;
+  const nightProgress = (body.phase >= 0.75 ? body.phase - 0.75 : body.phase + 0.25) * 2;
+  const fadeIn = smoothstep(0.04, 0.24, nightProgress);
+  const fadeOut = 1 - smoothstep(0.76, 0.96, nightProgress);
+  return body.night * fadeIn * fadeOut;
 }
 
 /**
