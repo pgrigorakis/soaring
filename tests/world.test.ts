@@ -21,6 +21,19 @@ describe('deterministic world generation', () => {
     expect(first.thermalAtCell(-2, 7)).toEqual(second.thermalAtCell(-2, 7));
   });
 
+  it('recomputes identical world data after all cached entries are evicted', () => {
+    const world = new WorldModel(seedFromText('cache-eviction'));
+    const points = [[0, 0], [359.99, -720], [12503.4, 9921.7], [-880, 440]];
+    const terrain = points.map(([x, z]) => world.sample(x!, z!));
+    const thermal = world.thermalAtCell(-2, 7);
+    const reaches = world.reachesNear(900, -1400);
+
+    expect(world.trim(0)).toEqual({ thermals: 0, riverNodes: 0, nearbyReaches: 0 });
+    expect(points.map(([x, z]) => world.sample(x!, z!))).toEqual(terrain);
+    expect(world.thermalAtCell(-2, 7)).toEqual(thermal);
+    expect(world.reachesNear(900, -1400)).toEqual(reaches);
+  });
+
   it('generates the same tree positions and forms after a chunk is rebuilt', () => {
     const first = new WorldModel(80231);
     const second = new WorldModel(80231);
