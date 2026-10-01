@@ -609,6 +609,19 @@ function currentDaylight(): Daylight {
   return daylight(skySeconds);
 }
 
+const smokeFrameTiming: Record<string, { count: number; total: number; max: number }> = {};
+function measureSmoke<T>(name: string, work: () => T): T {
+  if (!smokeMode) return work();
+  const start = performance.now();
+  const result = work();
+  const elapsed = performance.now() - start;
+  const timing = smokeFrameTiming[name] ??= { count: 0, total: 0, max: 0 };
+  timing.count += 1;
+  timing.total += elapsed;
+  timing.max = Math.max(timing.max, elapsed);
+  return result;
+}
+
 function frame(now: number): void {
   const rawDelta = Math.min(0.1, (now - lastTime) / 1000);
   lastTime = now;
@@ -654,11 +667,11 @@ function frame(now: number): void {
   }
   camera.position.copy(cameraPosition);
   camera.lookAt(lookAt);
-  terrain.update(cameraPosition.x, cameraPosition.z);
+  measureSmoke('terrain', () => terrain.update(cameraPosition.x, cameraPosition.z));
   updateFog();
   if (!skyPaused) skySeconds += rawDelta;
   const body = currentDaylight();
-  applyDaylight(body, rawDelta, false);
+  measureSmoke('daylight', () => applyDaylight(body, rawDelta, false));
 
   keyLight.target.position.set(camera.position.x, world.sample(camera.position.x, camera.position.z).height, camera.position.z);
   updateShadowBasis(keyDir);
@@ -671,7 +684,7 @@ function frame(now: number): void {
     cacheTrimElapsed -= 1;
     world.trim(WORLD_CACHE_LIMIT);
   }
-  renderer.render(scene, camera);
+  measureSmoke('render', () => renderer.render(scene, camera));
   fpsSmoothed += ((rawDelta > 0 ? 1 / rawDelta : 60) - fpsSmoothed) * 0.05;
   diagnosticsElapsed += rawDelta;
   if (diagnosticsVisible && diagnosticsElapsed > 0.22) {
@@ -717,7 +730,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number };
+      snapshot: () => { frameTiming: typeof smokeFrameTiming; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number };
       setTimeScale: (scale: number) => void;
       setTimeOfDay: (phase: number) => void;
       lookAtBody: (body: 'sun' | 'moon' | 'horizon' | 'chase') => void;
@@ -737,6 +750,7 @@ window.__SOARING__ = {
     const activeMarker = placed.find((marker) => marker.active);
     const body = currentDaylight();
     return {
+      frameTiming: smokeFrameTiming,
       seed: world.seed,
       chunks: terrain.chunkCount,
       pending: terrain.pendingCount,
