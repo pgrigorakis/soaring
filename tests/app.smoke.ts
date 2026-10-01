@@ -208,13 +208,34 @@ test('fades thermal clouds out after their thermal leaves range', async ({ page 
   });
   await page.evaluate(({ x, z }) => window.__SOARING__.setCloudOrigin!({ x, z }), target);
   await page.waitForFunction(({ x, z }) => window.__SOARING__.snapshot().clouds.some((cloud) => cloud[3] === x && cloud[4] === z && cloud[5]! >= 0.95), target);
-  await page.evaluate(({ x, z }) => window.__SOARING__.setCloudOrigin!({ x: x + 10_000, z: z + 10_000 }), target);
-  await page.waitForTimeout(2_000);
-  const halfway = await page.evaluate(({ x, z }) => window.__SOARING__.snapshot().clouds
-    .find((cloud) => cloud[3] === x && cloud[4] === z)?.[5], target);
-  expect(halfway).toBeGreaterThan(0.3);
-  expect(halfway).toBeLessThan(0.7);
-  await page.waitForFunction(({ x, z }) => !window.__SOARING__.snapshot().clouds.some((cloud) => cloud[3] === x && cloud[4] === z), target, { timeout: 6_000 });
+  const fades = await page.evaluate(({ x, z }) => {
+    window.__SOARING__.setCloudOrigin!({ x: x + 10_000, z: z + 10_000 });
+    const values: number[] = [];
+    return new Promise<number[]>((resolve) => {
+      const start = performance.now();
+      const sample = () => {
+        const fade = window.__SOARING__.snapshot().clouds
+          .find((cloud) => cloud[3] === x && cloud[4] === z)?.[5] ?? 0;
+        values.push(fade);
+        if (fade === 0 || performance.now() - start >= 6_000) {
+          resolve(values);
+          return;
+        }
+        requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    });
+  }, target);
+  expect(fades.at(-1)).toBe(0);
+  const visibleFades = fades.filter((fade) => fade > 0);
+  expect(visibleFades.length).toBeGreaterThan(10);
+  expect(visibleFades[0]).toBeLessThan(1);
+  for (let index = 1; index < fades.length; index += 1) {
+    const previous = fades[index - 1]!;
+    const current = fades[index]!;
+    expect(current).toBeLessThanOrEqual(previous + 1e-6);
+    expect(previous - current).toBeLessThan(0.03);
+  }
 });
 
 test('persists safe local-terrain height bounds across reloads', async ({ page }) => {
