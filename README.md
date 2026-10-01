@@ -39,13 +39,15 @@ A world clock runs a 15-minute day. The sun and a full moon sit on opposite side
 
 The hidden panel reports smoothed frame rate, loaded and pending chunks, loaded chunk counts per level of detail, current and selected visibility, draw calls, GPU geometry count, eagle behavior, terrain clearance, position, selected thermal, nearby thermal locations, and simulation speed.
 
-For an accelerated resource/stability check, run `window.__SOARING__.setTimeScale(n)` in the browser console. The scale is capped at 12×, and each frame runs bounded 0.1 s simulation substeps so the reported scale is the real one. `window.__SOARING__.snapshot()` exposes a small smoke-test snapshot. This supports practical traversal and resource checks without waiting one literal hour.
+For an accelerated resource/stability check, run `window.__SOARING__.setTimeScale(n)` in the browser console. The scale is capped at 12×, and each frame runs bounded 0.1 s simulation substeps. Wall-clock frame deltas are capped at 0.1 s, so slow rendering can reduce the effective simulation speed. `window.__SOARING__.snapshot()` exposes a small smoke-test snapshot. This supports practical traversal and resource checks without waiting one literal hour.
 
 ```sh
 npm test             # deterministic generation and long-flight navigation
 npm run test:smoke  # real Chromium render/stream/control smoke test
 npm run check        # unit tests and production type/build check
 ```
+
+The development-only `?smoke` mode keeps the real scene, shaders, terrain budgets and controls, but uses a 0.25 pixel ratio, no shadows, and one scene draw per four animation frames. Simulation, camera easing and streaming still run on every frame. Only this mode exposes `window.__SOARING__.advanceSimulation(seconds)` (0–300 seconds, in bounded navigation steps); tests use it for flight-state assertions instead of waiting on wall time. Sky screenshots wait for `snapshot().renderedFrames` to advance, not an assumed frame count. CI uploads `smoke-evidence` with per-test timings, frame-gap/long-task measurements, screenshots and retained failure traces for 14 days. There are no retries.
 
 The product reliability target is one uninterrupted hour without intervention or obvious repetition. The automated navigation test simulates one hour at 10 Hz across several flight-height ranges. Browser validation is intentionally shorter and accelerated; it does not claim a literal one-hour browser soak.
 

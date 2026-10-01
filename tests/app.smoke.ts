@@ -7,6 +7,38 @@ type TestWindow = Window & {
   __visibilityCapture?: { completed: boolean; snapshot: ReturnType<typeof window.__SOARING__.snapshot> | null };
 };
 
+// Record frame starvation independently of the simulation's clamped clock.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const gaps: number[] = [];
+    const tasks: number[] = [];
+    let previous = performance.now();
+    const sample = (now: number) => {
+      gaps.push(now - previous);
+      previous = now;
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+    new PerformanceObserver((list) => {
+      tasks.push(...list.getEntries().map((entry) => entry.duration));
+    }).observe({ type: 'longtask', buffered: true });
+    Object.assign(window, { __smokeTiming: { gaps, tasks } });
+  });
+});
+
+test.afterEach(async ({ page }, testInfo) => {
+  if (page.isClosed()) return;
+  const timing = await page.evaluate(() => {
+    const measured = (window as Window & { __smokeTiming?: { gaps: number[]; tasks: number[] } }).__smokeTiming;
+    const canvas = document.querySelector('canvas');
+    const gl = canvas?.getContext('webgl2');
+    const debug = gl?.getExtension('WEBGL_debug_renderer_info');
+    return { ...measured, renderer: debug ? gl?.getParameter(debug.UNMASKED_RENDERER_WEBGL) : null,
+      snapshot: window.__SOARING__?.snapshot() };
+  });
+  await testInfo.attach('frame-timing', { body: JSON.stringify(timing), contentType: 'application/json' });
+});
+
 function captureErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
@@ -50,7 +82,13 @@ test('renders high-detail terrain, streams, and supports camera controls', async
   await page.evaluate(() => window.__SOARING__.setTimeScale(8));
   await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0);
   const before = await page.evaluate(() => window.__SOARING__.snapshot());
-  await page.waitForTimeout(1500);
+  await page.evaluate(() => window.__SOARING__.advanceSimulation!(12));
+  // Flight can cross a tile boundary. Wait for real streaming and a post-advance
+  // draw before checking the full 720 m coverage, not a transient loading haze.
+  await page.waitForFunction((rendered) => {
+    const snapshot = window.__SOARING__.snapshot();
+    return snapshot.renderedFrames > rendered && snapshot.pending === 0 && snapshot.visibleDistance === 720;
+  }, before.renderedFrames);
   const after = await page.evaluate(() => window.__SOARING__.snapshot());
   expect(Math.hypot(after.position[0]! - before.position[0]!, after.position[2]! - before.position[2]!)).toBeGreaterThan(8);
   expect(after.chunks).toBeLessThanOrEqual(49);
@@ -70,6 +108,18 @@ test('renders high-detail terrain, streams, and supports camera controls', async
   await page.mouse.up();
   expect(errors).toEqual([]);
 });
+
+async function advanceToThermal(page: Page): Promise<void> {
+  // Exercise the real navigator in the same bounded steps as the frame loop. The old
+  // 25 s × 12 budget meant 300 simulated seconds only when rendering kept up.
+  const active = await page.evaluate(() => {
+    for (let step = 0; step < 3000 && window.__SOARING__.snapshot().activeThermal === null; step += 1) {
+      window.__SOARING__.advanceSimulation!(0.1);
+    }
+    return window.__SOARING__.snapshot().activeThermal;
+  });
+  expect(active).not.toBeNull();
+}
 
 function expectMarkersInRange(snapshot: {
   position: number[];
@@ -100,8 +150,7 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
   const setting = page.getByRole('checkbox', { name: 'Show thermal' });
   await openSettings(page);
   await expect(setting).toBeChecked();
-  await page.evaluate(() => window.__SOARING__.setTimeScale(12));
-  await page.waitForFunction(() => window.__SOARING__.snapshot().activeThermal !== null, undefined, { timeout: 25_000 });
+  await advanceToThermal(page);
   const active = await page.evaluate(() => window.__SOARING__.snapshot());
   expectMarkersInRange(active);
   expect(active.marker).toEqual(active.activeThermal);
@@ -111,8 +160,7 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
   await page.reload();
   await openSettings(page);
   await expect(setting).not.toBeChecked();
-  await page.evaluate(() => window.__SOARING__.setTimeScale(12));
-  await page.waitForFunction(() => window.__SOARING__.snapshot().activeThermal !== null, undefined, { timeout: 25_000 });
+  await advanceToThermal(page);
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).marker).toBeNull();
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).markers).toEqual([]);
   await setting.check();
@@ -491,11 +539,12 @@ test('renders daytime, aurora, and midnight sky states', async ({ page }) => {
   });
 
   async function showPhase(phase: number, name: string, look: 'sun' | 'moon' | 'horizon' | 'chase'): Promise<{ timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number }> {
-    await page.evaluate((value) => window.__SOARING__.setTimeOfDay(value), phase);
-    await page.evaluate((body) => window.__SOARING__.lookAtBody(body), look);
-    await page.evaluate(() => new Promise((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve(undefined))));
-    }));
+    const rendered = await page.evaluate(({ phase, look }) => {
+      window.__SOARING__.setTimeOfDay(phase);
+      window.__SOARING__.lookAtBody(look);
+      return window.__SOARING__.snapshot().renderedFrames;
+    }, { phase, look });
+    await page.waitForFunction((before) => window.__SOARING__.snapshot().renderedFrames > before, rendered);
     const shot = await page.screenshot({ path: `test-results/sky-${name}.png` });
     expect(shot.byteLength).toBeGreaterThan(1000);
     return page.evaluate(() => {
