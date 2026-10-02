@@ -813,6 +813,8 @@ function frame(now: number): void {
     diagnostics.textContent = [
       `FPS          ${fpsSmoothed.toFixed(0)}`,
       `chunks       ${terrain.chunkCount} (${terrain.pendingCount} pending)`,
+      `build ms     ${terrain.buildTiming.meanMs.toFixed(2)} mean · ${terrain.buildTiming.maxMs.toFixed(2)} max`,
+      `biome        ${Object.entries(world.sample(state.x, state.z).biome).map(([name, weight]) => `${name} ${weight.toFixed(2)}`).join(' · ')}`,
       `LOD          near ${terrain.tierCounts.near} · mid ${terrain.tierCounts.mid} · far ${terrain.tierCounts.far}`,
       `visibility   ${fog.far.toFixed(0)} / ${effectiveTerrainVisibility().toFixed(0)} m`,
       `cap          ${currentFrameCap() === null ? 'uncapped' : `${currentFrameCap()} fps`}`,
@@ -851,7 +853,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean };
       advanceSimulation?: (seconds: number) => void;
       reviewFlight?: (start: { x: number; z: number; heading: number } | null) => void;
       setTimeScale: (scale: number) => void;
@@ -900,6 +902,7 @@ window.__SOARING__ = {
     const body = currentDaylight();
     return {
       renderedFrames,
+      buildTiming: terrain.buildTiming,
       seed: world.seed,
       chunks: terrain.chunkCount,
       pending: terrain.pendingCount,

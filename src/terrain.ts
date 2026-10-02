@@ -1,13 +1,67 @@
 import * as THREE from 'three';
-import { fbm, hash2, highlandWeight, type LandscapeSample, WorldModel } from './world';
+import { fbm, hash2, type LandscapeSample, type Tree, WorldModel } from './world';
 
 /** Snow stays white; lighting supplies the blue shade. Steep faces remain granite. */
 export function snowCover(sample: LandscapeSample, slope: number, x: number, z: number, seed: number): number {
   if (sample.water || slope >= Math.tan(40 * Math.PI / 180) || sample.height < 380) return 0;
-  if (sample.height >= 420) return highlandWeight(sample.mountainRegion);
+  if (sample.height >= 420) return sample.biome.highlands;
   const altitude = (sample.height - 380) / 40;
   const patch = fbm(x / 85, z / 85, seed + 389, 2) * 0.5 + 0.5;
-  return highlandWeight(sample.mountainRegion) * THREE.MathUtils.smoothstep(altitude, patch * 0.65, patch * 0.65 + 0.35);
+  return sample.biome.highlands * THREE.MathUtils.smoothstep(altitude, patch * 0.65, patch * 0.65 + 0.35);
+}
+
+import { BIOME_PROFILES } from './biome';
+
+const palettes = Object.fromEntries(Object.entries(BIOME_PROFILES).map(([key, profile]) =>
+  [key, profile.palette.map((hex) => new THREE.Color(hex))])) as Record<keyof typeof BIOME_PROFILES, THREE.Color[]>;
+const legacyGround = new THREE.Color(0x6fa03c);
+const graniteGround = new THREE.Color(0x857e72);
+const peatGround = new THREE.Color(0x2e4a4a);
+const hedgeGround = new THREE.Color(0x2e6b34);
+const gladeFlowers = [0xe6c43a, 0xd2553f, 0xb06fa6].map((hex) => new THREE.Color(hex));
+const flecks = [0xe6c43a, 0xd2553f, 0xe1b93a].map((hex) => new THREE.Color(hex));
+const scratch = new THREE.Color();
+const highlandPalette = [0x7da548, 0x1e4e3a, 0x6e685e, 0xafa28a, 0x9a9489, 0xf2f4f7].map((hex) => new THREE.Color(hex));
+
+/** All palette choices are world-sample based, including the shared vertices of adjacent chunks. */
+export function terrainColor(sample: LandscapeSample, x: number, z: number, seed: number, target: THREE.Color, slope = 0, normalY = 1): THREE.Color {
+  const { biome } = sample;
+  const hill = palettes.hills[sample.field < 0.55 ? 2 : sample.field < 0.85 ? 0 : 1]!;
+  target.copy(hill).lerp(hedgeGround, sample.hedge).multiplyScalar(biome.hills);
+  const woodlandPatch = biome.woodland > 0 ? 0.5 + fbm(x / 180, z / 180, seed + 162, 2) * 0.5 : 0;
+  scratch.copy(palettes.woodland[0]!).lerp(palettes.woodland[2]!, woodlandPatch)
+    .lerp(palettes.woodland[3]!, sample.glade).multiplyScalar(biome.woodland);
+  target.add(scratch);
+  const patch = sample.moorPatch * 3;
+  const index = Math.min(2, Math.floor(patch));
+  scratch.copy(palettes.moor[index]!).lerp(palettes.moor[index + 1]!, patch - index).multiplyScalar(biome.moor);
+  target.add(scratch);
+  scratch.copy(highlandPalette[0]!);
+  if (sample.forest > 0.55) scratch.copy(highlandPalette[1]!);
+  else if (sample.height > 340 || slope > 0.5) scratch.copy(highlandPalette[2]!).lerp(highlandPalette[3]!, THREE.MathUtils.clamp(normalY - 0.3, 0, 1));
+  else if (sample.height > 320) scratch.lerp(highlandPalette[4]!, THREE.MathUtils.smoothstep(sample.height, 320, 340));
+  const snow = biome.highlands > 0 ? snowCover(sample, slope, x, z, seed) / biome.highlands : 0;
+  scratch.lerp(highlandPalette[5]!, snow).multiplyScalar(biome.highlands);
+  target.add(scratch);
+  scratch.copy(legacyGround).multiplyScalar(biome.lakeland);
+  target.add(scratch).lerp(graniteGround, sample.rock * (biome.hills + biome.woodland + biome.moor));
+  const jitter = hash2(Math.round(x), Math.round(z), seed + 310);
+  if (jitter < 0.012) target.lerp(flecks[jitter < 0.002 ? 1 : 0]!, biome.hills * 0.65);
+  if (jitter > 0.985) target.lerp(flecks[2]!, biome.moor * 0.7);
+  if (biome.woodland * sample.glade > 0.1 && jitter < 0.2
+    && fbm(x / 65, z / 65, seed + 163, 2) > 0.22) {
+    target.lerp(gladeFlowers[Math.floor(jitter * 15)]!, biome.woodland * sample.glade * 0.7);
+  }
+  target.lerp(peatGround, sample.peat);
+  if (sample.water) target.set(sample.peat > 0 ? 0x2e4a4a : 0x2f6e6a);
+  return target;
+}
+
+function treeColor(tree: Tree, target: THREE.Color): THREE.Color {
+  target.set(tree.tint).multiplyScalar(1 - tree.biome.hills - tree.biome.highlands);
+  target.add(scratch.copy(hedgeGround).multiplyScalar(tree.biome.hills));
+  target.add(scratch.copy(highlandPalette[1]!).multiplyScalar(tree.biome.highlands));
+  return target;
 }
 
 export const CHUNK_SIZE = 360;
@@ -41,6 +95,13 @@ export class TerrainStream {
   private rawX = 0;
   private rawZ = 0;
   private pending: Pending[] = [];
+  private buildTotalMs = 0;
+  private buildCount = 0;
+  private buildMaxMs = 0;
+
+  get buildTiming(): { chunks: number; meanMs: number; maxMs: number } {
+    return { chunks: this.buildCount, meanMs: this.buildTotalMs / Math.max(1, this.buildCount), maxMs: this.buildMaxMs };
+  }
 
   private readonly terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0 });
   // Fades the shadow to fully lit near the fixed shadow camera's edge, in place of a hard cutoff.
@@ -57,9 +118,9 @@ export class TerrainStream {
   });
   private readonly trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1 });
   private readonly foliageMaterials = [
-    new THREE.MeshStandardMaterial({ color: 0x1f5a34, roughness: 1, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: 0x2e7a3e, roughness: 1, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: 0x5c9443, roughness: 1, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
   ];
   private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x857e72, roughness: 1, flatShading: true });
   private readonly trunkGeometry = new THREE.CylinderGeometry(0.8, 1.35, 9, 5);
@@ -69,6 +130,9 @@ export class TerrainStream {
     new THREE.IcosahedronGeometry(3.7, 1), // tall, narrow tree
   ];
   private readonly rockGeometry = new THREE.DodecahedronGeometry(4.5, 0);
+  private readonly torGeometry = new THREE.BoxGeometry(6, 3.2, 5);
+  private readonly hedgeGeometry = new THREE.DodecahedronGeometry(1, 0);
+  private readonly hedgeMaterial = new THREE.MeshStandardMaterial({ color: 0x2e6b34, roughness: 1, flatShading: true });
   // Distant trees keep the near placement, trunks, and colors with two draw calls per tile.
   private readonly farCrownGeometry = new THREE.IcosahedronGeometry(5.4, 0);
   private readonly farFoliageMaterial = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });
@@ -146,7 +210,12 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     for (; built < buildBudget && this.pending.length > 0; built += 1) {
       const next = this.pending.shift()!;
       const old = this.chunks.get(next.key);
+      const start = performance.now();
       const chunk = this.createChunk(next);
+      const elapsed = performance.now() - start;
+      this.buildTotalMs += elapsed;
+      this.buildCount += 1;
+      this.buildMaxMs = Math.max(this.buildMaxMs, elapsed);
       if (old) { this.scene.remove(old.group); old.dispose(); }
       this.chunks.set(next.key, chunk);
     }
@@ -241,6 +310,9 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     this.trunkGeometry.dispose();
     this.crownGeometries.forEach((geometry) => geometry.dispose());
     this.rockGeometry.dispose();
+    this.torGeometry.dispose();
+    this.hedgeGeometry.dispose();
+    this.hedgeMaterial.dispose();
     this.farCrownGeometry.dispose();
     this.farFoliageMaterial.dispose();
   }
@@ -273,6 +345,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     const heightAt = (xIndex: number, zIndex: number) => sampleAt(xIndex, zIndex).height;
     const water: boolean[] = [];
     const surface: number[] = [];
+    const hedgeBlocks: { x: number; y: number; z: number; turn: number; weight: number }[] = [];
 
     for (let zIndex = 0; zIndex <= segments; zIndex += 1) {
       for (let xIndex = 0; xIndex <= segments; xIndex += 1) {
@@ -288,23 +361,18 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
           heightAt(xIndex, zIndex - 1) - heightAt(xIndex, zIndex + 1),
         ).normalize();
         normals.push(normal.x, normal.y, normal.z);
-        if (sample.water) color.set(0x2f6e6a);
-        else if (sample.rock > 0.67) color.set(0x8a8174).lerp(new THREE.Color(0xafa28a), sample.rock - 0.67);
-        else if (sample.forest > 0.55) color.set(0x2f6b3a);
-        else color.set(0x6fa03c).lerp(new THREE.Color(0xb3b04a), 1 - sample.moisture);
+        const slope = Math.hypot(normal.x, normal.z) / normal.y;
+        const edge = sample.fieldEdge;
+        if (detailed && edge && sample.biome.hills > 0 && !sample.water && sample.bank > 20 && slope < 0.45
+          && edge.x >= originX && edge.x < originX + chunkSize && edge.z >= originZ && edge.z < originZ + chunkSize) {
+          hedgeBlocks.push({ x: edge.x - originX, y: sample.height + 1.6 * sample.biome.hills,
+            z: edge.z - originZ, turn: edge.turn, weight: sample.biome.hills });
+        }
+        terrainColor(sample, x, z, this.world.seed, color, slope, normal.y);
         const hueJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 311) - 0.5) * 0.03;
         const saturationJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 312) - 0.5) * 0.12;
         const lightnessJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 313) - 0.5) * 0.06;
         color.offsetHSL(hueJitter, saturationJitter, lightnessJitter);
-        if (!sample.water && sample.mountainRegion > 0) {
-          const slope = Math.hypot(normal.x, normal.z) / normal.y;
-          const highland = new THREE.Color(0x7da548);
-          if (sample.forest > 0.55) highland.set(0x1e4e3a);
-          else if (sample.height > 340 || slope > 0.5) highland.set(0x6e685e).lerp(new THREE.Color(0xafa28a), THREE.MathUtils.clamp(normal.y - 0.3, 0, 1));
-          else if (sample.height > 320) highland.lerp(new THREE.Color(0x9a9489), THREE.MathUtils.smoothstep(sample.height, 320, 340));
-          color.lerp(highland, highlandWeight(sample.mountainRegion));
-          color.lerp(new THREE.Color(0xf2f4f7), snowCover(sample, slope, x, z, this.world.seed));
-        }
         colors.push(color.r, color.g, color.b);
       }
     }
@@ -360,6 +428,24 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     treeObjects.forEach((object) => group.add(object));
     const rocks = this.createRocks(chunkX, chunkZ, config.rocks, originX, originZ);
     if (rocks) group.add(rocks);
+    const tors = detailed ? this.createTors(chunkX, chunkZ) : null;
+    if (tors) group.add(tors);
+    const hedges = hedgeBlocks.length ? new THREE.InstancedMesh(this.hedgeGeometry, this.hedgeMaterial, hedgeBlocks.length) : null;
+    if (hedges) {
+      hedges.name = 'hedgerows';
+      const dummy = new THREE.Object3D();
+      hedgeBlocks.forEach((block, index) => {
+        dummy.position.set(block.x, block.y, block.z);
+        dummy.rotation.set(0, block.turn, 0);
+        dummy.scale.set(1.3 * block.weight, 1.8 * block.weight, 7);
+        dummy.updateMatrix();
+        hedges.setMatrixAt(index, dummy.matrix);
+      });
+      hedges.instanceMatrix.needsUpdate = true;
+      hedges.castShadow = true;
+      hedges.receiveShadow = true;
+      group.add(hedges);
+    }
 
     this.scene.add(group);
     return {
@@ -371,6 +457,8 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         waterGeometry?.dispose();
         treeObjects.forEach((object) => object.dispose());
         rocks?.dispose();
+        tors?.dispose();
+        hedges?.dispose();
       },
     };
   }
@@ -411,7 +499,8 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         for (const [dx, dz] of [[0, 0], [step, 0], [0, step], [step, step]]) {
           const sample = this.world.sample(worldX + dx!, worldZ + dz!);
           waterColor.set(0x2a8fa8);
-          if (!sample.river) waterColor.lerp(new THREE.Color(0x2a7fa0), highlandWeight(sample.mountainRegion));
+          if (!sample.river) waterColor.lerp(new THREE.Color(0x2a7fa0), sample.biome.highlands);
+          if (sample.peat > 0) waterColor.set(0x2e4a4a);
           colors.push(waterColor.r, waterColor.g, waterColor.b);
         }
         indices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
@@ -441,6 +530,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     trunks.instanceMatrix.needsUpdate = true;
     trunks.castShadow = true;
     const meshes: THREE.InstancedMesh[] = [trunks];
+    const tint = new THREE.Color();
     for (let kind = 0; kind < this.crownGeometries.length; kind += 1) {
       const ofKind = trees.filter((tree) => tree.kind === kind);
       if (ofKind.length === 0) continue;
@@ -454,12 +544,10 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         dummy.scale.set(tree.scale, tree.scale * (kind === 0 ? 1.4 : kind === 1 ? 0.83 : 2.6), tree.scale);
         dummy.updateMatrix();
         crowns.setMatrixAt(index, dummy.matrix);
-        const base = this.foliageMaterials[kind]!.color;
-        const tint = base.clone().lerp(new THREE.Color(0x1e4e3a), highlandWeight(this.world.sample(tree.x, tree.z).mountainRegion));
-        const multiplier = new THREE.Color().setRGB(tint.r / base.r, tint.g / base.g, tint.b / base.b);
-        crowns.setColorAt(index, multiplier);
-        upper?.setColorAt(index, multiplier);
+        treeColor(tree, tint);
+        crowns.setColorAt(index, tint);
         if (upper) {
+          upper.setColorAt(index, tint);
           dummy.position.y = tree.y + 22 * tree.scale;
           dummy.scale.setScalar(tree.scale * 0.85);
           dummy.updateMatrix();
@@ -483,6 +571,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     if (trees.length === 0) return [];
     const trunks = new THREE.InstancedMesh(this.trunkGeometry, this.trunkMaterial, trees.length);
     const crowns = new THREE.InstancedMesh(this.farCrownGeometry, this.farFoliageMaterial, trees.length);
+    const tint = new THREE.Color();
     const dummy = new THREE.Object3D();
     trees.forEach((tree, index) => {
       dummy.position.set(tree.x - originX, tree.y + 4.5 * tree.scale, tree.z - originZ);
@@ -494,14 +583,45 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
       dummy.scale.set(tree.scale * (tree.kind === 2 ? 0.68 : 1.2), tree.scale * (tree.kind === 0 ? 1.55 : tree.kind === 1 ? 1.05 : 1.8), tree.scale * (tree.kind === 2 ? 0.68 : 1.2));
       dummy.updateMatrix();
       crowns.setMatrixAt(index, dummy.matrix);
-      crowns.setColorAt(index, this.foliageMaterials[tree.kind]!.color.clone()
-        .lerp(new THREE.Color(0x1e4e3a), highlandWeight(this.world.sample(tree.x, tree.z).mountainRegion)));
+      crowns.setColorAt(index, treeColor(tree, tint));
     });
     trunks.instanceMatrix.needsUpdate = true;
     crowns.instanceMatrix.needsUpdate = true;
     trunks.castShadow = true;
     crowns.castShadow = true;
     return [trunks, crowns];
+  }
+
+  /** Stacked granite blocks sit on the local-high rock mask, not random low ground. */
+  private createTors(chunkX: number, chunkZ: number): THREE.InstancedMesh | null {
+    const entries: { x: number; y: number; z: number; scale: number; turn: number }[] = [];
+    for (let candidate = 0; candidate < 4; candidate += 1) {
+      const x = (chunkX + hash2(candidate, chunkZ, this.world.seed + 391)) * CHUNK_SIZE;
+      const z = (chunkZ + hash2(chunkX, candidate, this.world.seed + 393)) * CHUNK_SIZE;
+      const sample = this.world.sample(x, z);
+      if (sample.water || sample.biome.moor < 0.7 || sample.rock < 0.55) continue;
+      const scale = 1.1 + hash2(chunkX, chunkZ, this.world.seed + 395);
+      const turn = hash2(chunkX, candidate, this.world.seed + 397) * Math.PI;
+      let top = sample.height;
+      for (let level = 0; level < 3; level += 1) {
+        const blockScale = scale * (1 - level * 0.12);
+        entries.push({ x, z, y: top + 1.6 * blockScale, scale: blockScale, turn: turn + level * 0.07 });
+        top += 3.2 * blockScale;
+      }
+    }
+    if (!entries.length) return null;
+    const mesh = new THREE.InstancedMesh(this.torGeometry, this.rockMaterial, entries.length);
+    const dummy = new THREE.Object3D();
+    entries.forEach((block, index) => {
+      dummy.position.set(block.x - chunkX * CHUNK_SIZE, block.y, block.z - chunkZ * CHUNK_SIZE);
+      dummy.rotation.set(0, block.turn, 0);
+      dummy.scale.setScalar(block.scale);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(index, dummy.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.castShadow = true;
+    return mesh;
   }
 
   private createRocks(chunkX: number, chunkZ: number, attempts: number, originX: number, originZ: number): THREE.InstancedMesh | null {
