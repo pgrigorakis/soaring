@@ -1,0 +1,94 @@
+{
+  "issue": 96,
+  "method": {
+    "extension": "EXT_disjoint_timer_query_webgl2",
+    "available": true,
+    "disjoint": false,
+    "frameMetric": "GPU elapsed time around one application requestAnimationFrame callback, including all WebGL work issued in that callback",
+    "skyDrawMetric": "GPU elapsed time around the Sky shader drawElements call on the default framebuffer",
+    "sampling": "360 samples per run; values are milliseconds",
+    "limitations": "The batch medians vary between runs. Do not treat these readings as proof of a GPU saving."
+  },
+  "environment": {
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+    "webgl": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "appMode": "Normal development page, not ?smoke",
+    "viewport": [1440, 900],
+    "devicePixelRatio": 1,
+    "rendererPixelRatio": 1,
+    "shadowsEnabled": true,
+    "terrainVisibility": 1800,
+    "loadedChunks": 193,
+    "pendingChunks": 0
+  },
+  "scene": {
+    "seed": 5,
+    "eaglePosition": [16250, 234.82914712620817, 31250],
+    "cameraPosition": [16250, 289.509161442006, 31150],
+    "cameraLookAt": [16250, 225.82914712620817, 31288],
+    "timeOfDayPhase": 0.5,
+    "qualityStep": 0
+  },
+  "frameGpuMs": {
+    "before": {
+      "samples": 360,
+      "mean": 2.481293,
+      "median": 2.017791,
+      "p90": 4.247375,
+      "min": 1.273041,
+      "max": 6.613124,
+      "batchMedians": [2.029124, 1.6225, 2.06175]
+    },
+    "afterRun1": {
+      "samples": 360,
+      "mean": 3.011047,
+      "median": 3.581875,
+      "p90": 3.800249,
+      "min": 1.252083,
+      "max": 7.110458,
+      "batchMedians": [3.554249, 3.555625, 3.746499]
+    },
+    "afterRun2": {
+      "samples": 360,
+      "mean": 2.762623,
+      "median": 3.026249,
+      "p90": 3.85475,
+      "min": 1.252416,
+      "max": 6.848291,
+      "batchMedians": [1.630041, 3.577041, 3.587374]
+    }
+  },
+  "skyDrawGpuMs": {
+    "before": {
+      "samples": 360,
+      "mean": 2.485423,
+      "median": 2.026333,
+      "p90": 4.285625,
+      "min": 0.420125,
+      "max": 7.510458
+    },
+    "after": {
+      "samples": 360,
+      "mean": 2.338438,
+      "median": 2.361999,
+      "p90": 2.498666,
+      "min": 0.873374,
+      "max": 3.099541
+    }
+  },
+  "orderCheck": {
+    "afterFrameDefaultFramebufferDrawCalls": 242,
+    "skyDrawIndex": 220,
+    "drawCommand": "drawElements(TRIANGLES, 36, UNSIGNED_SHORT, 0)"
+  },
+  "visualComparison": {
+    "allImages": "1440x900; same seed, pose, time states, visibility, and quality",
+    "pixelIdenticalSkyCropHeights": {
+      "noon-terrain-occlusion.png": 450,
+      "golden-hour-lens-flare.png": 675,
+      "aurora-horizon.png": 675,
+      "midnight-moon-stars.png": 675
+    },
+    "note": "Sky-only upper crops matched exactly. Whole-frame differences came from changing scene animation outside those crops."
+  }
+}
