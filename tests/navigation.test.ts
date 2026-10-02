@@ -72,7 +72,7 @@ describe('autonomous eagle navigation', () => {
     const netDistance = Math.hypot(navigator.state.x - start.x, navigator.state.z - start.z);
     expect(netDistance).toBeGreaterThanOrEqual(distanceFlown * 0.35);
     expect(revisitPasses).toBeLessThanOrEqual(5);
-  });
+  }, 20_000); // A simulated hour exceeds Vitest's 5 s default on shared CI CPUs.
 
   it.each([
     { min: 50, max: 70, baselineFlappingTicks: 6552 },
@@ -115,6 +115,7 @@ describe('autonomous eagle navigation', () => {
       expect(behaviors.has('thermal-riding')).toBe(true);
       expect(behaviors.size).toBe(3);
     },
+    20_000,
   );
 
   it('normalizes invalid and inverted flight height preferences to safe bounds', () => {
