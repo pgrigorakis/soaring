@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { Soundscape } from '../src/audio';
+import { biomeWeights } from '../src/biome';
 
 class Parameter {
   value = 1;
@@ -17,6 +18,7 @@ class Node {
 
 class Gain extends Node { gain = new Parameter(); }
 class Filter extends Node { type = ''; frequency = new Parameter(); }
+class Convolver extends Node { buffer: { getChannelData: () => Float32Array } | null = null; }
 class Source extends Node {
   buffer: { getChannelData: () => Float32Array } | null = null;
   loop = false;
@@ -38,6 +40,7 @@ class BrowserAudio {
   constructor() { BrowserAudio.instances.push(this); }
   createGain(): Gain { return new Gain(); }
   createBiquadFilter(): Filter { return new Filter(); }
+  createConvolver(): Convolver { return new Convolver(); }
   createBufferSource(): Source { const source = new Source(); this.sources.push(source); return source; }
   createOscillator(): Source { const source = new Source(); this.sources.push(source); return source; }
   createBuffer(_channels: number, length: number): { getChannelData: () => Float32Array } {
@@ -62,7 +65,45 @@ function outputLevel(source: Source): number {
   return level;
 }
 
+function layerSource(context: BrowserAudio, filterFrequency: number): Source {
+  return context.sources.find((source) => {
+    if (!source.loop) return false;
+    let node: Node | null = source;
+    while (node) {
+      if (node instanceof Filter && node.frequency.value === filterFrequency) return true;
+      node = node.output;
+    }
+    return false;
+  })!;
+}
+
 afterEach(() => { vi.unstubAllGlobals(); BrowserAudio.instances = []; });
+
+test('biome weights sum to one across the hills-to-woodland boundary', () => {
+  const samples = Array.from({ length: 9 }, (_, index) => biomeWeights(0, 0.44 + index * 0.015, 60, 0.4));
+  expect(samples.some((weights) => weights.hills > 0 && weights.woodland > 0)).toBe(true);
+  for (const weights of samples) {
+    expect(weights.hills + weights.woodland + weights.moor + weights.highlands + weights.lakeland).toBeCloseTo(1);
+  }
+});
+
+test('biome ambience crossfades with the world weights', async () => {
+  vi.stubGlobal('AudioContext', BrowserAudio);
+  const sound = new Soundscape();
+  await sound.setMuted(false);
+  const context = BrowserAudio.instances[0]!;
+  context.currentTime = 4;
+  const hills = layerSource(context, 680);
+  const woodland = layerSource(context, 1700);
+  const start = biomeWeights(0, 0.44, 60, 0.4);
+  sound.update('gliding', false, start);
+  const startHills = outputLevel(hills);
+  const startWoodland = outputLevel(woodland);
+  const end = biomeWeights(0, 0.56, 60, 0.4);
+  sound.update('gliding', false, end);
+  expect(outputLevel(hills)).toBeLessThan(startHills);
+  expect(outputLevel(woodland)).toBeGreaterThan(startWoodland);
+});
 
 test('ambience (wind and flaps) and music each have an independent output level and shared mute', async () => {
   vi.stubGlobal('AudioContext', BrowserAudio);
@@ -73,7 +114,7 @@ test('ambience (wind and flaps) and music each have an independent output level 
   sound.update('thermal-seeking', true);
   const wind = context.sources.find((source) => source.loop)!;
   const flap = context.sources.find((source) => source.buffer && !source.loop)!;
-  const music = context.sources.find((source) => !source.buffer)!;
+  const music = context.sources.find((source) => !source.buffer && source.frequency.value > 100)!;
   expect(wind).toBeDefined();
   expect(flap).toBeDefined();
   expect(music).toBeDefined();
@@ -164,7 +205,7 @@ test('the musical bed stays in D major but does not settle into a fixed loop', a
     const before = context.sources.length;
     context.currentTime = 1 + bar * 2.52;
     sound.update(bar % 3 ? 'gliding' : 'thermal-riding', false);
-    const notes = context.sources.slice(before).filter((source) => !source.buffer)
+    const notes = context.sources.slice(before).filter((source) => !source.buffer && source.frequency.value > 100)
       .map((source) => Math.round(69 + 12 * Math.log2(source.frequency.value / 440)));
     expect(notes.length).toBeGreaterThan(0);
     for (const note of notes) expect([1, 2, 4, 6, 7, 9, 11]).toContain(note % 12);
