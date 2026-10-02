@@ -822,6 +822,8 @@ function frame(now: number): void {
       `draw calls   ${renderer.info.render.calls}`,
       `geometries   ${renderer.info.memory.geometries}`,
       `behavior     ${state.behavior}${state.flapping ? ' (flapping)' : ''}`,
+      `wind         ${navigator.wind.x.toFixed(1)}, ${navigator.wind.z.toFixed(1)} m/s (${navigator.wind.speed.toFixed(1)} m/s)`,
+      `ridge lift   ${navigator.ridgeLift.toFixed(2)} m/s`,
       `clearance    ${(state.y - world.sample(state.x, state.z).height).toFixed(0)} m`,
       `position     ${state.x.toFixed(0)}, ${state.z.toFixed(0)}`,
       `render origin ${renderOrigin.x.toFixed(0)}, ${renderOrigin.y.toFixed(0)}, ${renderOrigin.z.toFixed(0)}`,

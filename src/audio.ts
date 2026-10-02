@@ -105,8 +105,8 @@ export class Soundscape {
     for (const note of notes.slice(0, 3)) {
       this.playTone(frequency(note), start, BAR * 0.97, 0.095, 'triangle', 0.65);
     }
-    // Thermal-riding lifts the arpeggio an octave higher.
-    const lift = behavior === 'thermal-riding' ? 24 : 12;
+    // Thermal-riding lifts the arpeggio an octave higher; ridge-soaring a fifth higher.
+    const lift = behavior === 'thermal-riding' ? 24 : behavior === 'ridge-soaring' ? 19 : 12;
     const order = ARPEGGIOS[Math.floor(Math.random() * ARPEGGIOS.length)]!;
     order.forEach((noteIndex, position) => {
       this.playTone(frequency(notes[noteIndex]! + lift), start + position * BEAT, BEAT * 1.65, 0.13, 'sine', 0.045);
