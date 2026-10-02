@@ -1,5 +1,6 @@
 export type LandscapeSample = {
   height: number;
+  mountainRegion: number;
   /** Water surface height: the river's level in a river channel, otherwise the lake level. */
   surface: number;
   /** Distance from the nearest river or lake shore; negative inside the water. */
@@ -47,6 +48,7 @@ type RiverNode = {
   down?: RiverNode | null;
   flow?: number;
   reach?: Reach | null;
+  cirque?: Reach | null;
 };
 
 /** A river segment, or a lake disc when `lake` is set (then the endpoints coincide). */
@@ -169,6 +171,9 @@ function smootherstep(edge0: number, edge1: number, value: number): number {
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
+/** Keep transitional/lowland terrain unchanged; apply Highlands fully in its core. */
+export const highlandWeight = (region: number): number => smootherstep(0.5, 0.8, region);
+
 export type WorldCacheSizes = { thermals: number; riverNodes: number; nearbyReaches: number };
 
 export class WorldModel {
@@ -197,9 +202,11 @@ export class WorldModel {
   }
 
   sample(x: number, z: number): LandscapeSample {
-    const bare = this.baseHeight(x, z);
+    const { mountainRegion, elevation } = this.relief(x, z);
+    const highland = highlandWeight(mountainRegion);
+    // Preserve ridge crests between drainage nodes without changing the drainage field.
+    const bare = mix(this.baseHeight(x, z), elevation, highland);
     const detail = fbm(x / 125, z / 125, this.seed + 31, 3) * 4.2 + fbm(x / 46, z / 46, this.seed + 37, 2) * 1.05;
-    const { mountainRegion } = this.relief(x, z);
 
     // The nearest channel owns the valley. A second channel blends in only near a divide,
     // so a higher neighbor cannot lift this river onto a ridge or leave a cliff at the shore.
@@ -207,7 +214,12 @@ export class WorldModel {
     let nearest: Shore | null = null;
     let second: Shore | null = null;
     let wet: Shore | null = null;
-    const coneOf = (shore: Shore) => shore.surface + Math.max(0, shore.shoreDist) * (shore.lake ? 0.05 : 0.075);
+    const coneOf = (shore: Shore) => {
+      const distance = Math.max(0, shore.shoreDist);
+      const gentle = distance * (shore.lake ? 0.05 : 0.075);
+      const valley = 0.008 * distance + 0.00032 * Math.max(0, distance - 180) ** 2;
+      return shore.surface + mix(gentle, valley, highland);
+    };
     for (const reach of this.reachesNear(x, z)) {
       const { distance, t } = reachDistance(reach, x, z);
       const wobble = reach.lake ? 1 : 1 + 0.18 * Math.sin(Math.PI * t);
@@ -231,7 +243,7 @@ export class WorldModel {
       const primary = coneOf(nearest);
       const share = second ? 0.5 * (1 - smootherstep(0, 48, second.shoreDist - nearest.shoreDist)) : 0;
       height = mix(primary, second ? coneOf(second) : primary, share);
-      const land = smootherstep(280, 900, Math.max(0, nearest.shoreDist));
+      const land = smootherstep(mix(280, 380, highland), mix(900, 1050, highland), Math.max(0, nearest.shoreDist));
       height = mix(height, bare, land);
     }
     let river = false;
@@ -256,10 +268,11 @@ export class WorldModel {
     const woodland = fbm(x / 1450, z / 1450, this.seed + 139, 4) * 0.86
       + fbm(x / 290, z / 290, this.seed + 149, 3) * 0.25
       + (moisture - 0.5) * 0.18;
-    const forest = Math.max(smootherstep(-0.04, 0.05, woodland), riverside * 0.62) * (1 - mountainRegion * 0.5) * ((river || lake) ? 0 : 1);
+    const forest = Math.max(smootherstep(-0.04, 0.05, woodland), riverside * 0.62) * (1 - mountainRegion * 0.5)
+      * (1 - highland * smootherstep(280, 320, height)) * ((river || lake) ? 0 : 1);
     const rock = clamp01(mountainRegion * 0.74 + smootherstep(96, 170, height) + Math.abs(detail) * 0.16);
 
-    return { height, surface, bank, moisture, forest, rock, water: lake || river, river };
+    return { height, mountainRegion, surface, bank, moisture, forest, rock, water: lake || river, river };
   }
 
   /** Broad landform. Drainage and the rendered hills share this field, so rivers follow the visible relief. */
@@ -267,7 +280,9 @@ export class WorldModel {
     const broad = fbm(x / 3200, z / 3200, this.seed + 7, 4);
     const ridges = 1 - Math.abs(fbm(x / 1550, z / 1550, this.seed + 47, 4));
     const mountainRegion = smootherstep(0.04, 0.48, fbm(x / 5400, z / 5400, this.seed + 59, 3));
-    const mountains = mountainRegion * Math.pow(clamp01((ridges - 0.34) / 0.66), 1.65) * 188;
+    const highland = highlandWeight(mountainRegion);
+    const ridge = clamp01((ridges - 0.34) / 0.66);
+    const mountains = mountainRegion * mix(Math.pow(ridge, 1.65) * 188, Math.pow(ridge, 2) * 380, highland);
     return { elevation: 28 + broad * 52 + mountains, mountainRegion };
   }
 
@@ -313,8 +328,11 @@ export class WorldModel {
     const j1 = Math.floor(maxZ / DRAINAGE_SPACING - 0.5);
     for (let j = j0; j <= j1; j += 1) {
       for (let i = i0; i <= i1; i += 1) {
-        const reach = this.reachFrom(this.node(i, j));
+        const node = this.node(i, j);
+        const reach = this.reachFrom(node);
         if (reach) reaches.push(reach);
+        const cirque = this.cirqueFrom(node);
+        if (cirque) reaches.push(cirque);
       }
     }
     return reaches;
@@ -419,7 +437,7 @@ export class WorldModel {
     const down = this.downstream(node);
     const level = this.waterLevel(node);
     if (!down) {
-      const radius = lakeRadius(flow);
+      const radius = this.lakeRadius(node, flow);
       node.reach = {
         ax: node.x, az: node.z, bx: node.x, bz: node.z,
         aLevel: level, bLevel: level,
@@ -435,7 +453,7 @@ export class WorldModel {
     let bz = down.z;
     const downFlow = this.flow(down);
     if (!this.downstream(down) && downFlow >= RIVER_MIN_FLOW) {
-      const radius = lakeRadius(downFlow);
+      const radius = this.lakeRadius(down, downFlow);
       const dx = down.x - node.x;
       const dz = down.z - node.z;
       const length = Math.hypot(dx, dz);
@@ -452,6 +470,30 @@ export class WorldModel {
       lake: false,
     };
     return node.reach;
+  }
+
+  /** A small headwater bowl feeds the first mapped river, at that river's level. */
+  private cirqueFrom(node: RiverNode): Reach | null {
+    if (node.cirque !== undefined) return node.cirque;
+    node.cirque = null;
+    if (highlandWeight(this.relief(node.x, node.z).mountainRegion) < 0.5 || node.elevation < 180
+      || this.flow(node) < RIVER_MIN_FLOW || !this.downstream(node)
+      || this.upstreams(node).some((up) => this.flow(up) >= RIVER_MIN_FLOW)) return null;
+    const level = this.waterLevel(node);
+    const radius = this.lakeRadius(node, this.flow(node));
+    node.cirque = {
+      ax: node.x, az: node.z, bx: node.x, bz: node.z,
+      aLevel: level, bLevel: level, aWidth: radius * 2, bWidth: radius * 2,
+      meander: hash2(node.i, node.j, this.seed + 181) * Math.PI * 2,
+      bend: hash2(node.i, node.j, this.seed + 183) * Math.PI * 2,
+      lake: true,
+    };
+    return node.cirque;
+  }
+
+  private lakeRadius(node: RiverNode, flow: number): number {
+    const highland = highlandWeight(this.relief(node.x, node.z).mountainRegion);
+    return mix(lakeRadius(flow), 140 + Math.min(60, Math.sqrt(flow) * 5), highland);
   }
 
   private node(i: number, j: number): RiverNode {
@@ -506,7 +548,7 @@ export class WorldModel {
   private mouth(from: RiverNode, to: RiverNode): { x: number; z: number } {
     const flow = this.flow(to);
     if (!this.downstream(to) && flow >= RIVER_MIN_FLOW) {
-      const radius = lakeRadius(flow);
+      const radius = this.lakeRadius(to, flow);
       const dx = to.x - from.x;
       const dz = to.z - from.z;
       const length = Math.hypot(dx, dz) || 1;
@@ -659,13 +701,16 @@ export class WorldModel {
         if (x < minX || x >= minX + size || z < minZ || z >= minZ + size) continue;
         const sample = this.sample(x, z);
         const clumping = 0.5 + fbm(x / 120, z / 120, this.seed + 157, 2) * 1.2;
-        if (sample.water || sample.rock > 0.72 || hash2(cx, cz, this.seed + 349) > 0.018 + sample.forest * clumping) continue;
+        if (sample.water || (sample.height >= 320 && highlandWeight(sample.mountainRegion) > 0.5)
+          || sample.rock > mix(0.72, 1, highlandWeight(sample.mountainRegion))
+          || hash2(cx, cz, this.seed + 349) > (0.018 + sample.forest * clumping)
+            * (1 - highlandWeight(sample.mountainRegion) * smootherstep(280, 320, sample.height))) continue;
         if (sample.bank < TREE_BANK_CLEARANCE) continue;
         const slope = Math.hypot(this.sample(x + 3, z).height - sample.height, this.sample(x, z + 3).height - sample.height) / 3;
         if (slope > MAX_TREE_SLOPE) continue;
         trees.push({
           x, y: sample.height, z,
-          kind: Math.floor(hash2(cx, cz, this.seed + 353) * 3),
+          kind: highlandWeight(sample.mountainRegion) > 0.5 ? 0 : Math.floor(hash2(cx, cz, this.seed + 353) * 3),
           scale: 0.72 + hash2(cx, cz, this.seed + 359) * 0.72,
           turn: hash2(cx, cz, this.seed + 361) * Math.PI * 2,
         });

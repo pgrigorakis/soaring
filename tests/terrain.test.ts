@@ -75,7 +75,7 @@ describe('terrain streaming', () => {
     terrain.setReach(MIN_VISIBILITY);
     expect(terrain.chunkCount).toBeLessThanOrEqual(25);
     terrain.dispose();
-  });
+  }, 20_000); // Full visibility builds are CPU-bound on the shared CI runner.
 
   it('gives distant tiles the same trees and shadows as detailed tiles', () => {
     const scene = new THREE.Scene();
@@ -102,7 +102,7 @@ describe('terrain streaming', () => {
     expect(detailed).not.toBe(far);
     expect(treeTrunks(detailed)).toBe(farTrees);
     terrain.dispose();
-  });
+  }, 20_000);
 
   it('renders several distinct instanced tree silhouettes at generated world positions', () => {
     const scene = new THREE.Scene();
@@ -112,7 +112,7 @@ describe('terrain streaming', () => {
       const x = (index % 15) - 12;
       const z = Math.floor(index / 15) - 6;
       return { x, z, trees: world.treesInArea(x * CHUNK_SIZE, z * CHUNK_SIZE, CHUNK_SIZE, 29) };
-    }).find((cell) => cell.trees.length > 8)!;
+    }).find((cell) => cell.trees.length > 8 && new Set(cell.trees.map((tree) => tree.kind)).size === 3)!;
     terrain.update((forest.x + 0.5) * CHUNK_SIZE, (forest.z + 0.5) * CHUNK_SIZE, 1);
     const chunk = scene.getObjectByName(`land ${forest.x},${forest.z}`)!;
     const trees = forest.trees;

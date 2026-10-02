@@ -1,5 +1,14 @@
 import * as THREE from 'three';
-import { hash2, type LandscapeSample, WorldModel } from './world';
+import { fbm, hash2, highlandWeight, type LandscapeSample, WorldModel } from './world';
+
+/** Snow stays white; lighting supplies the blue shade. Steep faces remain granite. */
+export function snowCover(sample: LandscapeSample, slope: number, x: number, z: number, seed: number): number {
+  if (sample.water || slope >= Math.tan(40 * Math.PI / 180) || sample.height < 380) return 0;
+  if (sample.height >= 420) return highlandWeight(sample.mountainRegion);
+  const altitude = (sample.height - 380) / 40;
+  const patch = fbm(x / 85, z / 85, seed + 389, 2) * 0.5 + 0.5;
+  return highlandWeight(sample.mountainRegion) * THREE.MathUtils.smoothstep(altitude, patch * 0.65, patch * 0.65 + 0.35);
+}
 
 export const CHUNK_SIZE = 360;
 export const MIN_VISIBILITY = 720;
@@ -37,7 +46,8 @@ export class TerrainStream {
   // Fades the shadow to fully lit near the fixed shadow camera's edge, in place of a hard cutoff.
   private readonly shadowFadeRange = { value: new THREE.Vector2() };
   private readonly waterMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2a8fa8,
+    color: 0xffffff,
+    vertexColors: true,
     roughness: 0.38,
     metalness: 0.05,
     transparent: true,
@@ -285,6 +295,15 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         const saturationJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 312) - 0.5) * 0.12;
         const lightnessJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 313) - 0.5) * 0.06;
         color.offsetHSL(hueJitter, saturationJitter, lightnessJitter);
+        if (!sample.water && sample.mountainRegion > 0) {
+          const slope = Math.hypot(normal.x, normal.z) / normal.y;
+          const highland = new THREE.Color(0x7da548);
+          if (sample.forest > 0.55) highland.set(0x1e4e3a);
+          else if (sample.height > 340 || slope > 0.5) highland.set(0x6e685e).lerp(new THREE.Color(0xafa28a), THREE.MathUtils.clamp(normal.y - 0.3, 0, 1));
+          else if (sample.height > 320) highland.lerp(new THREE.Color(0x9a9489), THREE.MathUtils.smoothstep(sample.height, 320, 340));
+          color.lerp(highland, highlandWeight(sample.mountainRegion));
+          color.lerp(new THREE.Color(0xf2f4f7), snowCover(sample, slope, x, z, this.world.seed));
+        }
         colors.push(color.r, color.g, color.b);
       }
     }
@@ -373,7 +392,9 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
   private createWaterGeometry(originX: number, originZ: number, chunkSize: number, segments: number, water: boolean[], surface: number[]): THREE.BufferGeometry | null {
     const step = chunkSize / segments;
     const positions: number[] = [];
+    const colors: number[] = [];
     const indices: number[] = [];
+    const waterColor = new THREE.Color();
     for (let iz = 0; iz < segments; iz += 1) {
       for (let ix = 0; ix < segments; ix += 1) {
         const a = iz * (segments + 1) + ix;
@@ -384,12 +405,19 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         const [y0, y1, y2, y3] = corners.map((corner) => surface[corner]! + 0.15);
         const base = positions.length / 3;
         positions.push(x, y0!, z, x + step, y1!, z, x, y2!, z + step, x + step, y3!, z + step);
+        for (const [dx, dz] of [[0, 0], [step, 0], [0, step], [step, step]]) {
+          const sample = this.world.sample(x + dx!, z + dz!);
+          waterColor.set(0x2a8fa8);
+          if (!sample.river) waterColor.lerp(new THREE.Color(0x2a7fa0), highlandWeight(sample.mountainRegion));
+          colors.push(waterColor.r, waterColor.g, waterColor.b);
+        }
         indices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
       }
     }
     if (positions.length === 0) return null;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     return geometry;
@@ -423,6 +451,11 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         dummy.scale.set(tree.scale, tree.scale * (kind === 0 ? 1.4 : kind === 1 ? 0.83 : 2.6), tree.scale);
         dummy.updateMatrix();
         crowns.setMatrixAt(index, dummy.matrix);
+        const base = this.foliageMaterials[kind]!.color;
+        const tint = base.clone().lerp(new THREE.Color(0x1e4e3a), highlandWeight(this.world.sample(tree.x, tree.z).mountainRegion));
+        const multiplier = new THREE.Color().setRGB(tint.r / base.r, tint.g / base.g, tint.b / base.b);
+        crowns.setColorAt(index, multiplier);
+        upper?.setColorAt(index, multiplier);
         if (upper) {
           dummy.position.y = tree.y + 22 * tree.scale;
           dummy.scale.setScalar(tree.scale * 0.85);
@@ -458,7 +491,8 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
       dummy.scale.set(tree.scale * (tree.kind === 2 ? 0.68 : 1.2), tree.scale * (tree.kind === 0 ? 1.55 : tree.kind === 1 ? 1.05 : 1.8), tree.scale * (tree.kind === 2 ? 0.68 : 1.2));
       dummy.updateMatrix();
       crowns.setMatrixAt(index, dummy.matrix);
-      crowns.setColorAt(index, this.foliageMaterials[tree.kind]!.color);
+      crowns.setColorAt(index, this.foliageMaterials[tree.kind]!.color.clone()
+        .lerp(new THREE.Color(0x1e4e3a), highlandWeight(this.world.sample(tree.x, tree.z).mountainRegion)));
     });
     trunks.instanceMatrix.needsUpdate = true;
     crowns.instanceMatrix.needsUpdate = true;

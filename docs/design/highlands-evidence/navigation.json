@@ -1,0 +1,21 @@
+{
+  "baseline": {
+    "commit": "184df89de4f05087194fdc25e36ddd83a7ba0181",
+    "peakVerticalSpeed": 511.63911809568475,
+    "flappingSeconds": 164.8
+  },
+  "metrics": {
+    "seed": 57,
+    "start": {
+      "x": -24000,
+      "z": 3750,
+      "heading": 0
+    },
+    "seconds": 3600,
+    "minClearance": 12.343950863593307,
+    "peakVerticalSpeed": 4.000000000000057,
+    "flappingSeconds": 119.99999999999746,
+    "safetyCorrections": 0,
+    "highlandSeconds": 1835.499999999426
+  }
+}

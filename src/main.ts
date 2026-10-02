@@ -77,7 +77,7 @@ function pixelRatioForStep(step = qualityStep): number {
 const world = new WorldModel(loadSeed());
 const auroraSchedule = new AuroraSchedule(world.seed);
 const start = world.scenicStart(nextVisit());
-const navigator = new EagleNavigator(world, start, { min: settings.minFlightHeight, max: settings.maxFlightHeight });
+let navigator = new EagleNavigator(world, start, { min: settings.minFlightHeight, max: settings.maxFlightHeight });
 const eagle = new EagleView();
 const soundscape = new Soundscape();
 soundscape.setAmbienceVolume(settings.ambienceVolume);
@@ -277,6 +277,7 @@ let orbitYaw = 0;
 let orbitPitch = 0;
 let heldViewpoint: { x: number; y: number; z: number; lookX: number; lookY: number; lookZ: number } | null = null;
 let captureClear = false;
+let reviewFlightPaused = false;
 let dragging = false;
 let pointerX = 0;
 let pointerY = 0;
@@ -708,7 +709,9 @@ function currentDaylight(): Daylight {
 function updateFlight(delta: number, now: number): void {
   const substeps = Math.ceil(delta / 0.1);
   let state = navigator.state;
-  for (let step = 0; step < substeps; step += 1) state = navigator.update(delta / substeps);
+  if (!reviewFlightPaused) {
+    for (let step = 0; step < substeps; step += 1) state = navigator.update(delta / substeps);
+  }
   eagle.update(state, delta);
   thermalMarker.update(state, navigator.activeThermal, settings.showThermal, now / 1000);
   soundscape.update(state.behavior, state.flapping);
@@ -838,6 +841,7 @@ declare global {
     __SOARING__: {
       snapshot: () => { renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean };
       advanceSimulation?: (seconds: number) => void;
+      reviewFlight?: (start: { x: number; z: number; heading: number } | null) => void;
       setTimeScale: (scale: number) => void;
       setTimeOfDay: (phase: number) => void;
       lookAtBody: (body: 'sun' | 'moon' | 'horizon' | 'chase') => void;
@@ -852,6 +856,25 @@ declare global {
   }
 }
 window.__SOARING__ = {
+  ...(import.meta.env.DEV ? {
+    // Freeze only navigation for repeatable lighting comparisons. The normal
+    // chase camera, renderer, streaming and light loop remain unchanged.
+    reviewFlight: (pose: { x: number; z: number; heading: number } | null) => {
+      reviewFlightPaused = pose !== null;
+      if (!pose) return;
+      navigator = new EagleNavigator(world, pose, { min: settings.minFlightHeight, max: settings.maxFlightHeight });
+      cameraHeading = pose.heading;
+      orbitYaw = 0;
+      orbitPitch = 0;
+      rideBlend = 0;
+      skyLook = null;
+      heldViewpoint = null;
+      cameraPosition.set(navigator.state.x - Math.sin(pose.heading) * settings.cameraDistance,
+        navigator.state.y + followCameraHeight(settings.cameraDistance),
+        navigator.state.z - Math.cos(pose.heading) * settings.cameraDistance);
+      terrain.clear();
+    },
+  } : {}),
   ...(smokeMode ? {
     advanceSimulation: (seconds: number) => {
       if (!Number.isFinite(seconds) || seconds < 0 || seconds > 300) throw new RangeError('Expected 0–300 simulated seconds');
