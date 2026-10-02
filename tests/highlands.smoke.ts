@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
 // vertical jumps; a higher ground reference causes excessive flapping; lattice
 // interpolation erases snow-height crests; snow leaks onto steep rock or water.
 // Baseline: pre-#57 HEAD, seed 57, same start, 3600 seconds at 10 Hz.
-const baseline = { peakVerticalSpeed: 570.1892707026345, flappingSeconds: 204.7 };
+const baseline = { commit: '184df89de4f05087194fdc25e36ddd83a7ba0181', peakVerticalSpeed: 511.63911809568475, flappingSeconds: 164.8 };
 
 test('one hour through Highlands keeps clearance and flight energy bounded', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
@@ -16,7 +16,7 @@ test('one hour through Highlands keeps clearance and flight energy bounded', asy
     const { WorldModel } = await import(/* @vite-ignore */ worldPath) as typeof import('../src/world');
     const { EagleNavigator, TERRAIN_SAFETY_MARGIN } = await import(/* @vite-ignore */ eaglePath) as typeof import('../src/eagle');
     const world = new WorldModel(57);
-    const nav = new EagleNavigator(world, { x: -13000, z: -16000, heading: 0 });
+    const nav = new EagleNavigator(world, { x: -24000, z: 3750, heading: 0 });
     let minClearance = Infinity;
     let peakVerticalSpeed = 0;
     let flappingSeconds = 0;
@@ -34,13 +34,13 @@ test('one hour through Highlands keeps clearance and flight energy bounded', asy
       if (sample.mountainRegion > 0.5) highlandSeconds += 0.1;
       if (step % 100 === 0) world.trim(20000);
     }
-    return { seed: 57, seconds: 3600, minClearance, peakVerticalSpeed, flappingSeconds, safetyCorrections, highlandSeconds };
+    return { seed: 57, start: { x: -24000, z: 3750, heading: 0 }, seconds: 3600, minClearance, peakVerticalSpeed, flappingSeconds, safetyCorrections, highlandSeconds };
   });
   await writeFile('test-results/highlands-navigation.json', JSON.stringify({ baseline, metrics }, null, 2));
   await testInfo.attach('highlands-navigation', { body: JSON.stringify({ baseline, metrics }), contentType: 'application/json' });
   expect(metrics.minClearance).toBeGreaterThan(6);
   expect(metrics.safetyCorrections).toBe(0);
-  expect(metrics.highlandSeconds).toBeGreaterThan(1200);
+  expect(metrics.highlandSeconds).toBeGreaterThan(1800);
   expect(metrics.peakVerticalSpeed).toBeLessThan(baseline.peakVerticalSpeed);
   expect(metrics.flappingSeconds).toBeLessThanOrEqual(baseline.flappingSeconds * 1.25);
 });

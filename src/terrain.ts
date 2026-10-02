@@ -492,7 +492,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
       dummy.updateMatrix();
       crowns.setMatrixAt(index, dummy.matrix);
       crowns.setColorAt(index, this.foliageMaterials[tree.kind]!.color.clone()
-        .lerp(new THREE.Color(0x1e4e3a), this.world.sample(tree.x, tree.z).mountainRegion));
+        .lerp(new THREE.Color(0x1e4e3a), highlandWeight(this.world.sample(tree.x, tree.z).mountainRegion)));
     });
     trunks.instanceMatrix.needsUpdate = true;
     crowns.instanceMatrix.needsUpdate = true;

@@ -132,7 +132,7 @@ export class EagleNavigator {
       } else if (this.behaviorTime > 34) {
         const altitude = this.state.y - ground;
         const span = this.heightRange.max - this.heightRange.min;
-        if (altitude < this.heightRange.min + span * (0.2 + mountain * 0.3) || hash2(Math.floor(this.totalTime / 20), this.scenicIndex, this.world.seed + 401) > 0.64) this.seekThermal();
+        if (altitude < this.heightRange.min + span * (0.2 + mountain * 0.35) || hash2(Math.floor(this.totalTime / 20), this.scenicIndex, this.world.seed + 401) > 0.64) this.seekThermal();
         else this.behaviorTime = 0;
       }
     }
@@ -161,6 +161,31 @@ export class EagleNavigator {
     return highest;
   }
 
+  /** Trade forward progress, not a vertical jump, when a face outruns climb lift. */
+  private moveAboveTerrain(dx: number, dz: number): void {
+    const mountain = highlandWeight(this.world.sample(this.state.x, this.state.z).mountainRegion);
+    if (mountain === 0) {
+      this.state.x += dx;
+      this.state.z += dz;
+      return;
+    }
+    const clear = (fraction: number) => this.world.sample(this.state.x + dx * fraction, this.state.z + dz * fraction).height
+      + TERRAIN_SAFETY_MARGIN + 6 < this.state.y;
+    let fraction = 1;
+    if (!clear(1)) {
+      let low = 0;
+      let high = 1;
+      for (let step = 0; step < 8; step += 1) {
+        const middle = (low + high) / 2;
+        if (clear(middle)) low = middle;
+        else high = middle;
+      }
+      fraction = low;
+    }
+    this.state.x += dx * fraction;
+    this.state.z += dz * fraction;
+  }
+
   private flyTowardTarget(dt: number, ground: number): void {
     const desiredHeading = Math.atan2(this.target.x - this.state.x, this.target.z - this.state.z);
     const headingError = wrapAngle(desiredHeading - this.state.heading);
@@ -168,8 +193,7 @@ export class EagleNavigator {
     this.state.heading = wrapAngle(this.state.heading + turnRate * dt);
     this.state.bank += (clamp(-headingError * 0.78, -0.48, 0.48) - this.state.bank) * Math.min(1, dt * 2.2);
     const speed = 32;
-    this.state.x += Math.sin(this.state.heading) * speed * dt;
-    this.state.z += Math.cos(this.state.heading) * speed * dt;
+    this.moveAboveTerrain(Math.sin(this.state.heading) * speed * dt, Math.cos(this.state.heading) * speed * dt);
 
     const aheadX = Math.sin(this.state.heading);
     const aheadZ = Math.cos(this.state.heading);
@@ -178,7 +202,12 @@ export class EagleNavigator {
     const nearGround = this.world.sample(this.state.x + aheadX * 105, this.state.z + aheadZ * 105).height;
     const slope = Math.max(0, (nearGround - localGround) / 105);
     const distance = clamp(105 + slope * 500 * highlandWeight(local.mountainRegion), 105, 250);
-    const lookAhead = this.world.sample(this.state.x + aheadX * distance, this.state.z + aheadZ * distance).height;
+    // Check the approach as well as its endpoint: looking across a crest into a
+    // lower basin must not hide the ground that lies between them.
+    let lookAhead = nearGround;
+    for (const along of [distance / 2, distance]) {
+      lookAhead = Math.max(lookAhead, this.world.sample(this.state.x + aheadX * along, this.state.z + aheadZ * along).height);
+    }
     this.updateHeightEnergy(dt, ground, lookAhead);
 
     if (this.state.behavior !== 'thermal-seeking' && Math.hypot(this.target.x - this.state.x, this.target.z - this.state.z) < 150) {
@@ -238,8 +267,7 @@ export class EagleNavigator {
     const desiredX = this.thermal.x + Math.cos(this.circleAngle) * radius;
     const desiredZ = this.thermal.z + Math.sin(this.circleAngle) * radius;
     const follow = Math.min(1, dt * 1.6);
-    this.state.x += (desiredX - this.state.x) * follow;
-    this.state.z += (desiredZ - this.state.z) * follow;
+    this.moveAboveTerrain((desiredX - this.state.x) * follow, (desiredZ - this.state.z) * follow);
     const tangent = wrapAngle(-this.circleAngle);
     this.state.heading = wrapAngle(this.state.heading + wrapAngle(tangent - this.state.heading) * Math.min(1, dt * 2.4));
 
@@ -311,7 +339,10 @@ export class EagleNavigator {
       const heading = routeHeading + variation;
       const x = this.state.x + Math.sin(heading) * distance;
       const z = this.state.z + Math.cos(heading) * distance;
-      const score = this.world.interest(x, z) + 0.25 * Math.cos(heading - bearing);
+      const midpoint = this.world.sample((this.state.x + x) / 2, (this.state.z + z) / 2);
+      const destination = this.world.sample(x, z);
+      const climb = Math.max(0, Math.max(midpoint.height, destination.height) - this.flightGround);
+      const score = this.world.interest(x, z) + 0.25 * Math.cos(heading - bearing) - mountain * climb / 160;
       if (score <= bestScore) continue;
       bestScore = score;
       this.target = { x, z };

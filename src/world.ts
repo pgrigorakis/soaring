@@ -48,6 +48,7 @@ type RiverNode = {
   down?: RiverNode | null;
   flow?: number;
   reach?: Reach | null;
+  cirque?: Reach | null;
 };
 
 /** A river segment, or a lake disc when `lake` is set (then the endpoints coincide). */
@@ -327,8 +328,11 @@ export class WorldModel {
     const j1 = Math.floor(maxZ / DRAINAGE_SPACING - 0.5);
     for (let j = j0; j <= j1; j += 1) {
       for (let i = i0; i <= i1; i += 1) {
-        const reach = this.reachFrom(this.node(i, j));
+        const node = this.node(i, j);
+        const reach = this.reachFrom(node);
         if (reach) reaches.push(reach);
+        const cirque = this.cirqueFrom(node);
+        if (cirque) reaches.push(cirque);
       }
     }
     return reaches;
@@ -466,6 +470,25 @@ export class WorldModel {
       lake: false,
     };
     return node.reach;
+  }
+
+  /** A small headwater bowl feeds the first mapped river, at that river's level. */
+  private cirqueFrom(node: RiverNode): Reach | null {
+    if (node.cirque !== undefined) return node.cirque;
+    node.cirque = null;
+    if (highlandWeight(this.relief(node.x, node.z).mountainRegion) < 0.5 || node.elevation < 180
+      || this.flow(node) < RIVER_MIN_FLOW || !this.downstream(node)
+      || this.upstreams(node).some((up) => this.flow(up) >= RIVER_MIN_FLOW)) return null;
+    const level = this.waterLevel(node);
+    const radius = this.lakeRadius(node, this.flow(node));
+    node.cirque = {
+      ax: node.x, az: node.z, bx: node.x, bz: node.z,
+      aLevel: level, bLevel: level, aWidth: radius * 2, bWidth: radius * 2,
+      meander: hash2(node.i, node.j, this.seed + 181) * Math.PI * 2,
+      bend: hash2(node.i, node.j, this.seed + 183) * Math.PI * 2,
+      lake: true,
+    };
+    return node.cirque;
   }
 
   private lakeRadius(node: RiverNode, flow: number): number {
@@ -773,10 +796,7 @@ export class WorldModel {
       high = Math.max(high, around.height);
       water ||= around.water;
     }
-    const valley = 1 - smootherstep(180, 750, Math.max(0, center.bank));
-    return Math.min(1, (high - low) / 120) + (water ? 0.8 : 0) + center.rock * 0.35
-      + Math.min(center.forest, 1 - center.forest) * 0.5
-      + highlandWeight(center.mountainRegion) * (valley * 0.6 - smootherstep(280, 420, center.height));
+    return Math.min(1, (high - low) / 120) + (water ? 0.8 : 0) + center.rock * 0.35 + Math.min(center.forest, 1 - center.forest) * 0.5;
   }
 
   scenicStart(visit: number): { x: number; z: number; heading: number } {
