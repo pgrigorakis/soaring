@@ -677,6 +677,7 @@ function applyDaylight(body: Daylight, delta: number, forceFog: boolean): void {
   keyDir.copy(dominantSun ? sunDir : moonDir);
   const keyColor = dominantSun ? body.sunColor : body.moonColor;
   const keyIntensity = dominantSun ? body.sunIntensity : body.moonIntensity;
+  terrain.setWaterLighting(keyDir, body.sun.y, body.moon.y, dominantSun, delta, renderOrigin);
   keyLight.color.setRGB(keyColor.r, keyColor.g, keyColor.b);
   keyLight.intensity = keyIntensity;
   hemisphere.color.setRGB(0.16 + day * 0.68, 0.2 + day * 0.68, 0.36 + day * 0.5);

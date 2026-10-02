@@ -36,6 +36,8 @@ Renderer settings that go with it:
 
 The noon haze on the board (`#8FAEB8` → `#9CC3DA`) is the expected result of these changes, not a constant to set: the haze is sampled from the sky every 0.35 s.
 
+Water surface `#2A8FA8` is the vertex tint, not the full rendered colour. The water shader mixes it with Lakeland deep water and shallows by terrain depth. Non-river water in a mountain region tints that vertex colour toward `#2A7FA0` before the same mix. Glint colours are in the Lakeland table.
+
 The time-of-day strip on the colour-pass board is illustrative. The real sky comes from the Preetham `Sky` addon and the day cycle in `src/main.ts`.
 
 ## Biome palettes
@@ -76,6 +78,7 @@ Each biome's terrain colour is a weighted blend of its palette (see the biome we
 | Reeds | `#9FB65A` |
 | Lake cliff | `#8A8174` |
 | Sun glint | `#FFF1C2` |
+| Moon glint | `#DDE7F0` |
 
 ### Highlands (`boards/biome-04-highlands.png`)
 

@@ -117,10 +117,17 @@ export class TerrainStream {
   private readonly terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0 });
   // Fades the shadow to fully lit near the fixed shadow camera's edge, in place of a hard cutoff.
   private readonly shadowFadeRange = { value: new THREE.Vector2() };
+  private readonly waterLightDirection = { value: new THREE.Vector3(0, 1, 0) };
+  private readonly waterGlintColor = { value: new THREE.Color(0xfff1c2) };
+  private readonly waterSparkle = { value: 0 };
+  private readonly waterTime = { value: 0 };
+  private readonly waterPatternOffset = { value: new THREE.Vector2() };
+  private readonly waterDeepColor = { value: new THREE.Color(0x1d5e8a) };
+  private readonly waterShallowColor = { value: new THREE.Color(0x3fb0b8) };
   private readonly waterMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     vertexColors: true,
-    roughness: 0.38,
+    roughness: 0.16,
     metalness: 0.05,
     transparent: true,
     opacity: 0.78,
@@ -168,11 +175,133 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
 #endif`,
       );
     };
+    // Integer cell hash plus the floating-origin offset. A float hash of world XZ repeats on long flights.
+    // The offset keeps ripple phase continuous when the render origin rebases.
+    this.waterMaterial.onBeforeCompile = (shader) => {
+      shader.uniforms.waterLightDirection = this.waterLightDirection;
+      shader.uniforms.waterGlintColor = this.waterGlintColor;
+      shader.uniforms.waterSparkle = this.waterSparkle;
+      shader.uniforms.waterTime = this.waterTime;
+      shader.uniforms.waterPatternOffset = this.waterPatternOffset;
+      shader.uniforms.waterDeepColor = this.waterDeepColor;
+      shader.uniforms.waterShallowColor = this.waterShallowColor;
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+attribute float waterDepth;
+varying vec3 vWaterWorldPosition;
+varying float vWaterDepth;`,
+        )
+        .replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+vWaterWorldPosition = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+vWaterDepth = waterDepth;`,
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+uniform vec3 waterLightDirection;
+uniform vec3 waterGlintColor;
+uniform float waterSparkle;
+uniform float waterTime;
+uniform vec2 waterPatternOffset;
+uniform vec3 waterDeepColor;
+uniform vec3 waterShallowColor;
+varying vec3 vWaterWorldPosition;
+varying float vWaterDepth;
+
+float waterHash(vec2 cell) {
+  uvec2 bits = uvec2(ivec2(cell)) * uvec2(1597334673u, 3812015801u);
+  uint hash = (bits.x ^ bits.y) * 1597334673u;
+  hash ^= hash >> 16u;
+  return float(hash) * (1.0 / 4294967295.0);
+}
+
+float waterValueNoise(vec2 point) {
+  vec2 cell = floor(point);
+  vec2 local = fract(point);
+  vec2 curve = local * local * (3.0 - 2.0 * local);
+  float lower = mix(waterHash(cell), waterHash(cell + vec2(1.0, 0.0)), curve.x);
+  float upper = mix(waterHash(cell + vec2(0.0, 1.0)), waterHash(cell + vec2(1.0, 1.0)), curve.x);
+  return mix(lower, upper, curve.y);
+}
+
+float waterRippleHeight(vec2 worldXZ) {
+  mat2 rotateA = mat2(0.83, -0.55, 0.55, 0.83);
+  mat2 rotateB = mat2(0.47, 0.88, -0.88, 0.47);
+  float warpNoise = waterValueNoise(rotateA * worldXZ * 0.035 + vec2(waterTime * 0.015, -waterTime * 0.01));
+  vec2 warped = worldXZ + vec2(warpNoise - 0.5, 0.5 - warpNoise) * 6.0;
+  vec2 low = rotateA * warped * 0.10 + vec2(waterTime * 0.12, -waterTime * 0.08);
+  vec2 mid = rotateB * warped * 0.29 + vec2(31.7, 7.9) + vec2(-waterTime * 0.15, waterTime * 0.10);
+  return waterValueNoise(low) * 1.8 + waterValueNoise(mid) * 0.85;
+}`,
+        )
+        .replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
+vec3 biomeWaterColor = diffuseColor.rgb;
+float shallowWater = 1.0 - smoothstep( 0.7, 3.2, vWaterDepth );
+vec3 depthWaterColor = mix( waterDeepColor, waterShallowColor, shallowWater );
+diffuseColor.rgb = mix( depthWaterColor, biomeWaterColor, 0.35 );`,
+        )
+        .replace(
+          '#include <normal_fragment_maps>',
+          `#include <normal_fragment_maps>
+vec2 waterWorldXZ = vWaterWorldPosition.xz;
+float rippleHeight = waterRippleHeight( waterWorldXZ + waterPatternOffset );
+vec2 positionDx = dFdx( waterWorldXZ );
+vec2 positionDy = dFdy( waterWorldXZ );
+float heightDx = dFdx( rippleHeight );
+float heightDy = dFdy( rippleHeight );
+float determinant = positionDx.x * positionDy.y - positionDy.x * positionDx.y;
+vec2 rippleSlope = vec2( 0.0 );
+if ( abs( determinant ) > 0.00001 ) {
+  rippleSlope = vec2(
+    heightDx * positionDy.y - heightDy * positionDx.y,
+    positionDx.x * heightDy - positionDy.x * heightDx
+  ) / determinant;
+}
+float pixelFootprint = max( length( positionDx ), length( positionDy ) );
+float rippleFade = 1.0 - smoothstep( 1.25, 3.8, pixelFootprint );
+rippleSlope = clamp( rippleSlope, vec2( -0.9 ), vec2( 0.9 ) ) * rippleFade * 0.55;
+vec3 waterBaseWorldNormal = normalize( transpose( mat3( viewMatrix ) ) * normal );
+vec3 waterWorldNormal = normalize( waterBaseWorldNormal + vec3( -rippleSlope.x, 0.0, -rippleSlope.y ) );
+normal = normalize( mat3( viewMatrix ) * waterWorldNormal );`,
+        )
+        .replace(
+          'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
+          `vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;
+vec3 waterViewDirection = normalize( cameraPosition - vWaterWorldPosition );
+vec3 waterHalfVector = normalize( waterViewDirection + normalize( waterLightDirection ) );
+float waterGlint = pow( max( dot( waterWorldNormal, waterHalfVector ), 0.0 ), 100.0 );
+float waterShimmer = 1.0 + 0.12 * sin( waterTime * 0.55 );
+outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.6;`,
+        );
+    };
   }
 
   // Distance (from the camera) at which the fixed-range shadow starts, and finishes, fading to fully lit.
   setShadowFadeRange(inner: number, outer: number): void {
     this.shadowFadeRange.value.set(inner, outer);
+  }
+
+  setWaterLighting(direction: THREE.Vector3, sunHeight: number, moonHeight: number, sunDominant: boolean, delta: number, renderOrigin: THREE.Vector3): void {
+    this.waterLightDirection.value.copy(direction);
+    this.waterPatternOffset.value.set(renderOrigin.x, renderOrigin.z);
+    if (sunDominant) {
+      const sunUp = THREE.MathUtils.smoothstep(sunHeight, 0, 0.1);
+      const goldenHour = THREE.MathUtils.smoothstep(sunHeight, 0.015, 0.1)
+        * (1 - THREE.MathUtils.smoothstep(sunHeight, 0.2, 0.5));
+      this.waterGlintColor.value.set(0xfff1c2);
+      this.waterSparkle.value = sunUp * (0.28 + goldenHour * 0.72);
+    } else {
+      this.waterGlintColor.value.set(0xdde7f0);
+      this.waterSparkle.value = THREE.MathUtils.smoothstep(moonHeight, 0, 0.35) * 0.16;
+    }
+    this.waterTime.value += Math.max(0, delta);
   }
 
   get chunkCount(): number {
@@ -438,14 +567,17 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     const waterAt = (ix: number, iz: number) => waterSamples[(iz + 1) * (waterSegments + 3) + ix + 1]!;
     const wet: boolean[] = [];
     const levels: number[] = [];
+    const waterDepth: number[] = [];
     for (let iz = 0; iz <= waterSegments; iz += 1) {
       for (let ix = 0; ix <= waterSegments; ix += 1) {
         const sample = waterAt(ix, iz);
+        const waterSurface = sample.water ? sample.surface : this.dryWaterLevel(waterAt, ix, iz);
         wet.push(sample.water);
-        levels.push(sample.water ? sample.surface : this.dryWaterLevel(waterAt, ix, iz));
+        levels.push(waterSurface);
+        waterDepth.push(Math.max(0, waterSurface - sample.height));
       }
     }
-    const waterGeometry = this.createWaterGeometry(originX, originZ, chunkSize, waterSegments, wet, levels);
+    const waterGeometry = this.createWaterGeometry(originX, originZ, chunkSize, waterSegments, wet, levels, waterDepth);
     if (waterGeometry) group.add(new THREE.Mesh(waterGeometry, this.waterMaterial));
 
     const treeObjects = treeMode === 'near' ? this.createTrees(originX, originZ, TREE_SPACING)
@@ -507,9 +639,10 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     return Math.min(count > 0 ? sum / count : dry.surface, dry.height - 0.15);
   }
 
-  private createWaterGeometry(originX: number, originZ: number, chunkSize: number, segments: number, water: boolean[], surface: number[]): THREE.BufferGeometry | null {
+  private createWaterGeometry(originX: number, originZ: number, chunkSize: number, segments: number, water: boolean[], surface: number[], waterDepth: number[]): THREE.BufferGeometry | null {
     const step = chunkSize / segments;
     const positions: number[] = [];
+    const depths: number[] = [];
     const colors: number[] = [];
     const indices: number[] = [];
     const waterColor = new THREE.Color();
@@ -525,6 +658,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         const [y0, y1, y2, y3] = corners.map((corner) => surface[corner]! + 0.15);
         const base = positions.length / 3;
         positions.push(localX, y0!, localZ, localX + step, y1!, localZ, localX, y2!, localZ + step, localX + step, y3!, localZ + step);
+        depths.push(waterDepth[corners[0]!]!, waterDepth[corners[1]!]!, waterDepth[corners[2]!]!, waterDepth[corners[3]!]!);
         for (const [dx, dz] of [[0, 0], [step, 0], [0, step], [step, step]]) {
           const sample = this.world.sample(worldX + dx!, worldZ + dz!);
           waterColor.set(0x2a8fa8);
@@ -542,6 +676,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     if (positions.length === 0) return null;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('waterDepth', new THREE.Float32BufferAttribute(depths, 1));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
