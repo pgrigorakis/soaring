@@ -117,6 +117,8 @@ keyLight.shadow.normalBias = 0.8;
 worldRoot.add(keyLight, keyLight.target);
 
 const sky = new Sky();
+// Opaque sorting checks renderOrder before material ID. Draw the far-plane sky last so terrain depth rejects hidden fragments.
+sky.renderOrder = 1;
 sky.scale.setScalar(450000);
 sky.material.uniforms.turbidity!.value = 2.4;
 sky.material.uniforms.rayleigh!.value = 2.6;
