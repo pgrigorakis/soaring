@@ -1,0 +1,15 @@
+{
+  "check": "passed",
+  "tests": 52,
+  "browser": {
+    "startTime": "2026-10-02T15:11:24.733Z",
+    "duration": 79325.921,
+    "expected": 20,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "retries": 0,
+  "flappingCriterion": "Total flapping is unrestricted by user decision; thermal/ridge no-flap checks remain.",
+  "mergedMain": "5394f8947968b521390ee554c8fbfb49d39b4637"
+}

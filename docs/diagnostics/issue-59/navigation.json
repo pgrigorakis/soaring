@@ -1,0 +1,41 @@
+{
+  "seed": 448122,
+  "landSamples": 3415,
+  "waterSamples": 306,
+  "coverage": 0.12069750586908012,
+  "lake": {
+    "ax": 7647.127558763605,
+    "az": -11252.509786414448,
+    "bx": 7647.127558763605,
+    "bz": -11252.509786414448,
+    "aLevel": 81.03002261455394,
+    "bLevel": 81.03002261455394,
+    "aWidth": 1884.545185901475,
+    "bWidth": 1884.545185901475,
+    "meander": 3.976000764093974,
+    "bend": 3.186190163277939,
+    "lake": true,
+    "heading": 0.5697219008573795,
+    "aspect": 0.5589857042953372,
+    "islandRadius": 181.15265499800444
+  },
+  "islands": 88,
+  "beaches": 421,
+  "deep": 18.156814823768443,
+  "flight": {
+    "seconds": 3600,
+    "distance": 101613.3144311187,
+    "netDistance": 48134.95908323011,
+    "minimumClearance": 86.57792361790791,
+    "wetTicks": 4180,
+    "longestCrossing": 1104.0000000000186,
+    "revisits": 0,
+    "flappingSeconds": 101.6,
+    "behaviorSeconds": {
+      "gliding": 2050.3999999992307,
+      "thermal-seeking": 793.8000000001119,
+      "thermal-riding": 744.6000000001007,
+      "ridge-soaring": 11.199999999999976
+    }
+  }
+}

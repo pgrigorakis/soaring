@@ -57,8 +57,8 @@ test('renders blended biome terrain with deterministic shared chunk edges', asyn
     expect(entry.deterministic).toBe(true);
     expect(entry.sum).toBeCloseTo(1, 12);
     expect(Object.values(entry.sample.biome).every((weight) => Number(weight) >= 0 && Number(weight) <= 1)).toBe(true);
-    expect(entry.sample.biome.lakeland).toBe(0);
   }
+  expect(evidence.samples.some((entry) => entry.sample.biome.lakeland > 0.5)).toBe(true);
   expect(evidence.seamError).toBe(0);
   expect(errors).toEqual([]);
   await testInfo.attach('biome-evidence', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' });

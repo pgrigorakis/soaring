@@ -19,6 +19,8 @@ export type LandscapeSample = {
   rock: number;
   water: boolean;
   river: boolean;
+  /** Land dome within a large drainage lake. */
+  island?: boolean;
 };
 
 export type Thermal = { x: number; z: number; strength: number };
@@ -54,6 +56,7 @@ type RiverNode = {
   z: number;
   elevation: number;
   highland: number;
+  lakeland: number;
   level?: number;
   down?: RiverNode | null;
   flow?: number;
@@ -75,6 +78,10 @@ export type Reach = {
   /** Second sideways harmonic, or a lake-outline phase when `lake` is set. */
   bend: number;
   lake: boolean;
+  /** Lake ellipse: major radius is aWidth/2; heading follows the basin's spill direction. */
+  aspect?: number;
+  heading?: number;
+  islandRadius?: number;
 };
 
 export type DrainageNode = {
@@ -185,13 +192,19 @@ export const meanderOffset = (reach: Reach, t: number) => {
   return length * (reach.meander * Math.sin(Math.PI * t) + reach.bend * Math.sin(2 * Math.PI * t));
 };
 
-/** Lake outline scale at an angle around the disc center; the shore lies at half-width times this. */
-const lakeWarp = (reach: Reach, angle: number) =>
-  Math.max(0.7, 1 + 0.2 * Math.sin(2 * angle + reach.meander) + 0.11 * Math.sin(5 * angle + reach.bend));
+/** Outline scale in the lake's local disc/ellipse coordinates. */
+const lakeWarp = (reach: Reach, angle: number) => reach.aspect
+  ? 1 + 0.05 * Math.sin(3 * angle + reach.bend)
+  : Math.max(0.7, 1 + 0.2 * Math.sin(2 * angle + reach.meander) + 0.11 * Math.sin(5 * angle + reach.bend));
 
-/** Shore point of a lake disc at an angle (0 points +x, increasing toward +z), pushed `outward` metres onto land. */
+/** Shore point at a world-space angle (0 points +x), pushed `outward` metres onto land. */
 export function lakeShorePoint(reach: Reach, angle: number, outward = 0): { x: number; z: number } {
-  const radius = (reach.aWidth / 2) * lakeWarp(reach, angle) + outward;
+  const localAngle = angle - (reach.heading ?? 0);
+  const dx = Math.cos(localAngle);
+  const dz = Math.sin(localAngle) / (reach.aspect ?? 1);
+  const radius = (reach.aWidth / 2) * (reach.aspect
+    ? lakeWarp(reach, Math.atan2(dz, dx)) / Math.hypot(dx, dz)
+    : lakeWarp(reach, angle)) + outward;
   return { x: reach.ax + Math.cos(angle) * radius, z: reach.az + Math.sin(angle) * radius };
 }
 
@@ -200,8 +213,11 @@ function reachDistance(reach: Reach, x: number, z: number): { distance: number; 
   const dz = reach.bz - reach.az;
   const length = Math.hypot(dx, dz);
   if (length === 0) {
-    const dx = x - reach.ax;
-    const dz = z - reach.az;
+    const angle = reach.heading ?? 0;
+    const rx = x - reach.ax;
+    const rz = z - reach.az;
+    const dx = rx * Math.cos(angle) + rz * Math.sin(angle);
+    const dz = (-rx * Math.sin(angle) + rz * Math.cos(angle)) / (reach.aspect ?? 1);
     return { distance: Math.hypot(dx, dz) / lakeWarp(reach, Math.atan2(dz, dx)), t: 0 };
   }
   const along = ((x - reach.ax) * dx + (z - reach.az) * dz) / length;
@@ -255,7 +271,7 @@ export class WorldModel {
 
     // The nearest channel owns the valley. A second channel blends in only near a divide,
     // so a higher neighbor cannot lift this river onto a ridge or leave a cliff at the shore.
-    type Shore = { shoreDist: number; surface: number; lake: boolean; distance: number; half: number };
+    type Shore = { shoreDist: number; surface: number; lake: boolean; distance: number; half: number; islandDistance?: number; islandRadius?: number };
     let nearest: Shore | null = null;
     let second: Shore | null = null;
     let wet: Shore | null = null;
@@ -265,12 +281,28 @@ export class WorldModel {
       const valley = 0.008 * distance + 0.00032 * Math.max(0, distance - 180) ** 2;
       return shore.surface + mix(gentle, valley, highland);
     };
-    for (const reach of this.reachesNear(x, z)) {
+    const shores = this.reachesNear(x, z).map((reach) => {
       const { distance, t } = reachDistance(reach, x, z);
       const wobble = reach.lake ? 1 : 1 + 0.18 * Math.sin(Math.PI * t);
       const half = mix(reach.aWidth, reach.bWidth, t) / 2 * wobble;
       const surface = mix(reach.aLevel, reach.bLevel, t);
-      const shore: Shore = { shoreDist: distance - half, surface, lake: reach.lake, distance, half };
+      return { shoreDist: distance - half, surface, lake: reach.lake, distance, half,
+        largeLake: reach.lake && half > MAX_LAKE_RADIUS,
+        islandDistance: reach.islandRadius ? Math.hypot(x - reach.ax, z - reach.az) : undefined,
+        islandRadius: reach.islandRadius };
+    });
+    for (const original of shores) {
+      const shore: Shore = { ...original };
+      if (original.largeLake) {
+        // Reshape lake shores around higher tributaries and neighboring lakes. The
+        // clearance grows with the level difference, leaving room for a gentle bank.
+        // Only the lake mask changes; river beds, levels and routing stay unchanged.
+        for (const other of shores) {
+          const drop = other.surface - shore.surface;
+          if (other === original || drop <= 0.3) continue;
+          shore.shoreDist = Math.max(shore.shoreDist, 2 * SHELF + 48 + drop * 3 - other.shoreDist);
+        }
+      }
       if (shore.shoreDist > 1600) continue;
       if (!nearest || shore.shoreDist < nearest.shoreDist) {
         second = nearest;
@@ -298,8 +330,12 @@ export class WorldModel {
       lake = wet.lake;
       surface = wet.surface;
       bank = wet.shoreDist;
-      const bowl = wet.lake ? 0.7 + 0.3 * (1 - wet.distance / Math.max(wet.half, 1)) : 1;
-      height = surface - (wet.lake ? 3.6 : 2.7) * bowl;
+      const depth = wet.lake ? 3.6 + Math.max(0, wet.half - MAX_LAKE_RADIUS) * 0.025 : 2.7;
+      const inward = Math.min(-wet.shoreDist, wet.islandRadius ? Math.max(0, wet.islandDistance! - wet.islandRadius) : Infinity);
+      const bowl = !wet.lake ? 1 : wet.half > MAX_LAKE_RADIUS
+        ? mix(0.08, 1, smootherstep(0, Math.max(80, wet.half * 0.35), inward))
+        : 0.7 + 0.3 * (1 - wet.distance / Math.max(wet.half, 1));
+      height = surface - depth * bowl;
     } else if (bank < SHELF && bank > 0) {
       height = Math.max(height, surface + 0.85);
     }
@@ -307,6 +343,17 @@ export class WorldModel {
     height += detail * detailScale;
     if (wet) height = Math.min(height, surface - 1.5);
     else if (bank < SHELF && bank > 0) height = Math.max(height, surface + 0.85);
+
+    let island = false;
+    if (wet?.islandRadius && wet.islandDistance! < wet.islandRadius) {
+      island = true;
+      river = false;
+      lake = false;
+      bank = wet.islandRadius - wet.islandDistance!;
+      height = surface + 0.85 + 12 * (1 - (wet.islandDistance! / wet.islandRadius) ** 2);
+    } else if (wet?.islandRadius) {
+      bank = Math.max(bank, wet.islandRadius - wet.islandDistance!);
+    }
 
     let peat = 0;
     const pool = this.peatPool(x, z, biome, bank);
@@ -334,13 +381,14 @@ export class WorldModel {
       ? farmland(x, z, this.seed) : { field: 0, hedge: 0, fieldEdge: null };
     const legacyForest = Math.max(smootherstep(-0.04, 0.05, woodland), riverside * 0.62) * (1 - mountainRegion * 0.5);
     const forest = (biome.hills * (BIOME_PROFILES.hills.forestDensity + hedge * 0.55) + biome.woodland * BIOME_PROFILES.woodland.forestDensity * (1 - glade)
-      + biome.moor * BIOME_PROFILES.moor.forestDensity + (biome.highlands + biome.lakeland) * legacyForest) * ((river || lake) ? 0 : 1);
+      + biome.moor * BIOME_PROFILES.moor.forestDensity + biome.highlands * legacyForest
+      + biome.lakeland * BIOME_PROFILES.lakeland.forestDensity) * ((river || lake) ? 0 : 1);
     const moorPatch = biome.moor > 0 ? clamp01(0.5 + fbm(x / 250, z / 250, this.seed + 155, 2)) : 0;
     const localHigh = smootherstep(0.6, 2.8, detail);
-    const rock = clamp01((biome.highlands + biome.lakeland) * (mountainRegion * 0.74 + smootherstep(96, 170, height))
+    const rock = clamp01(biome.highlands * (mountainRegion * 0.74 + smootherstep(96, 170, height))
       + blendParameter(biome, 'rockBias', 0) + biome.moor * localHigh * 0.7);
 
-    return { height, mountainRegion, surface, bank, moisture, forest, rock, water: lake || river, river, biome, glade, field, hedge, fieldEdge, moorPatch, peat };
+    return { height, mountainRegion, surface, bank, moisture, forest, rock, water: lake || river, river, biome, glade, field, hedge, fieldEdge, moorPatch, peat, island };
   }
 
   /** Broad landform. Drainage and the rendered hills share this field, so rivers follow the visible relief. */
@@ -353,14 +401,19 @@ export class WorldModel {
     const dry = 1 - transition(BIOME_SELECTION.moorThreshold, climate);
     const candidate = 65 + broad * 45 + dry * (85 + broad * 15);
     const hillsField = clamp01(0.5 + fbm(x / BIOME_SELECTION.hillsWavelength, z / BIOME_SELECTION.hillsWavelength, this.seed + 129, 3));
-    const biome = biomeWeights(mountainRegion, climate, candidate, hillsField);
+    const lakeField = clamp01(0.5 + fbm(x / BIOME_SELECTION.lakeWavelength, z / BIOME_SELECTION.lakeWavelength, this.seed + 131, 4));
+    // Lakeland replaces appearance and basin water, not the accepted drainage
+    // landform. Both allocations use the same ordered biome rules; the landform
+    // allocation reserves no lake territory, exactly as before issue 59.
+    const landform = biomeWeights(mountainRegion, climate, candidate, hillsField);
+    const biome = biomeWeights(mountainRegion, climate, candidate, hillsField, lakeField);
     const ridges = biome.highlands > 0 ? 1 - Math.abs(fbm(x / 1550, z / 1550, this.seed + 47, 4)) : 0;
     const ridge = clamp01((ridges - 0.34) / 0.66);
     const mountains = mountainRegion * ridge * ridge * 380;
-    const elevation = biome.hills * (BIOME_PROFILES.hills.heightOffset + broad * BIOME_PROFILES.hills.heightAmplitude)
-      + biome.woodland * (BIOME_PROFILES.woodland.heightOffset + broad * BIOME_PROFILES.woodland.heightAmplitude)
-      + biome.moor * (BIOME_PROFILES.moor.heightOffset + broad * BIOME_PROFILES.moor.heightAmplitude)
-      + (biome.highlands + biome.lakeland) * (28 + broad * 52 + mountains);
+    const elevation = landform.hills * (BIOME_PROFILES.hills.heightOffset + broad * BIOME_PROFILES.hills.heightAmplitude)
+      + landform.woodland * (BIOME_PROFILES.woodland.heightOffset + broad * BIOME_PROFILES.woodland.heightAmplitude)
+      + landform.moor * (BIOME_PROFILES.moor.heightOffset + broad * BIOME_PROFILES.moor.heightAmplitude)
+      + landform.highlands * (28 + broad * 52 + mountains);
     return { elevation, mountainRegion, biome };
   }
 
@@ -402,7 +455,8 @@ export class WorldModel {
     const key = nodeKey(ci, cj);
     let reaches = getLru(this.nearbyReaches, key);
     if (reaches === undefined) {
-      const margin = 4;
+      // 1,470 m maximum warped lake + 1,600 m valley influence, plus node jitter.
+      const margin = 7;
       reaches = this.reachesIn(
         (ci - margin) * DRAINAGE_SPACING,
         (cj - margin) * DRAINAGE_SPACING,
@@ -456,7 +510,7 @@ export class WorldModel {
       elevation: node.elevation,
       level: this.waterLevel(node),
       flow,
-      lake: !down && flow >= RIVER_MIN_FLOW,
+      lake: !down && flow >= (node.lakeland > 0.5 ? 2 : RIVER_MIN_FLOW),
       downstreamI: down?.i ?? null,
       downstreamJ: down?.j ?? null,
     };
@@ -466,16 +520,36 @@ export class WorldModel {
   landmarkNear(x: number, z: number, radius = 10): { x: number; z: number; surface: number; lake: boolean } | null {
     const ci = Math.round(x / DRAINAGE_SPACING - 0.5);
     const cj = Math.round(z / DRAINAGE_SPACING - 0.5);
-    let best: DrainageNode | null = null;
+    const candidates: DrainageNode[] = [];
     for (let j = cj - radius; j <= cj + radius; j += 1) {
       for (let i = ci - radius; i <= ci + radius; i += 1) {
         const node = this.drainageAt(i, j);
         const useful = node.lake || (node.downstreamI !== null && node.flow >= RIVER_MIN_FLOW);
         if (!useful) continue;
-        if (!best || Number(node.lake) > Number(best.lake) || (node.lake === best.lake && node.flow > best.flow)) best = node;
+        candidates.push(node);
       }
     }
-    return best ? { x: best.x, z: best.z, surface: best.level, lake: best.lake } : null;
+    candidates.sort((a, b) => Number(b.lake) - Number(a.lake) || b.flow - a.flow);
+    for (const node of candidates) {
+      const wetPoint = (px: number, pz: number) => {
+        const sample = this.sample(px, pz);
+        return sample.water && (!node.lake || !sample.river)
+          ? { x: px, z: pz, surface: sample.surface, lake: !sample.river } : null;
+      };
+      const center = wetPoint(node.x, node.z);
+      if (center) return center;
+      // A lake's center can be an island, or its entire mask can be clipped by
+      // higher tributaries. Try actual lake water, then the next visible feature.
+      if (!node.lake) continue;
+      for (const distance of [300, 600, 900, 1200]) {
+        for (let direction = 0; direction < 16; direction += 1) {
+          const angle = direction * Math.PI / 8;
+          const point = wetPoint(node.x + Math.cos(angle) * distance, node.z + Math.sin(angle) * distance);
+          if (point) return point;
+        }
+      }
+    }
+    return null;
   }
 
   /** Four altitude viewpoints: a confluence, a basin lake, a multi-segment run, and a wide network. */
@@ -539,8 +613,8 @@ export class WorldModel {
     if (node.reach !== undefined) return node.reach;
     node.reach = null;
     const flow = this.flow(node);
-    if (flow < RIVER_MIN_FLOW) return null;
     const down = this.downstream(node);
+    if (flow < (!down && node.lakeland > 0.5 ? 2 : RIVER_MIN_FLOW)) return null;
     const level = this.waterLevel(node);
     if (!down) {
       const radius = this.lakeRadius(node, flow);
@@ -551,6 +625,7 @@ export class WorldModel {
         meander: hash2(node.i, node.j, this.seed + 181) * Math.PI * 2,
         bend: hash2(node.i, node.j, this.seed + 183) * Math.PI * 2,
         lake: true,
+        ...(node.lakeland > 0.5 ? this.lakeShape(node, radius) : {}),
       };
       return node.reach;
     }
@@ -559,7 +634,9 @@ export class WorldModel {
     let bz = down.z;
     const downFlow = this.flow(down);
     if (!this.downstream(down) && downFlow >= RIVER_MIN_FLOW) {
-      const radius = this.lakeRadius(down, downFlow);
+      // Keep the accepted inlet geometry. The enlarged lake mask reshapes itself
+      // around tributaries instead of shortening their channels to zero length.
+      const radius = this.inletRadius(down, downFlow);
       const dx = down.x - node.x;
       const dz = down.z - node.z;
       const length = Math.hypot(dx, dz);
@@ -597,9 +674,24 @@ export class WorldModel {
     return node.cirque;
   }
 
+  /** Basin lakes stretch along the lowest potential spill, without changing river routing. */
+  private lakeShape(node: RiverNode, radius: number) {
+    let spill = this.node(node.i + 1, node.j);
+    for (const [di, dj] of NEIGHBORS) {
+      const other = this.node(node.i + di, node.j + dj);
+      if (other.elevation < spill.elevation) spill = other;
+    }
+    return { heading: Math.atan2(spill.z - node.z, spill.x - node.x),
+      aspect: 0.42 + hash2(node.i, node.j, this.seed + 185) * 0.16,
+      islandRadius: radius >= 900 ? 160 + hash2(node.i, node.j, this.seed + 187) * 80 : undefined };
+  }
+
   private lakeRadius(node: RiverNode, flow: number): number {
-    const highland = node.highland;
-    return mix(lakeRadius(flow), 140 + Math.min(60, Math.sqrt(flow) * 5), highland);
+    return mix(this.inletRadius(node, flow), 750 + 650 * clamp01(Math.sqrt(flow / 80)), node.lakeland);
+  }
+
+  private inletRadius(node: RiverNode, flow: number): number {
+    return mix(lakeRadius(flow), 140 + Math.min(60, Math.sqrt(flow) * 5), node.highland);
   }
 
   private node(i: number, j: number): RiverNode {
@@ -609,7 +701,7 @@ export class WorldModel {
     const x = (i + 0.5 + (hash2(i, j, this.seed + 163) - 0.5) * 0.42) * DRAINAGE_SPACING;
     const z = (j + 0.5 + (hash2(i, j, this.seed + 167) - 0.5) * 0.42) * DRAINAGE_SPACING;
     const { elevation, biome } = this.relief(x, z);
-    node = { i, j, x, z, elevation, highland: biome.highlands };
+    node = { i, j, x, z, elevation, highland: biome.highlands, lakeland: biome.lakeland };
     this.riverNodes.set(key, node);
     return node;
   }
@@ -655,7 +747,7 @@ export class WorldModel {
   private mouth(from: RiverNode, to: RiverNode): { x: number; z: number } {
     const flow = this.flow(to);
     if (!this.downstream(to) && flow >= RIVER_MIN_FLOW) {
-      const radius = this.lakeRadius(to, flow);
+      const radius = this.inletRadius(to, flow);
       const dx = to.x - from.x;
       const dz = to.z - from.z;
       const length = Math.hypot(dx, dz) || 1;
@@ -819,7 +911,8 @@ export class WorldModel {
           // A 0.35 reference occupancy leaves headroom for the full 2.5× profile density.
           + sample.biome.woodland * (1 - sample.glade) * 0.35 * density
           + sample.biome.moor * (0.004 + moorGrove * 0.3)
-          + (sample.biome.highlands + sample.biome.lakeland) * (0.018 + sample.forest * clumping);
+          + sample.biome.highlands * (0.018 + sample.forest * clumping)
+          + sample.biome.lakeland * (sample.island ? 0.5 : 0.2);
         if (sample.water || (sample.height >= 320 && sample.biome.highlands > 0.5)
           || sample.rock > mix(0.72, 1, sample.biome.highlands)
           || hash2(cx, cz, this.seed + 349) > chance * (1 - sample.biome.highlands * smootherstep(280, 320, sample.height))) continue;
@@ -828,9 +921,9 @@ export class WorldModel {
         if (slope > MAX_TREE_SLOPE) continue;
         const reserved = sample.biome.lakeland;
         const conifer = sample.biome.hills * BIOME_PROFILES.hills.species[0] + sample.biome.woodland * BIOME_PROFILES.woodland.species[0]
-          + sample.biome.moor * BIOME_PROFILES.moor.species[0] + sample.biome.highlands + reserved / 3;
+          + sample.biome.moor * BIOME_PROFILES.moor.species[0] + sample.biome.highlands + reserved * BIOME_PROFILES.lakeland.species[0];
         const birch = sample.biome.hills * BIOME_PROFILES.hills.species[2] + sample.biome.woodland * BIOME_PROFILES.woodland.species[2]
-          + sample.biome.moor * BIOME_PROFILES.moor.species[2] + reserved / 3;
+          + sample.biome.moor * BIOME_PROFILES.moor.species[2] + reserved * BIOME_PROFILES.lakeland.species[2];
         const species = hash2(cx, cz, this.seed + 353);
         const kind = species < conifer ? 0 : species > 1 - birch ? 2 : 1;
         const autumn = hash2(cx, cz, this.seed + 355) < sample.biome.woodland * 0.04;
@@ -947,10 +1040,21 @@ export class WorldModel {
       const radius = ring * 920 + hash2(ring, visit * 8 + candidate, this.seed + 257) * 700;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
+      if (this.sample(x, z).water) continue;
       const score = this.interest(x, z);
       if (score <= bestScore) continue;
       bestScore = score;
       best = { x, z, heading: angle + Math.PI * (0.72 + hash2(visit, candidate, this.seed + 263) * 0.56) };
+    }
+    // If every ring candidate is flooded, find dry ground on a deterministic spiral.
+    if (bestScore === -Infinity) {
+      for (let step = 1; ; step += 1) {
+        const radius = Math.sqrt(step) * 180;
+        const angle = step * 2.399963229728653;
+        const x = Math.cos(angle) * radius;
+        const z = Math.sin(angle) * radius;
+        if (!this.sample(x, z).water) return { x, z, heading: angle };
+      }
     }
     return best;
   }

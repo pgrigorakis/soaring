@@ -1,0 +1,270 @@
+{
+  "gladeShift": 0,
+  "seed": 448122,
+  "start": {
+    "x": -4804.329426881198,
+    "z": -1931.278897154048
+  },
+  "netDistance": 48816.96964724779,
+  "requiredNetDistance": 36364.88259957471,
+  "distance": 103899.66457021347,
+  "revisitPasses": 0,
+  "flappingTicks": 1997,
+  "flappingOutsideWoodland": 1972.1002318048716,
+  "woodlandTicks": 991.488459338203,
+  "seekEntries": 29,
+  "backwardSeekEntries": 6,
+  "stalledTicks": 0,
+  "mostVisitedThermals": [
+    [
+      "-9102,-3879",
+      1
+    ],
+    [
+      "-12336,-3106",
+      1
+    ],
+    [
+      "-13499,-2263",
+      1
+    ],
+    [
+      "-14499,-1898",
+      1
+    ],
+    [
+      "-16056,-94",
+      1
+    ],
+    [
+      "-18497,4040",
+      1
+    ],
+    [
+      "-18501,4045",
+      1
+    ],
+    [
+      "-21799,5114",
+      1
+    ]
+  ],
+  "snapshots": [
+    {
+      "seconds": 300,
+      "position": [
+        -11877.88161908452,
+        -3263.1457099445797
+      ],
+      "behavior": "thermal-seeking",
+      "biome": {
+        "hills": 1,
+        "woodland": 0,
+        "moor": 0,
+        "highlands": 0,
+        "lakeland": 0
+      },
+      "netDistance": 7197.847582634493,
+      "distance": 8821.381808536044,
+      "flappingTicks": 283
+    },
+    {
+      "seconds": 600,
+      "position": [
+        -14646.876836992175,
+        -1154.8453209901354
+      ],
+      "behavior": "gliding",
+      "biome": {
+        "hills": 0,
+        "woodland": 0,
+        "moor": 0,
+        "highlands": 1,
+        "lakeland": 0
+      },
+      "netDistance": 9873.124562086563,
+      "distance": 16478.463009627656,
+      "flappingTicks": 454
+    },
+    {
+      "seconds": 900,
+      "position": [
+        -17312.64551756896,
+        3756.889677884568
+      ],
+      "behavior": "gliding",
+      "biome": {
+        "hills": 0,
+        "woodland": 0,
+        "moor": 0,
+        "highlands": 1,
+        "lakeland": 0
+      },
+      "netDistance": 13740.932761738382,
+      "distance": 25705.73910364062,
+      "flappingTicks": 463
+    },
+    {
+      "seconds": 1200,
+      "position": [
+        -19992.855730479056,
+        4929.327422629471
+      ],
+      "behavior": "gliding",
+      "biome": {
+        "hills": 0,
+        "woodland": 0,
+        "moor": 0,
+        "highlands": 1,
+        "lakeland": 0
+      },
+      "netDistance": 16666.11083456898,
+      "distance": 34311.30235146298,
+      "flappingTicks": 819
+    },
+    {
+      "seconds": 1500,
+      "position": [
+        -22629.264823808036,
+        1566.8547998244537
+      ],
+      "behavior": "gliding",
+      "biome": {
+        "hills": 0,
+        "woodland": 0,
+        "moor": 0,
+        "highlands": 1,
+        "lakeland": 0
+      },
+      "netDistance": 18164.945947251035,
+      "distance": 43186.53134907357,
+      "flappingTicks": 837
+    },
+    {
+      "seconds": 1800,
+      "position": [
+        -24748.31779065906,
+        -5919.127839531555
+      ],
+      "behavior": "thermal-seeking",
+      "biome": {
+        "hills": 0,
+        "woodland": 0,
+        "moor": 0,
+        "highlands": 1,
+        "lakeland": 0
+      },
+      "netDistance": 20338.77112909549,
+      "distance": 52217.94880867117,
+      "flappingTicks": 1152
+    },
+    {
+      "seconds": 2100,
+      "position": [
+        -29886.252542772847,
+        -9675.26596715653
+      ],
+      "behavior": "gliding",
+      "biome": {
+        "hills": 1,
+        "woodland": 0,
+        "moor": 0,
+        "highlands": 0,
+        "lakeland": 0
+      },
+      "netDistance": 26250.184817099205,
+      "distance": 61033.05517677445,
+      "flappingTicks": 1368
+    },
+    {
+      "seconds": 2400,
+      "position": [
+        -35692.268437517465,
+        -13523.11846465668
+      ],
+      "behavior": "thermal-seeking",
+      "biome": {
+        "hills": 0.0002454866700531966,
+        "woodland": 0,
+        "moor": 0.3358782291399912,
+        "highlands": 0,
+        "lakeland": 0.6638762841899556
+      },
+      "netDistance": 32991.44617750949,
+      "distance": 70108.82921659353,
+      "flappingTicks": 1467
+    },
+    {
+      "seconds": 2700,
+      "position": [
+        -37355.71452509813,
+        -14585.433421280784
+      ],
+      "behavior": "thermal-seeking",
+      "biome": {
+        "hills": 0.0003213853452190829,
+        "woodland": 0,
+        "moor": 0.9996786146547809,
+        "highlands": 0,
+        "lakeland": 0
+      },
+      "netDistance": 34924.49424877755,
+      "distance": 79080.46917364464,
+      "flappingTicks": 1764
+    },
+    {
+      "seconds": 3000,
+      "position": [
+        -40951.765915929645,
+        -18574.998256676525
+      ],
+      "behavior": "gliding",
+      "biome": {
+        "hills": 0,
+        "woodland": 0.2600537514147981,
+        "moor": 0.739946248585202,
+        "highlands": 0,
+        "lakeland": 0
+      },
+      "netDistance": 39795.107222475664,
+      "distance": 87288.439524487,
+      "flappingTicks": 1854
+    },
+    {
+      "seconds": 3300,
+      "position": [
+        -45637.146314666476,
+        -19124.224425095043
+      ],
+      "behavior": "thermal-seeking",
+      "biome": {
+        "hills": 0,
+        "woodland": 0,
+        "moor": 1,
+        "highlands": 0,
+        "lakeland": 0
+      },
+      "netDistance": 44304.81137436598,
+      "distance": 95722.27664829839,
+      "flappingTicks": 1907
+    },
+    {
+      "seconds": 3600,
+      "position": [
+        -48958.8004777197,
+        -22751.442483470477
+      ],
+      "behavior": "gliding",
+      "biome": {
+        "hills": 0,
+        "woodland": 0,
+        "moor": 1,
+        "highlands": 0,
+        "lakeland": 0
+      },
+      "netDistance": 48816.96964724779,
+      "distance": 103899.66457021347,
+      "flappingTicks": 1997
+    }
+  ]
+}

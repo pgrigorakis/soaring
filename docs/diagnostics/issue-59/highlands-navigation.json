@@ -1,0 +1,37 @@
+{
+  "baseline": {
+    "commit": "184df89de4f05087194fdc25e36ddd83a7ba0181",
+    "start": {
+      "x": -24000,
+      "z": 3750
+    },
+    "peakVerticalSpeed": 511.63911809568475,
+    "flappingSeconds": 164.8
+  },
+  "metrics": {
+    "seed": 57,
+    "start": {
+      "x": -84000,
+      "z": 122000,
+      "heading": 0
+    },
+    "seconds": 3600,
+    "minClearance": 12.40004604385365,
+    "peakVerticalSpeed": 4.000000000000057,
+    "flappingSeconds": 275.89999999999424,
+    "safetyCorrections": 0,
+    "highlandSeconds": 2602.2999999987287,
+    "ridgeEpisodes": 2,
+    "ridgeSeconds": 420.20000000002705,
+    "ridgeMeanClimb": 0.05782542133628972,
+    "ridgeFlappingTicks": 0,
+    "ridgeCeilingBreaches": 0,
+    "ridgeMinClearance": 86.34216164434656,
+    "longestEpisode": {
+      "gliding": 169.99999999999463,
+      "thermal-seeking": 42.00000000000033,
+      "thermal-riding": 63.700000000000635,
+      "ridge-soaring": 210.09999999999235
+    }
+  }
+}

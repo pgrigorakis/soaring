@@ -1,0 +1,74 @@
+[
+  {
+    "threshold": 0.735,
+    "seed": 448122,
+    "samples": 3721,
+    "land": 3406,
+    "weightedCoverage": 0.12924609755458194,
+    "dominantCoverage": 0.1285965942454492
+  },
+  {
+    "threshold": 0.735,
+    "seed": 80231,
+    "samples": 3721,
+    "land": 3394,
+    "weightedCoverage": 0.1799457455919792,
+    "dominantCoverage": 0.1817913965822039
+  },
+  {
+    "threshold": 0.735,
+    "seed": 5914,
+    "samples": 3721,
+    "land": 3314,
+    "weightedCoverage": 0.19455131475745616,
+    "dominantCoverage": 0.1955340977670489
+  },
+  {
+    "threshold": 0.75,
+    "seed": 448122,
+    "samples": 3721,
+    "land": 3415,
+    "weightedCoverage": 0.12069750586908012,
+    "dominantCoverage": 0.11976573938506589
+  },
+  {
+    "threshold": 0.75,
+    "seed": 80231,
+    "samples": 3721,
+    "land": 3396,
+    "weightedCoverage": 0.16617233450445498,
+    "dominantCoverage": 0.16607773851590105
+  },
+  {
+    "threshold": 0.75,
+    "seed": 5914,
+    "samples": 3721,
+    "land": 3322,
+    "weightedCoverage": 0.17867534851947717,
+    "dominantCoverage": 0.1785069235400361
+  },
+  {
+    "threshold": 0.765,
+    "seed": 448122,
+    "samples": 3721,
+    "land": 3417,
+    "weightedCoverage": 0.11059216298797868,
+    "dominantCoverage": 0.1106233538191396
+  },
+  {
+    "threshold": 0.765,
+    "seed": 80231,
+    "samples": 3721,
+    "land": 3402,
+    "weightedCoverage": 0.15270484507028617,
+    "dominantCoverage": 0.14873603762492651
+  },
+  {
+    "threshold": 0.765,
+    "seed": 5914,
+    "samples": 3721,
+    "land": 3330,
+    "weightedCoverage": 0.16322501718339272,
+    "dominantCoverage": 0.16216216216216217
+  }
+]
