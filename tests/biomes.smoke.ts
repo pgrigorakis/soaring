@@ -29,8 +29,10 @@ test('renders blended biome terrain with deterministic shared chunk edges', asyn
     const scene = new THREE.Scene();
     const terrain = new TerrainStream(scene, first);
     terrain.update(CHUNK_SIZE / 2, CHUNK_SIZE / 2, 25);
-    const left = scene.getObjectByName('land 0,0').children[0].geometry;
-    const right = scene.getObjectByName('land 1,0').children[0].geometry;
+    const leftGroup = scene.getObjectByName('land 0,0');
+    const rightGroup = scene.getObjectByName('land 1,0');
+    const left = leftGroup.children[0].geometry;
+    const right = rightGroup.children[0].geometry;
     const attributes = ['position', 'normal', 'color'];
     let seamError = 0;
     for (const name of attributes) {
@@ -38,7 +40,11 @@ test('renders blended biome terrain with deterministic shared chunk edges', asyn
       const b = right.getAttribute(name);
       for (let row = 0; row <= 40; row += 1) {
         for (let axis = 0; axis < 3; axis += 1) {
-          seamError = Math.max(seamError, Math.abs(a.array[(row * 41 + 40) * 3 + axis] - b.array[row * 41 * 3 + axis]));
+          // Floating-origin chunks store local positions; compare the shared world edge.
+          const leftOffset = name === 'position' ? leftGroup.position.getComponent(axis) : 0;
+          const rightOffset = name === 'position' ? rightGroup.position.getComponent(axis) : 0;
+          seamError = Math.max(seamError, Math.abs(a.array[(row * 41 + 40) * 3 + axis] + leftOffset
+            - b.array[row * 41 * 3 + axis] - rightOffset));
         }
       }
     }

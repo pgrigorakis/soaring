@@ -49,7 +49,7 @@
     ]
   },
   "benchmark": {
-    "baselineRef": "bb19112",
+    "baselineRef": "5103c32",
     "spots": [
       [
         -8000,
@@ -72,67 +72,67 @@
       {
         "baseline": {
           "chunks": 100,
-          "meanMs": 12.340999999642372,
-          "maxMs": 31.900000035762787
+          "meanMs": 12.288999999165535,
+          "maxMs": 31.80000001192093
         },
         "current": {
           "chunks": 100,
-          "meanMs": 12.611000000238418,
-          "maxMs": 45.80000001192093
+          "meanMs": 12.706999999880791,
+          "maxMs": 44.60000002384186
         }
       },
       {
         "baseline": {
           "chunks": 100,
-          "meanMs": 12.235999998450279,
-          "maxMs": 31.599999964237213
+          "meanMs": 12.173999999761582,
+          "maxMs": 32
         },
         "current": {
           "chunks": 100,
-          "meanMs": 12.63099999845028,
-          "maxMs": 44.19999998807907
+          "meanMs": 12.700999998450278,
+          "maxMs": 45.09999996423721
         }
       },
       {
         "baseline": {
           "chunks": 100,
-          "meanMs": 12.385000000596046,
-          "maxMs": 31.69999998807907
+          "meanMs": 12.200000000596047,
+          "maxMs": 31.5
         },
         "current": {
           "chunks": 100,
-          "meanMs": 12.540000000596047,
-          "maxMs": 45.30000001192093
+          "meanMs": 12.681999998688697,
+          "maxMs": 44.5
         }
       },
       {
         "baseline": {
           "chunks": 100,
-          "meanMs": 12.225,
-          "maxMs": 32.5
+          "meanMs": 12.210000000596047,
+          "maxMs": 33.19999998807907
         },
         "current": {
           "chunks": 100,
-          "meanMs": 12.598999999761581,
-          "maxMs": 45.30000001192093
+          "meanMs": 12.444000000357628,
+          "maxMs": 44.5
         }
       },
       {
         "baseline": {
           "chunks": 100,
-          "meanMs": 12.125,
-          "maxMs": 31.399999976158142
+          "meanMs": 12.163000000715256,
+          "maxMs": 31.5
         },
         "current": {
           "chunks": 100,
-          "meanMs": 12.691000000834466,
-          "maxMs": 46.60000002384186
+          "meanMs": 12.54800000011921,
+          "maxMs": 44.89999997615814
         }
       }
     ],
-    "baselineMeanMs": 12.26239999973774,
-    "currentMeanMs": 12.614399999976158,
-    "increasePercent": 2.870563676327187
+    "baselineMeanMs": 12.207200000166894,
+    "currentMeanMs": 12.61639999949932,
+    "increasePercent": 3.352120054777763
   },
   "peatPool": {
     "found": {

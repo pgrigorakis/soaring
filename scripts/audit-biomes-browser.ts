@@ -71,5 +71,5 @@ export async function benchmark() {
   }
   const baselineMeanMs = rows.reduce((sum, row) => sum + row.baseline.meanMs, 0) / rows.length;
   const currentMeanMs = rows.reduce((sum, row) => sum + row.current.meanMs, 0) / rows.length;
-  return { baselineRef: 'bb19112', spots, rows, baselineMeanMs, currentMeanMs, increasePercent: (currentMeanMs / baselineMeanMs - 1) * 100 };
+  return { baselineRef: '5103c32', spots, rows, baselineMeanMs, currentMeanMs, increasePercent: (currentMeanMs / baselineMeanMs - 1) * 100 };
 }

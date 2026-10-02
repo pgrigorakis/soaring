@@ -74,18 +74,18 @@ CHROME_DEVTOOLS_AXI_SESSION=soaring-biome-weights chrome-devtools-axi eval \
 
 ## Build-time diagnostics
 
-Compared against immutable post-Highlands main commit `bb19112`, in the same real Chrome session. Four locations cover Hills, Woodland, Moor and a blend zone. Each run builds 100 near chunks. After one warm-up per version, five paired runs alternate version order (500 measured chunks per version). Timers observe `createChunk`, the boundary used by the production `buildTiming` diagnostic.
+Compared against immutable main commit `5103c32` (Highlands plus floating origin), in the same real Chrome session. Four locations cover Hills, Woodland, Moor and a blend zone. Each run builds 100 near chunks. After one warm-up per version, five paired runs alternate version order (500 measured chunks per version). Timers observe `createChunk`, the boundary used by the production `buildTiming` diagnostic.
 
-- Baseline mean: **12.2624 ms/chunk**.
-- New mean: **12.6144 ms/chunk** (**+2.87%**, within the +20% limit).
-- Observed cold-chunk maxima: baseline 31.4–32.5 ms; new 44.2–46.6 ms. The mean passes; worst cold chunks are slower. This is reported explicitly, not hidden by the average.
+- Baseline mean: **12.2072 ms/chunk**.
+- New mean: **12.6164 ms/chunk** (**+3.35%**, within the +20% limit).
+- Observed cold-chunk maxima: baseline 31.5–33.2 ms; new 44.5–45.1 ms. The mean passes; worst cold chunks are slower. This is reported explicitly, not hidden by the average.
 
 Reproduce baseline setup inside this worktree, then call `benchmark()` in the live app:
 
 ```sh
 mkdir -p test-results/baseline
-git show bb19112:src/world.ts > test-results/baseline/world.ts
-git show bb19112:src/terrain.ts > test-results/baseline/terrain.ts
+git show 5103c32:src/world.ts > test-results/baseline/world.ts
+git show 5103c32:src/terrain.ts > test-results/baseline/terrain.ts
 CHROME_DEVTOOLS_AXI_SESSION=soaring-biome-weights chrome-devtools-axi eval \
   "async () => (await import('/scripts/audit-biomes-browser.ts')).benchmark()"
 ```
@@ -98,7 +98,7 @@ The complete ten-choice list, including rejected alternatives, is in `docs/desig
 
 ## Validation
 
-`npm run check` passes all 50 existing unit assertions plus production type/build validation. `npm run test:smoke` passes all 17 browser tests, including the new deterministic biome/shared-edge test. Browser evidence is repeatable and attached by the test runner. The original grove, river-count, route-persistence and narrow-band flapping assertions remain intact.
+`npm run check` passes all 50 existing unit assertions plus production type/build validation. `npm run test:smoke` passes all 18 browser tests, including the new deterministic biome/shared-edge test. Browser evidence is repeatable and attached by the test runner. The original grove, river-count, route-persistence and narrow-band flapping assertions remain intact.
 
 ### Bounded navigation experiment
 
