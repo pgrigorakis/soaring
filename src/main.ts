@@ -16,6 +16,8 @@ const CAMERA_CLOSE_HEIGHT = 3;
 // The previous far height was 178 m x 0.31; the camera now sits one third as high at full zoom-out.
 const CAMERA_FAR_HEIGHT = 178 * 0.31 / 3;
 const RENDER_ORIGIN_DISTANCE = 10_000;
+const MAX_RENDER_PIXELS = 2_000_000;
+const MAX_PIXEL_RATIO = 1.5;
 const SETTINGS_KEY = 'soaring.settings.v1';
 const SEED_KEY = 'soaring.world-seed.v1';
 const VISIT_KEY = 'soaring.scenic-visit.v1';
@@ -71,13 +73,15 @@ const profileMode = import.meta.env.DEV && new URLSearchParams(location.search).
 const hasSavedSettings = localStorage.getItem(SETTINGS_KEY) != null;
 const settings = loadSettings();
 let qualityStep = 0;
-const QUALITY_PIXEL_RATIOS = [1.75, 1.25, 1.0] as const;
+const QUALITY_PIXEL_RATIOS = [MAX_PIXEL_RATIO, 1.25, 1.0] as const;
 if (smokeMode && !hasSavedSettings) settings.terrainVisibility = MIN_VISIBILITY;
 
 function pixelRatioForStep(step = qualityStep): number {
   if (smokeMode) return 0.25;
-  if (settings.lowPower) return 1.0;
-  return Math.min(devicePixelRatio, QUALITY_PIXEL_RATIOS[Math.min(step, QUALITY_PIXEL_RATIOS.length - 1)]!);
+  const budgetRatio = Math.sqrt(MAX_RENDER_PIXELS / (innerWidth * innerHeight));
+  if (settings.lowPower) return Math.min(1.0, budgetRatio);
+  return Math.min(devicePixelRatio, MAX_PIXEL_RATIO,
+    QUALITY_PIXEL_RATIOS[Math.min(step, QUALITY_PIXEL_RATIOS.length - 1)]!, budgetRatio);
 }
 const world = new WorldModel(loadSeed());
 const auroraSchedule = new AuroraSchedule(world.seed);
@@ -336,6 +340,17 @@ function applyRenderQuality(): void {
   keyLight.castShadow = shadowsEnabled;
   terrain.setReach(terrainReach());
 }
+let pixelRatioMedia: MediaQueryList | undefined;
+function watchPixelRatioChange(): void {
+  pixelRatioMedia?.removeEventListener('change', handlePixelRatioChange);
+  pixelRatioMedia = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+  pixelRatioMedia.addEventListener('change', handlePixelRatioChange, { once: true });
+}
+function handlePixelRatioChange(): void {
+  applyRenderQuality();
+  watchPixelRatioChange();
+}
+watchPixelRatioChange();
 let lastChunkBuilds = terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, settings.lowPower ? 2 : 4);
 
 let orbitYaw = 0;
@@ -919,6 +934,7 @@ function frame(now: number): void {
       `visibility   ${fog.far.toFixed(0)} / ${effectiveTerrainVisibility().toFixed(0)} m`,
       `cap          ${currentFrameCap() === null ? 'uncapped' : `${currentFrameCap()} fps`}`,
       `quality step ${qualityStep}/3 · pixel ${renderer.getPixelRatio().toFixed(2)}`,
+      `render       ${renderer.domElement.width} × ${renderer.domElement.height} · ${renderer.domElement.width * renderer.domElement.height} px`,
       `draw calls   ${renderer.info.render.calls}`,
       `geometries   ${renderer.info.memory.geometries}`,
       `behavior     ${state.behavior}${state.flapping ? ' (flapping)' : ''}`,
@@ -942,8 +958,8 @@ requestAnimationFrame(frame);
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
+  applyRenderQuality();
   renderer.setSize(innerWidth, innerHeight);
-  terrain.setReach(terrainReach());
 });
 
 window.addEventListener('beforeunload', () => {
@@ -958,7 +974,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
       profile?: { begin: () => void; end: () => void; report: () => ProfileReport };
@@ -1027,6 +1043,9 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       chunkBuildBudget: settings.lowPower ? 2 : 4,
       qualityStep,
       pixelRatio: renderer.getPixelRatio(),
+      renderWidth: renderer.domElement.width,
+      renderHeight: renderer.domElement.height,
+      renderPixels: renderer.domElement.width * renderer.domElement.height,
       shadowsEnabled: renderer.shadowMap.enabled,
       cameraHeight: cameraPosition.y - navigator.state.y,
       behavior: navigator.state.behavior,
