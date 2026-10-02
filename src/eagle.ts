@@ -764,31 +764,22 @@ export class EagleNavigator {
     const routeHeading = bearing;
     let best = { x: this.state.x, z: this.state.z };
     let bestScore = -Infinity;
-    // Highlands look along more headings so the lowest col on the route can win.
-    const candidates = 6 + Math.round(mountain * 4);
-    for (let candidate = 0; candidate < candidates; candidate += 1) {
-      const index = candidate < 6 ? this.scenicIndex * 6 + candidate : this.scenicIndex * 4 + candidate - 6;
-      const salt = candidate < 6 ? 0 : 6;
-      const variation = (hash2(index, Math.floor(this.state.x / 400), this.world.seed + 419 + salt) - 0.5) * 1.35;
-      const distance = 720 + hash2(index, Math.floor(this.state.z / 400), this.world.seed + 421 + salt) * 680;
+    for (let candidate = 0; candidate < 6; candidate += 1) {
+      const variation = (hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.x / 400), this.world.seed + 419) - 0.5) * 1.35;
+      const distance = 720 + hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.z / 400), this.world.seed + 421) * 680;
       const heading = routeHeading + variation;
       const x = this.state.x + Math.sin(heading) * distance;
       const z = this.state.z + Math.cos(heading) * distance;
+      // Valley routing: in Highlands the cost is the highest point on the path, its col, so the
+      // bird follows the valley floor and crosses a ridge at its lowest pass.
+      const midpoint = this.world.sample((this.state.x + x) / 2, (this.state.z + z) / 2);
       const destination = this.world.sample(x, z);
-      let pathHeight = Math.max(destination.height, this.world.sample((this.state.x + x) / 2, (this.state.z + z) / 2).height);
-      let valley = 0;
-      if (mountain > 0) {
-        // Valley routing: the highest point on the path is the col to cross; a low destination
-        // under its surroundings keeps the bird on the valley floor.
-        for (const fraction of [0.25, 0.75]) {
-          pathHeight = Math.max(pathHeight, this.world.sample(this.state.x + (x - this.state.x) * fraction, this.state.z + (z - this.state.z) * fraction).height);
-        }
-        let around = 0;
-        for (const [dx, dz] of [[300, 0], [-300, 0], [0, 300], [0, -300]] as const) around += this.world.sample(x + dx, z + dz).height / 4;
-        valley = clamp((around - destination.height) / 150, 0, 1);
+      let pathHeight = Math.max(midpoint.height, destination.height);
+      for (const fraction of mountain > 0 ? [0.25, 0.75] : []) {
+        pathHeight = Math.max(pathHeight, this.world.sample(this.state.x + (x - this.state.x) * fraction, this.state.z + (z - this.state.z) * fraction).height);
       }
       const climb = Math.max(0, pathHeight - this.flightGround);
-      const score = this.world.interest(x, z) + 0.25 * Math.cos(heading - bearing) - mountain * climb / 160 + mountain * valley * 0.35;
+      const score = this.world.interest(x, z) + 0.25 * Math.cos(heading - bearing) - mountain * climb / 160;
       if (score <= bestScore) continue;
       bestScore = score;
       best = { x, z };
