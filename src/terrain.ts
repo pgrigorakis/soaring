@@ -10,6 +10,41 @@ export function snowCover(sample: LandscapeSample, slope: number, x: number, z: 
   return highlandWeight(sample.mountainRegion) * THREE.MathUtils.smoothstep(altitude, patch * 0.65, patch * 0.65 + 0.35);
 }
 
+import { BIOME_PROFILES } from './biome';
+
+const palettes = Object.fromEntries(Object.entries(BIOME_PROFILES).map(([key, profile]) =>
+  [key, profile.palette.map((hex) => new THREE.Color(hex))])) as Record<keyof typeof BIOME_PROFILES, THREE.Color[]>;
+const legacyGround = new THREE.Color(0x6fa03c);
+const forestGround = new THREE.Color(0x2f6b3a);
+const graniteGround = new THREE.Color(0x857e72);
+const peatGround = new THREE.Color(0x2e4a4a);
+const hedgeGround = new THREE.Color(0x2e6b34);
+const flecks = [0xe6c43a, 0xd2553f, 0xe1b93a].map((hex) => new THREE.Color(hex));
+const gladeGround = new THREE.Color(0x7fae45);
+const scratch = new THREE.Color();
+
+/** All palette choices are world-sample based, including the shared vertices of adjacent chunks. */
+export function terrainColor(sample: LandscapeSample, x: number, z: number, seed: number, target: THREE.Color): THREE.Color {
+  const { biome } = sample;
+  const hill = palettes.hills[Math.min(2, Math.floor(sample.field * 3))]!;
+  target.copy(hill).lerp(hedgeGround, sample.hedge).multiplyScalar(biome.hills);
+  scratch.copy(forestGround).lerp(gladeGround, sample.glade).multiplyScalar(biome.woodland);
+  target.add(scratch);
+  const patch = sample.moorPatch * 3;
+  const index = Math.min(2, Math.floor(patch));
+  scratch.copy(palettes.moor[index]!).lerp(palettes.moor[index + 1]!, patch - index).multiplyScalar(biome.moor);
+  target.add(scratch);
+  scratch.copy(legacyGround).lerp(forestGround, sample.forest).lerp(graniteGround, sample.rock)
+    .multiplyScalar(biome.highlands + biome.lakeland);
+  target.add(scratch).lerp(graniteGround, sample.rock * (biome.hills + biome.woodland + biome.moor));
+  const jitter = hash2(Math.round(x), Math.round(z), seed + 310);
+  if (jitter < 0.012) target.lerp(flecks[jitter < 0.002 ? 1 : 0]!, biome.hills * 0.65);
+  if (jitter > 0.985) target.lerp(flecks[2]!, biome.moor * 0.7);
+  target.lerp(peatGround, sample.peat);
+  if (sample.water) target.set(0x2f6e6a);
+  return target;
+}
+
 export const CHUNK_SIZE = 360;
 export const MIN_VISIBILITY = 720;
 export const MAX_VISIBILITY = 5000;
@@ -41,6 +76,13 @@ export class TerrainStream {
   private rawX = 0;
   private rawZ = 0;
   private pending: Pending[] = [];
+  private buildTotalMs = 0;
+  private buildCount = 0;
+  private buildMaxMs = 0;
+
+  get buildTiming(): { chunks: number; meanMs: number; maxMs: number } {
+    return { chunks: this.buildCount, meanMs: this.buildTotalMs / Math.max(1, this.buildCount), maxMs: this.buildMaxMs };
+  }
 
   private readonly terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0 });
   // Fades the shadow to fully lit near the fixed shadow camera's edge, in place of a hard cutoff.
@@ -57,9 +99,9 @@ export class TerrainStream {
   });
   private readonly trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1 });
   private readonly foliageMaterials = [
-    new THREE.MeshStandardMaterial({ color: 0x1f5a34, roughness: 1, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: 0x2e7a3e, roughness: 1, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: 0x5c9443, roughness: 1, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
   ];
   private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x857e72, roughness: 1, flatShading: true });
   private readonly trunkGeometry = new THREE.CylinderGeometry(0.8, 1.35, 9, 5);
@@ -146,7 +188,12 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     for (; built < buildBudget && this.pending.length > 0; built += 1) {
       const next = this.pending.shift()!;
       const old = this.chunks.get(next.key);
+      const start = performance.now();
       const chunk = this.createChunk(next);
+      const elapsed = performance.now() - start;
+      this.buildTotalMs += elapsed;
+      this.buildCount += 1;
+      this.buildMaxMs = Math.max(this.buildMaxMs, elapsed);
       if (old) { this.scene.remove(old.group); old.dispose(); }
       this.chunks.set(next.key, chunk);
     }
@@ -288,10 +335,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
           heightAt(xIndex, zIndex - 1) - heightAt(xIndex, zIndex + 1),
         ).normalize();
         normals.push(normal.x, normal.y, normal.z);
-        if (sample.water) color.set(0x2f6e6a);
-        else if (sample.rock > 0.67) color.set(0x8a8174).lerp(new THREE.Color(0xafa28a), sample.rock - 0.67);
-        else if (sample.forest > 0.55) color.set(0x2f6b3a);
-        else color.set(0x6fa03c).lerp(new THREE.Color(0xb3b04a), 1 - sample.moisture);
+        terrainColor(sample, x, z, this.world.seed, color);
         const hueJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 311) - 0.5) * 0.03;
         const saturationJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 312) - 0.5) * 0.12;
         const lightnessJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 313) - 0.5) * 0.06;
@@ -454,12 +498,9 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         dummy.scale.set(tree.scale, tree.scale * (kind === 0 ? 1.4 : kind === 1 ? 0.83 : 2.6), tree.scale);
         dummy.updateMatrix();
         crowns.setMatrixAt(index, dummy.matrix);
-        const base = this.foliageMaterials[kind]!.color;
-        const tint = base.clone().lerp(new THREE.Color(0x1e4e3a), highlandWeight(this.world.sample(tree.x, tree.z).mountainRegion));
-        const multiplier = new THREE.Color().setRGB(tint.r / base.r, tint.g / base.g, tint.b / base.b);
-        crowns.setColorAt(index, multiplier);
-        upper?.setColorAt(index, multiplier);
+        crowns.setColorAt(index, new THREE.Color(tree.tint));
         if (upper) {
+          upper.setColorAt(index, new THREE.Color(tree.tint));
           dummy.position.y = tree.y + 22 * tree.scale;
           dummy.scale.setScalar(tree.scale * 0.85);
           dummy.updateMatrix();
@@ -494,8 +535,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
       dummy.scale.set(tree.scale * (tree.kind === 2 ? 0.68 : 1.2), tree.scale * (tree.kind === 0 ? 1.55 : tree.kind === 1 ? 1.05 : 1.8), tree.scale * (tree.kind === 2 ? 0.68 : 1.2));
       dummy.updateMatrix();
       crowns.setMatrixAt(index, dummy.matrix);
-      crowns.setColorAt(index, this.foliageMaterials[tree.kind]!.color.clone()
-        .lerp(new THREE.Color(0x1e4e3a), highlandWeight(this.world.sample(tree.x, tree.z).mountainRegion)));
+      crowns.setColorAt(index, new THREE.Color(tree.tint));
     });
     trunks.instanceMatrix.needsUpdate = true;
     crowns.instanceMatrix.needsUpdate = true;
