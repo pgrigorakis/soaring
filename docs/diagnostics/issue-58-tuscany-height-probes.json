@@ -1,0 +1,150 @@
+{
+  "purpose": "Decision evidence; no candidate approved or pushed",
+  "acceptedDecisionsAndAssertions": "unchanged",
+  "repair1": {
+    "commit": "92d730c",
+    "heightOffset": 400,
+    "heightAmplitude": 200,
+    "heightNoiseWavelength": 8000,
+    "riverSlope": 17.346421664958186,
+    "dryBankShortfallMeters": 0.2888965151513,
+    "checkTestsPassed": 47,
+    "route": {
+      "netDistance": 55311.893683644106,
+      "requiredNetDistance": 36492.717157974614,
+      "revisitPasses": 0,
+      "flappingTicks": 2247,
+      "allowedFlappingTicks": 1964.9110502407962,
+      "woodlandTicks": 15194.820103135487
+    }
+  },
+  "repair2": {
+    "commit": "5315bfb",
+    "heightOffset": 400,
+    "heightAmplitude": 200,
+    "heightNoiseWavelength": 12000,
+    "riverSlope": 4.962067130845867,
+    "riverCrossingFailures": 1,
+    "checkTestsPassed": 47,
+    "browserTestsPassed": 18,
+    "route": {
+      "netDistance": 49327.97601579168,
+      "requiredNetDistance": 36414.59038019676,
+      "revisitPasses": 0,
+      "flappingTicks": 2570,
+      "allowedFlappingTicks": 1826.1944110253762,
+      "woodlandTicks": 9039.135651049051
+    }
+  },
+  "lowerHeightProbes": [
+    {
+      "heightOffset": 300,
+      "heightAmplitude": 150.0,
+      "worldSource": "980469ce8730ca35193b7b8e490a442fe76ba35a",
+      "heightNoiseWavelength": 3200,
+      "checkPass": false,
+      "riverSlope": 13.838362818735305,
+      "browserTestsPassed": null,
+      "route": {
+        "netDistance": 48772.97247833632,
+        "requiredNetDistance": 36611.04761530217,
+        "revisitPasses": 0,
+        "flappingTicks": 2056,
+        "allowedFlappingTicks": 1655.9773139964261,
+        "woodlandTicks": 1485.5880479153655
+      }
+    },
+    {
+      "heightOffset": 200,
+      "heightAmplitude": 100.0,
+      "worldSource": "980469ce8730ca35193b7b8e490a442fe76ba35a",
+      "heightNoiseWavelength": 3200,
+      "checkPass": false,
+      "riverSlope": 4.808346669222189,
+      "browserTestsPassed": null,
+      "route": {
+        "netDistance": 57647.75810629659,
+        "requiredNetDistance": 35579.919654322475,
+        "revisitPasses": 0,
+        "flappingTicks": 1333,
+        "allowedFlappingTicks": 1900.7404278815682,
+        "woodlandTicks": 12347.186938350029
+      }
+    },
+    {
+      "heightOffset": 175,
+      "heightAmplitude": 87.5,
+      "worldSource": "980469ce8730ca35193b7b8e490a442fe76ba35a",
+      "heightNoiseWavelength": 3200,
+      "checkPass": false,
+      "riverSlope": 3.818657093756258,
+      "browserTestsPassed": null,
+      "route": {
+        "netDistance": 51992.54314830694,
+        "requiredNetDistance": 36006.942402974666,
+        "revisitPasses": 0,
+        "flappingTicks": 1514,
+        "allowedFlappingTicks": 1742.819111982858,
+        "woodlandTicks": 5339.276463954251
+      }
+    },
+    {
+      "heightOffset": 150,
+      "heightAmplitude": 75.0,
+      "worldSource": "980469ce8730ca35193b7b8e490a442fe76ba35a",
+      "heightNoiseWavelength": 3200,
+      "checkPass": true,
+      "riverSlope": 2.6998772670113738,
+      "browserTestsPassed": 18,
+      "route": {
+        "netDistance": 54831.5133826453,
+        "requiredNetDistance": 36096.73484272313,
+        "revisitPasses": 0,
+        "flappingTicks": 1404,
+        "allowedFlappingTicks": 1776.2650086064577,
+        "woodlandTicks": 6823.470335694892
+      }
+    },
+    {
+      "heightOffset": 100,
+      "heightAmplitude": 50.0,
+      "worldSource": "980469ce8730ca35193b7b8e490a442fe76ba35a",
+      "heightNoiseWavelength": 3200,
+      "checkPass": true,
+      "riverSlope": null,
+      "browserTestsPassed": null,
+      "route": {
+        "netDistance": 60082.67271028225,
+        "requiredNetDistance": 35611.34784415762,
+        "revisitPasses": 0,
+        "flappingTicks": 1201,
+        "allowedFlappingTicks": 1794.9441166757138,
+        "woodlandTicks": 7652.373744623359
+      }
+    }
+  ],
+  "closestPassingTestedRange": {
+    "heightOffset": 150,
+    "heightAmplitude": 75,
+    "checkTestsPassed": 50,
+    "browserTestsPassed": 18,
+    "riverSlope": 2.6998772670113738,
+    "qualification": "Closest among tested lower ranges, not a proven global maximum. Uses original validated river model, not either failed repair."
+  },
+  "remainingUnverifiedAtLowerHeight": [
+    "actual dry-land coverage",
+    "chunk build performance",
+    "new farmland/hedgerows",
+    "new Woodland colours/glade flowers",
+    "new screenshots"
+  ],
+  "reproduction": {
+    "lowerRangeSource": "Use WorldModel from commit 980469ce8730ca35193b7b8e490a442fe76ba35a; change only BIOME_PROFILES.hills heightOffset/heightAmplitude to each row. Leave all assertions unchanged.",
+    "commands": [
+      "npm run check",
+      "node scripts/audit-route.mjs",
+      "npm run test:smoke"
+    ],
+    "localNumericalWallTrace": "node .diagnostics/probe-walls.mjs"
+  }
+}
