@@ -210,18 +210,60 @@ const fogProbeCamera = new THREE.PerspectiveCamera(1, 1, 0.1, 10);
 const fogTarget = new THREE.WebGLRenderTarget(1, 1);
 const fogPixel = new Uint8Array(4);
 const fogSample = new THREE.Color();
+const fogGoal = new THREE.Color(0x8faeb8);
 const horizonLook = new THREE.Vector3();
-function sampleHorizonColor(): THREE.Color {
+const fogViewport = new THREE.Vector4();
+const fogScissor = new THREE.Vector4();
+let fogSampleAge = 999;
+let fogInputRevision = 0;
+let fogSamplePending = false;
+let fogSampleDisposed = false;
+let fogSamplingFailed = false;
+let fogSampleCount = 0;
+let fogReadbackFailures = 0;
+function sampleHorizonColor(): void {
+  if (fogSamplePending || fogSampleDisposed || fogSamplingFailed) return;
+  fogSamplePending = true;
+  const revision = fogInputRevision;
+  const exposure = renderer.toneMappingExposure;
   // Perpendicular to the sun, just above the horizon, so haze matches the sky band and not the solar disc.
   horizonLook.set(-sunDir.z, 0.07, sunDir.x);
   if (horizonLook.x * horizonLook.x + horizonLook.z * horizonLook.z < 1e-4) horizonLook.set(1, 0.07, 0);
   fogProbeCamera.lookAt(horizonLook);
-  renderer.setRenderTarget(fogTarget);
-  renderer.render(fogProbeScene, fogProbeCamera);
-  renderer.readRenderTargetPixels(fogTarget, 0, 0, 1, 1, fogPixel);
-  renderer.setRenderTarget(null);
-  fogSample.setRGB(fogPixel[0]! / 255, fogPixel[1]! / 255, fogPixel[2]! / 255);
-  return neutralToneMap(fogSample, renderer.toneMappingExposure);
+
+  const previousTarget = renderer.getRenderTarget();
+  const previousCubeFace = renderer.getActiveCubeFace();
+  const previousMipmapLevel = renderer.getActiveMipmapLevel();
+  renderer.getViewport(fogViewport);
+  renderer.getScissor(fogScissor);
+  const previousScissorTest = renderer.getScissorTest();
+  try {
+    renderer.setRenderTarget(fogTarget);
+    renderer.render(fogProbeScene, fogProbeCamera);
+  } catch {
+    fogReadbackFailures += 1;
+    fogSamplingFailed = true;
+    fogSamplePending = false;
+    return;
+  } finally {
+    renderer.setRenderTarget(previousTarget, previousCubeFace, previousMipmapLevel);
+    renderer.setViewport(fogViewport);
+    renderer.setScissor(fogScissor);
+    renderer.setScissorTest(previousScissorTest);
+  }
+
+  void renderer.readRenderTargetPixelsAsync(fogTarget, 0, 0, 1, 1, fogPixel).then((pixel) => {
+    if (fogSampleDisposed || revision !== fogInputRevision) return;
+    fogSample.setRGB(pixel[0]! / 255, pixel[1]! / 255, pixel[2]! / 255);
+    fogGoal.copy(neutralToneMap(fogSample, exposure));
+    fogSampleCount += 1;
+  }).catch(() => {
+    if (fogSampleDisposed) return;
+    fogReadbackFailures += 1;
+    fogSamplingFailed = true;
+  }).finally(() => {
+    fogSamplePending = false;
+  });
 }
 const fog = new THREE.Fog(0x8faeb8, MIN_VISIBILITY * 0.5, MIN_VISIBILITY);
 scene.fog = fog;
@@ -638,19 +680,17 @@ document.addEventListener('visibilitychange', () => {
 let skySeconds = 0.36 * DAY_SECONDS;
 let skyPaused = false;
 let skyLook: 'sun' | 'moon' | 'horizon' | null = null;
-let fogSampleAge = 999;
 const sunDir = new THREE.Vector3();
 const moonDir = new THREE.Vector3();
 const skyAim = new THREE.Vector3();
 const keyDir = new THREE.Vector3();
-const fogGoal = new THREE.Color(0x8faeb8);
 const veil = document.querySelector<HTMLElement>('#veil')!;
 const smooth01 = (edge0: number, edge1: number, value: number): number => {
   const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);
 };
 
-function applyDaylight(body: Daylight, delta: number, forceFog: boolean): void {
+function applyDaylight(body: Daylight, delta: number): void {
   sunDir.set(body.sun.x, body.sun.y, body.sun.z);
   moonDir.set(body.moon.x, body.moon.y, body.moon.z);
   const high = smooth01(0.12, 0.72, Math.max(0, body.sun.y));
@@ -700,13 +740,11 @@ function applyDaylight(body: Daylight, delta: number, forceFog: boolean): void {
   veil.style.setProperty('--veil-bottom', 'rgba(20, 32, 40, 0.03)');
 
   fogSampleAge += delta;
-  if (forceFog || fogSampleAge > 0.35) {
+  if (fogSampleAge > 0.35 && !fogSamplePending) {
     fogSampleAge = 0;
-    fogGoal.copy(sampleHorizonColor());
-    fog.color.copy(fogGoal);
-  } else {
-    fog.color.lerp(fogGoal, 1 - Math.exp(-Math.max(delta, 0.016) * 4));
+    sampleHorizonColor();
   }
+  fog.color.lerp(fogGoal, 1 - Math.exp(-Math.max(delta, 0.016) * 4));
 }
 
 function currentDaylight(): Daylight {
@@ -784,7 +822,7 @@ function frame(now: number): void {
   updateFog();
   if (!skyPaused) skySeconds += rawDelta;
   const body = currentDaylight();
-  applyDaylight(body, rawDelta, false);
+  applyDaylight(body, rawDelta);
 
   keyLight.target.position.set(cameraPosition.x, world.sample(cameraPosition.x, cameraPosition.z).height, cameraPosition.z);
   updateShadowBasis(keyDir);
@@ -849,6 +887,7 @@ window.addEventListener('resize', () => {
 
 window.addEventListener('beforeunload', () => {
   lensflare.dispose();
+  fogSampleDisposed = true;
   fogTarget.dispose();
   thermalMarker.dispose();
   terrain.dispose();
@@ -857,7 +896,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
       advanceSimulation?: (seconds: number) => void;
       reviewFlight?: (start: { x: number; z: number; heading: number } | null) => void;
       setTimeScale: (scale: number) => void;
@@ -939,12 +978,20 @@ window.__SOARING__ = {
       sunElevation: body.sun.y,
       moonElevation: body.moon.y,
       auroraAmount: auroraAmount(body, auroraSchedule.hasAurora(nightCycle(skySeconds))),
+      fog: {
+        color: [fog.color.r, fog.color.g, fog.color.b],
+        targetColor: [fogGoal.r, fogGoal.g, fogGoal.b],
+        readPending: fogSamplePending,
+        samples: fogSampleCount,
+        failures: fogReadbackFailures,
+      },
     };
   },
   setTimeScale: (scale: number) => { timeScale = Math.max(1, Math.min(12, scale)); },
   setTimeOfDay: (phase: number) => {
     skySeconds = phase * DAY_SECONDS;
     skyPaused = true;
+    fogInputRevision += 1;
     fogSampleAge = 999;
   },
   lookAtBody: (body: 'sun' | 'moon' | 'horizon' | 'chase') => {

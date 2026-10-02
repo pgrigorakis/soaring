@@ -1,0 +1,20 @@
+{
+  "environment": "Chrome WebGL2, development ?smoke, 1440x900, pixel ratio 0.25",
+  "seed": 5,
+  "vantage": { "x": 0, "z": 0, "heading": 0 },
+  "phase": "noon (0.5)",
+  "measuredAnimationFrames": 180,
+  "synchronousPixelReads": 10,
+  "asynchronousPixelReads": 0,
+  "frameGapMs": {
+    "mean": 17.8533,
+    "median": 16.7,
+    "p95": 16.8,
+    "max": 66.8
+  },
+  "screenshots": [
+    "before-noon.png",
+    "before-golden-hour.png",
+    "before-night.png"
+  ]
+}
