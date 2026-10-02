@@ -79,7 +79,7 @@ describe('autonomous eagle navigation', () => {
     { min: 90, max: 145, baselineFlappingTicks: 4449 },
     { min: 65, max: 210, baselineFlappingTicks: 1298 },
   ])(
-    'never enters terrain and caps thermal-riding climb at the max in $min–$max m during a one-hour flight', (range) => {
+    'never enters terrain and caps thermal climb against smoothed ground in $min–$max m during a one-hour flight', (range) => {
       const world = new WorldModel(448122);
       const navigator = new EagleNavigator(world, world.scenicStart(2), range);
       const start = { x: navigator.state.x, z: navigator.state.z };
@@ -90,6 +90,7 @@ describe('autonomous eagle navigation', () => {
       let flappingTicks = 0;
       for (let step = 0; step < 36_000; step += 1) {
         const before = navigator.state.behavior;
+        const previousY = navigator.state.y;
         const heading = navigator.state.heading;
         const state = navigator.update(0.1);
         behaviors.add(state.behavior);
@@ -98,10 +99,10 @@ describe('autonomous eagle navigation', () => {
         minimumClearance = Math.min(minimumClearance, clearance);
         if (state.behavior === 'thermal-seeking' && Math.abs(state.heading - heading) > 0.001) seekingTurns += 1;
         if (state.behavior === 'thermal-riding' && before === 'thermal-seeking') circleEntries += 1;
-        // Max flight height only caps climbing while thermal-riding; gliding may drift higher over low ground.
+        // Cap climbing against the smoothed envelope, without teleporting down over a crest.
         if (state.behavior === 'thermal-riding') {
           expect(state.flapping).toBe(false);
-          expect(clearance).toBeLessThanOrEqual(range.max + 0.001);
+          expect(state.y).toBeLessThanOrEqual(Math.max(previousY, navigator.flightGround + range.max) + 0.001);
         }
       }
       expect(minimumClearance).toBeGreaterThanOrEqual(TERRAIN_SAFETY_MARGIN - 0.001);

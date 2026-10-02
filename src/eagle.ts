@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { fbm, hash2, Thermal, WorldModel } from './world';
+import { fbm, hash2, highlandWeight, Thermal, WorldModel } from './world';
 
 export type EagleBehavior = 'gliding' | 'thermal-seeking' | 'thermal-riding';
 
@@ -76,14 +76,24 @@ export class EagleNavigator {
   private circleDrift = 0;
   private rideLift = 1;
   private thermalCore = { x: 0, z: 0 };
+  private smoothedGround: number;
+  private groundEnvelope: number;
+  private groundSampleAge = 0;
 
   constructor(world: WorldModel, start: { x: number; z: number; heading: number }, heightRange = DEFAULT_FLIGHT_HEIGHT) {
     this.world = world;
     this.seedAngle = hash2(0, 0, world.seed + COMPASS_SEED) * Math.PI * 2;
     this.heightRange = normalizeFlightHeight(heightRange.min, heightRange.max);
-    const ground = world.sample(start.x, start.z).height;
+    const startSample = world.sample(start.x, start.z);
+    const ground = startSample.height + highlandWeight(startSample.mountainRegion) * (this.highestGround(start.x, start.z) - startSample.height);
+    this.smoothedGround = ground;
+    this.groundEnvelope = ground;
     this.state = { x: start.x, y: ground + clamp(105, this.heightRange.min, this.heightRange.max), z: start.z, heading: start.heading, bank: 0, behavior: 'gliding', flapping: false };
     this.chooseScenicTarget();
+  }
+
+  get flightGround(): number {
+    return this.smoothedGround;
   }
 
   get activeThermal(): Thermal | null {
@@ -92,7 +102,7 @@ export class EagleNavigator {
 
   setFlightHeightRange(range: FlightHeightRange): void {
     this.heightRange = normalizeFlightHeight(range.min, range.max);
-    const ground = this.world.sample(this.state.x, this.state.z).height;
+    const ground = this.flightGround;
     this.state.y = ground + clamp(this.state.y - ground, this.heightRange.min, this.heightRange.max);
   }
 
@@ -100,7 +110,17 @@ export class EagleNavigator {
     const dt = Math.min(deltaSeconds, 0.1);
     this.behaviorTime += dt;
     this.totalTime += dt;
-    const ground = this.world.sample(this.state.x, this.state.z).height;
+    this.groundSampleAge += dt;
+    if (this.groundSampleAge >= 0.5) {
+      this.groundEnvelope = this.highestGround(this.state.x, this.state.z);
+      this.groundSampleAge = 0;
+    }
+    const local = this.world.sample(this.state.x, this.state.z);
+    const mountain = highlandWeight(local.mountainRegion);
+    const envelope = local.height + mountain * (this.groundEnvelope - local.height);
+    const easingSeconds = Math.max(0.01, 5 * mountain);
+    this.smoothedGround += (envelope - this.smoothedGround) * (1 - Math.exp(-dt / easingSeconds));
+    const ground = this.smoothedGround;
 
     if (this.state.behavior !== 'thermal-riding') {
       if (this.state.behavior === 'thermal-seeking' && this.thermal) {
@@ -112,7 +132,7 @@ export class EagleNavigator {
       } else if (this.behaviorTime > 34) {
         const altitude = this.state.y - ground;
         const span = this.heightRange.max - this.heightRange.min;
-        if (altitude < this.heightRange.min + span * 0.2 || hash2(Math.floor(this.totalTime / 20), this.scenicIndex, this.world.seed + 401) > 0.64) this.seekThermal();
+        if (altitude < this.heightRange.min + span * (0.2 + mountain * 0.3) || hash2(Math.floor(this.totalTime / 20), this.scenicIndex, this.world.seed + 401) > 0.64) this.seekThermal();
         else this.behaviorTime = 0;
       }
     }
@@ -124,10 +144,21 @@ export class EagleNavigator {
     } else {
       this.flyTowardTarget(dt, ground);
     }
-    const currentGround = this.world.sample(this.state.x, this.state.z).height;
-    if (this.state.behavior === 'thermal-riding') this.state.y = Math.min(this.state.y, currentGround + this.heightRange.max);
-    this.state.y = Math.max(this.state.y, currentGround + TERRAIN_SAFETY_MARGIN);
+    const current = this.world.sample(this.state.x, this.state.z);
+    this.state.y = Math.max(this.state.y, current.height + TERRAIN_SAFETY_MARGIN);
     return this.state;
+  }
+
+  /** Sample the 250 m disk, not just the point below the bird. Refresh at 2 Hz. */
+  private highestGround(x: number, z: number): number {
+    let highest = -Infinity;
+    for (let dz = -250; dz <= 250; dz += 125) {
+      for (let dx = -250; dx <= 250; dx += 125) {
+        if (dx * dx + dz * dz > 250 ** 2) continue;
+        highest = Math.max(highest, this.world.sample(x + dx, z + dz).height);
+      }
+    }
+    return highest;
   }
 
   private flyTowardTarget(dt: number, ground: number): void {
@@ -140,7 +171,14 @@ export class EagleNavigator {
     this.state.x += Math.sin(this.state.heading) * speed * dt;
     this.state.z += Math.cos(this.state.heading) * speed * dt;
 
-    const lookAhead = this.world.sample(this.state.x + Math.sin(this.state.heading) * 105, this.state.z + Math.cos(this.state.heading) * 105).height;
+    const aheadX = Math.sin(this.state.heading);
+    const aheadZ = Math.cos(this.state.heading);
+    const local = this.world.sample(this.state.x, this.state.z);
+    const localGround = local.height;
+    const nearGround = this.world.sample(this.state.x + aheadX * 105, this.state.z + aheadZ * 105).height;
+    const slope = Math.max(0, (nearGround - localGround) / 105);
+    const distance = clamp(105 + slope * 500 * highlandWeight(local.mountainRegion), 105, 250);
+    const lookAhead = this.world.sample(this.state.x + aheadX * distance, this.state.z + aheadZ * distance).height;
     this.updateHeightEnergy(dt, ground, lookAhead);
 
     if (this.state.behavior !== 'thermal-seeking' && Math.hypot(this.target.x - this.state.x, this.target.z - this.state.z) < 150) {
@@ -215,7 +253,8 @@ export class EagleNavigator {
     const targetBank = bankSign * clamp(bankMag, THERMAL_BANK_RANGE.min, THERMAL_BANK_RANGE.max);
     this.state.bank += (targetBank - this.state.bank) * Math.min(1, dt * 1.4);
 
-    this.state.y = Math.min(this.state.y + climbRate * dt, ground + this.heightRange.max);
+    // A falling reference must not teleport the bird down when crossing a crest.
+    this.state.y += Math.min(climbRate * dt, Math.max(0, this.flightGround + this.heightRange.max - this.state.y));
     // Skip the max-height/weaken exit on the entry tick: gliding can arrive already at/above max over low ground,
     // and this guarantees at least one visible thermal-riding tick before assessing it.
     const clearance = this.state.y - ground;
@@ -261,11 +300,15 @@ export class EagleNavigator {
   private chooseScenicTarget(): void {
     this.scenicIndex += 1;
     const bearing = this.seedAngle + fbm1d(this.totalTime / 300, this.world.seed + COMPASS_SEED) * Math.PI;
+    const mountain = highlandWeight(this.world.sample(this.state.x, this.state.z).mountainRegion);
+    // Keep the long-lived compass through a pass; do not let a thermal's exit yaw
+    // turn valley preference into repeated trips around the same basin.
+    const routeHeading = this.state.heading + wrapAngle(bearing - this.state.heading) * mountain;
     let bestScore = -Infinity;
     for (let candidate = 0; candidate < 6; candidate += 1) {
       const variation = (hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.x / 400), this.world.seed + 419) - 0.5) * 1.35;
       const distance = 720 + hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.z / 400), this.world.seed + 421) * 680;
-      const heading = this.state.heading + variation;
+      const heading = routeHeading + variation;
       const x = this.state.x + Math.sin(heading) * distance;
       const z = this.state.z + Math.cos(heading) * distance;
       const score = this.world.interest(x, z) + 0.25 * Math.cos(heading - bearing);

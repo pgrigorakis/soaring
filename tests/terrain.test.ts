@@ -112,7 +112,7 @@ describe('terrain streaming', () => {
       const x = (index % 15) - 12;
       const z = Math.floor(index / 15) - 6;
       return { x, z, trees: world.treesInArea(x * CHUNK_SIZE, z * CHUNK_SIZE, CHUNK_SIZE, 29) };
-    }).find((cell) => cell.trees.length > 8)!;
+    }).find((cell) => cell.trees.length > 8 && new Set(cell.trees.map((tree) => tree.kind)).size === 3)!;
     terrain.update((forest.x + 0.5) * CHUNK_SIZE, (forest.z + 0.5) * CHUNK_SIZE, 1);
     const chunk = scene.getObjectByName(`land ${forest.x},${forest.z}`)!;
     const trees = forest.trees;
