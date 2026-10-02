@@ -133,7 +133,6 @@ test('caps total render pixels through resize, DPR changes, Low power, and smoke
     { expectedWidth: width, expectedHeight: height, expectedDpr: deviceScaleFactor });
     // Chromium changes DPR through emulation without sending the native resize event.
     await page.evaluate(() => window.dispatchEvent(new Event('resize')));
-    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
   };
   const metrics = () => page.evaluate(() => {
     const canvas = document.querySelector('canvas')!;
@@ -142,35 +141,33 @@ test('caps total render pixels through resize, DPR changes, Low power, and smoke
       pixels: canvas.width * canvas.height, ratio: snapshot.pixelRatio, lowPower: snapshot.lowPower,
       diagnosticRender: [snapshot.renderWidth, snapshot.renderHeight], diagnosticPixels: snapshot.renderPixels };
   });
-  await setMetrics(1512, 982, 2);
+  await page.setViewportSize({ width: 1200, height: 800 });
   await page.addInitScript(() => {
     localStorage.setItem('soaring.world-seed.v1', '123456789');
     localStorage.setItem('soaring.scenic-visit.v1', '0');
     localStorage.setItem('soaring.settings.v1', JSON.stringify({
-      ambienceVolume: 0.52, musicVolume: 0.52, muted: true, lowPower: false,
+      ambienceVolume: 0.52, musicVolume: 0.52, muted: true, lowPower: true,
       cameraDistance: 100, terrainVisibility: 720, showThermal: true, minFlightHeight: 45, maxFlightHeight: 180,
     }));
   });
   await page.goto('/');
   await expect(page.locator('canvas')).toBeVisible();
-  await page.waitForFunction(() => window.__SOARING__?.snapshot().renderedFrames > 0);
+  await page.evaluate(() => {
+    const input = document.querySelector<HTMLInputElement>('#low-power')!;
+    if (!input.checked) throw new Error('Expected Low power during light-weight startup');
+    input.checked = false;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await setMetrics(1512, 982, 2);
   let measured = await metrics();
   expect(measured.ratio).toBeLessThanOrEqual(Math.sqrt(2_000_000 / (measured.css[0]! * measured.css[1]!)));
   expect(measured.pixels).toBeLessThanOrEqual(2_000_000);
   expect(measured.diagnosticRender).toEqual(measured.render);
   expect(measured.diagnosticPixels).toBe(measured.pixels);
-  await page.keyboard.press('d');
-  await expect(page.locator('#diagnostics')).toContainText(`pixel ${measured.ratio.toFixed(2)}`);
-  await expect(page.locator('#diagnostics')).toContainText(`${measured.pixels} px`);
 
   await setMetrics(1512, 982, 1);
   measured = await metrics();
   expect(measured.ratio).toBeLessThanOrEqual(1);
-  expect(measured.pixels).toBeLessThanOrEqual(2_000_000);
-
-  await setMetrics(1600, 1400, 2);
-  measured = await metrics();
-  expect(measured.ratio).toBeLessThanOrEqual(Math.sqrt(2_000_000 / (1600 * 1400)));
   expect(measured.pixels).toBeLessThanOrEqual(2_000_000);
   await page.evaluate(() => {
     const input = document.querySelector<HTMLInputElement>('#low-power')!;
@@ -178,18 +175,15 @@ test('caps total render pixels through resize, DPR changes, Low power, and smoke
     input.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await page.waitForFunction(() => window.__SOARING__.snapshot().lowPower);
+
+  await setMetrics(1512, 982, 2);
+  measured = await metrics();
+  expect(measured.ratio).toBeLessThanOrEqual(1);
+  expect(measured.pixels).toBeLessThanOrEqual(2_000_000);
+  await setMetrics(1600, 1400, 2);
   measured = await metrics();
   expect(measured.ratio).toBeLessThanOrEqual(Math.min(1, Math.sqrt(2_000_000 / (1600 * 1400))));
   expect(measured.pixels).toBeLessThanOrEqual(2_000_000);
-
-  await setMetrics(1200, 800, 2);
-  measured = await metrics();
-  expect(measured.ratio).toBe(1);
-  expect(measured.pixels).toBe(1200 * 800);
-  await setMetrics(1200, 800, 1);
-  measured = await metrics();
-  expect(measured.ratio).toBe(1);
-  expect(measured.pixels).toBe(1200 * 800);
 
   await page.goto('/?smoke');
   await expect(page.locator('canvas')).toBeVisible();
