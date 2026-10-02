@@ -41,13 +41,22 @@ The audit starts beside a real lake at `(7647.127558763605, -11252.509786414448)
 
 The audit runs 36,000 navigation updates at 0.1 s:
 
-- Travel: 100,960.6 m; displacement: 47,992.1 m, above the retained 35% requirement.
-- Longest uninterrupted water crossing: 1,129.6 m.
-- Water updates: 5,130; minimum clearance above land or water: 73.34 m.
+- Travel: 101,613.3 m; displacement: 48,135.0 m, above the retained 35% requirement.
+- Longest uninterrupted water crossing: 1,104.0 m.
+- Water updates: 4,180; minimum clearance above land or water: 86.58 m.
+- Flapping: 101.6 seconds. Behavior time: 2,050.4 seconds gliding, 793.8 seconds seeking thermals, 744.6 seconds riding thermals, and 11.2 seconds ridge soaring.
 - Old-route returns after ten minutes: zero, below the retained maximum of five.
 - 100 scenic starts are on land; all sampled nearby thermal placements are on land.
 
-This is a simulated hour, not a literal one-hour browser soak. The existing full navigation suite still checks all three altitude bands and its original energy budgets. The lake-aware scenic reach extends to about 2 km; flap energy already supports crossing without water thermals.
+This is a simulated hour, not a literal one-hour browser soak. The full navigation suite still checks all three altitude bands, clearance, thermal/ridge climb ceilings and behavior duration. The lake-aware scenic reach extends to about 2 km; existing flap energy supports crossing without water thermals.
+
+## Reconciliation with biome-aware flight
+
+The branch merges main commit `5394f8947968b521390ee554c8fbfb49d39b4637`, preserving accepted ridge soaring, shore tracing, glade/tor scoring and valley routing. The shared shoreline helper now follows Lakeland ellipses as well as ordinary discs. All 32 tested landward shoreline targets are dry; the featured lake's minor-axis shoreline radius is 553.0 m.
+
+The combined flight initially exceeded an old total-flapping ceiling. The user explicitly rejected that criterion: the bird may flap as much as needed. Only total flap ceilings were removed from navigation and Highlands tests. Safety, travel, episode duration, thermal/ridge no-flap behavior, climb bounds and water exclusions remain checked. Lakeland `thermalOdds` remains 1; accepted shore tracing remains enabled. No production behavior was changed to hide the flap increase.
+
+`issue-59/navigation-default.json` records the default scenic-start hour: 103.90 km traveled, 48.82 km displacement, 199.7 seconds flapping, no stalls and no old-route returns. `issue-59/highlands-navigation.json` records the browser Highlands hour: 275.9 seconds flapping, minimum clearance 12.40 m, peak vertical speed 4 m/s, zero safety corrections, two ridge episodes totaling 420.2 seconds, zero ridge flapping or ceiling breaches, and a longest behavior episode of 210.1 seconds. Historical baseline flap time is reference data, not a limit.
 
 ## Screenshots
 

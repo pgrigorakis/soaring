@@ -75,9 +75,9 @@ describe('autonomous eagle navigation', () => {
   }, 20_000); // A simulated hour exceeds Vitest's 5 s default on shared CI CPUs.
 
   it.each([
-    { min: 50, max: 70, baselineFlappingTicks: 6552, allowWoodlandFlapping: false },
-    { min: 90, max: 145, baselineFlappingTicks: 4449, allowWoodlandFlapping: false },
-    { min: 65, max: 210, baselineFlappingTicks: 1298, allowWoodlandFlapping: true },
+    { min: 50, max: 70 },
+    { min: 90, max: 145 },
+    { min: 65, max: 210 },
   ])(
     'never enters terrain and caps thermal climb against smoothed ground in $min–$max m during a one-hour flight', (range) => {
       const world = new WorldModel(448122);
@@ -87,8 +87,6 @@ describe('autonomous eagle navigation', () => {
       let minimumClearance = Infinity;
       let seekingTurns = 0;
       let circleEntries = 0;
-      let flappingTicks = 0;
-      let woodlandTicks = 0;
       let episodeTicks = 0;
       let longestEpisodeTicks = 0;
       for (let step = 0; step < 36_000; step += 1) {
@@ -100,8 +98,6 @@ describe('autonomous eagle navigation', () => {
         episodeTicks = state.behavior === before ? episodeTicks + 1 : 1;
         longestEpisodeTicks = Math.max(longestEpisodeTicks, episodeTicks);
         const sample = world.sample(state.x, state.z);
-        woodlandTicks += sample.biome.woodland;
-        if (state.flapping) flappingTicks += 1;
         const clearance = state.y - sample.height;
         minimumClearance = Math.min(minimumClearance, clearance);
         if (state.behavior === 'thermal-seeking' && Math.abs(state.heading - heading) > 0.001) seekingTurns += 1;
@@ -116,11 +112,7 @@ describe('autonomous eagle navigation', () => {
       expect(longestEpisodeTicks * 0.1).toBeLessThanOrEqual(240); // no behaviour runs four minutes
       expect(seekingTurns).toBeGreaterThan(10);
       expect(circleEntries).toBeGreaterThan(0);
-      // Woodland has less lift; its energy deficit can require flaps after an exit too.
-      // Only the wide band gets a time-weighted allowance: no Woodland means no increase.
-      // Narrow bands retain their original ceiling. Transition weights count fractionally.
-      const woodlandFraction = range.allowWoodlandFlapping ? woodlandTicks / 36_000 : 0;
-      expect(flappingTicks).toBeLessThanOrEqual(range.baselineFlappingTicks * 1.25 * (1 + woodlandFraction * 0.5));
+      // Total flap time is unrestricted. Thermal/ridge no-flap rules remain checked above.
       expect(Math.hypot(navigator.state.x - start.x, navigator.state.z - start.z)).toBeGreaterThan(700);
       expect(behaviors.has('thermal-seeking')).toBe(true);
       expect(behaviors.has('thermal-riding')).toBe(true);

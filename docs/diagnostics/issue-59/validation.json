@@ -2,20 +2,14 @@
   "check": "passed",
   "tests": 52,
   "browser": {
-    "startTime": "2026-10-02T14:47:51.507Z",
-    "duration": 80685.932,
+    "startTime": "2026-10-02T15:11:24.733Z",
+    "duration": 79325.921,
     "expected": 20,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0
   },
   "retries": 0,
-  "hydrologyStability": {
-    "startTime": "2026-10-02T14:49:38.926Z",
-    "duration": 9283.995,
-    "expected": 3,
-    "skipped": 0,
-    "unexpected": 0,
-    "flaky": 0
-  }
+  "flappingCriterion": "Total flapping is unrestricted by user decision; thermal/ridge no-flap checks remain.",
+  "mergedMain": "5394f8947968b521390ee554c8fbfb49d39b4637"
 }

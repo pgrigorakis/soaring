@@ -43,12 +43,15 @@ for (const thermal of world.nearbyThermals(lake.ax, lake.az, 3)) {
 const navigator = new EagleNavigator(world, { x: lake.ax - Math.cos(lake.heading) * 1100,
   z: lake.az - Math.sin(lake.heading) * 1100, heading: Math.PI / 2 - lake.heading });
 const start = { x: navigator.state.x, z: navigator.state.z };
-let distance = 0, minimumClearance = Infinity, wetTicks = 0, longestCrossing = 0, crossing = 0;
+let distance = 0, minimumClearance = Infinity, wetTicks = 0, longestCrossing = 0, crossing = 0, flappingTicks = 0;
+const behaviorSeconds = {};
 const route = [{ time: 0, ...start }];
 let revisits = 0, nearOld = false;
 for (let step = 0; step < 36000; step++) {
   const before = { ...navigator.state };
   const s = navigator.update(.1);
+  if (s.flapping) flappingTicks++;
+  behaviorSeconds[s.behavior] = (behaviorSeconds[s.behavior] ?? 0) + .1;
   const traveled = Math.hypot(s.x - before.x, s.z - before.z);
   distance += traveled;
   const ground = world.sample(s.x, s.z);
@@ -64,7 +67,7 @@ for (let step = 0; step < 36000; step++) {
   }
 }
 const report = { seed: world.seed, landSamples: land, waterSamples: water, coverage: weight / land, lake, islands, beaches, deep,
-  flight: { seconds: 3600, distance, netDistance: Math.hypot(navigator.state.x - start.x, navigator.state.z - start.z), minimumClearance, wetTicks, longestCrossing, revisits } };
+  flight: { seconds: 3600, distance, netDistance: Math.hypot(navigator.state.x - start.x, navigator.state.z - start.z), minimumClearance, wetTicks, longestCrossing, revisits, flappingSeconds: flappingTicks / 10, behaviorSeconds } };
 await writeFile('test-results/lakeland-audit.json', JSON.stringify(report, null, 2) + '\n');
 console.log(JSON.stringify(report, null, 2));
 assert(report.coverage >= .1 && report.coverage <= .2, 'Lakeland outside 10–20% land');

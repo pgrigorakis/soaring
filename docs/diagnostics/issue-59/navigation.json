@@ -24,11 +24,18 @@
   "deep": 18.156814823768443,
   "flight": {
     "seconds": 3600,
-    "distance": 100960.63051495087,
-    "netDistance": 47992.06454685171,
-    "minimumClearance": 73.34062100191812,
-    "wetTicks": 5130,
-    "longestCrossing": 1129.59999999999,
-    "revisits": 0
+    "distance": 101613.3144311187,
+    "netDistance": 48134.95908323011,
+    "minimumClearance": 86.57792361790791,
+    "wetTicks": 4180,
+    "longestCrossing": 1104.0000000000186,
+    "revisits": 0,
+    "flappingSeconds": 101.6,
+    "behaviorSeconds": {
+      "gliding": 2050.3999999992307,
+      "thermal-seeking": 793.8000000001119,
+      "thermal-riding": 744.6000000001007,
+      "ridge-soaring": 11.199999999999976
+    }
   }
 }

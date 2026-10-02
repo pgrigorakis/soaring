@@ -21,5 +21,7 @@
   "islandTrees": 41,
   "waterRing": 32,
   "dryThermals": true,
-  "landmarkWater": true
+  "landmarkWater": true,
+  "dryShoreTargets": true,
+  "minorRadius": 553.0265686196162
 }

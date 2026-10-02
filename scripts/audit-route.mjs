@@ -2,7 +2,7 @@
 // Run: node scripts/audit-route.mjs
 // Failure modes: circling the same thermal, seeking behind the persistent compass,
 // scenic targets following thermal-exit yaw, steep approaches starving progress,
-// excessive flapping, and returns to a route visited more than ten minutes ago.
+// and returns to a route visited more than ten minutes ago. Flap time is observational.
 import { build } from 'esbuild';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 await mkdir('test-results', { recursive: true });
@@ -69,8 +69,7 @@ for (let step = 0; step < 36000; step += 1) {
     netDistance: Math.hypot(state.x - start.x, state.z - start.z), distance, flappingTicks });
 }
 const report = { gladeShift, seed: world.seed, start, netDistance: Math.hypot(navigator.state.x - start.x, navigator.state.z - start.z),
-  requiredNetDistance: distance * 0.35, distance, revisitPasses, flappingTicks, flappingOutsideWoodland, woodlandTicks, originalFlappingLimit: 1298 * 1.25,
-  allowedFlappingTicks: 1298 * 1.25 * (1 + woodlandTicks / 36000 * 0.5),
+  requiredNetDistance: distance * 0.35, distance, revisitPasses, flappingTicks, flappingOutsideWoodland, woodlandTicks,
   seekEntries, backwardSeekEntries, stalledTicks,
   mostVisitedThermals: [...visits.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8), snapshots };
 await writeFile('test-results/biome-route.json', JSON.stringify(report, null, 2) + '\n');
