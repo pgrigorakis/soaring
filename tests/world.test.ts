@@ -346,9 +346,10 @@ describe('deterministic world generation', () => {
       const center = world.sample(middle.x, middle.z);
       // Lake-covered tributaries have lake shores, not banks at river half-width.
       if (!center.river) continue;
-      exposedRivers += 1;
       const left = world.sample(middle.x + nx * 260, middle.z + nz * 260);
       const right = world.sample(middle.x - nx * 260, middle.z - nz * 260);
+      if ((left.water && !left.river) || (right.water && !right.river)) continue;
+      exposedRivers += 1;
       expect(center.water).toBe(true);
       expect(center.height).toBeLessThan(center.surface);
       const half = (reach.aWidth + reach.bWidth) / 4;

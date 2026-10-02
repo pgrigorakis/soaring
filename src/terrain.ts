@@ -501,7 +501,10 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         count += 1;
       }
     }
-    return count > 0 ? sum / count : sampleAt(xIndex, zIndex).surface;
+    const dry = sampleAt(xIndex, zIndex);
+    // Neighboring reaches can have different levels. Never extend their water
+    // above a dry bank, including the 0.15 m render offset.
+    return Math.min(count > 0 ? sum / count : dry.surface, dry.height - 0.15);
   }
 
   private createWaterGeometry(originX: number, originZ: number, chunkSize: number, segments: number, water: boolean[], surface: number[]): THREE.BufferGeometry | null {

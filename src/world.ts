@@ -287,7 +287,7 @@ export class WorldModel {
         for (const other of shores) {
           const drop = other.surface - shore.surface;
           if (other === original || drop <= 0.3) continue;
-          shore.shoreDist = Math.max(shore.shoreDist, 150 + drop * 3 - other.shoreDist);
+          shore.shoreDist = Math.max(shore.shoreDist, 2 * SHELF + 48 + drop * 3 - other.shoreDist);
         }
       }
       if (shore.shoreDist > 1600) continue;
@@ -387,15 +387,18 @@ export class WorldModel {
     const candidate = 65 + broad * 45 + dry * (85 + broad * 15);
     const hillsField = clamp01(0.5 + fbm(x / BIOME_SELECTION.hillsWavelength, z / BIOME_SELECTION.hillsWavelength, this.seed + 129, 3));
     const lakeField = clamp01(0.5 + fbm(x / BIOME_SELECTION.lakeWavelength, z / BIOME_SELECTION.lakeWavelength, this.seed + 131, 4));
+    // Lakeland replaces appearance and basin water, not the accepted drainage
+    // landform. Both allocations use the same ordered biome rules; the landform
+    // allocation reserves no lake territory, exactly as before issue 59.
+    const landform = biomeWeights(mountainRegion, climate, candidate, hillsField);
     const biome = biomeWeights(mountainRegion, climate, candidate, hillsField, lakeField);
     const ridges = biome.highlands > 0 ? 1 - Math.abs(fbm(x / 1550, z / 1550, this.seed + 47, 4)) : 0;
     const ridge = clamp01((ridges - 0.34) / 0.66);
     const mountains = mountainRegion * ridge * ridge * 380;
-    const elevation = biome.hills * (BIOME_PROFILES.hills.heightOffset + broad * BIOME_PROFILES.hills.heightAmplitude)
-      + biome.woodland * (BIOME_PROFILES.woodland.heightOffset + broad * BIOME_PROFILES.woodland.heightAmplitude)
-      + biome.moor * (BIOME_PROFILES.moor.heightOffset + broad * BIOME_PROFILES.moor.heightAmplitude)
-      + biome.lakeland * (BIOME_PROFILES.lakeland.heightOffset + broad * BIOME_PROFILES.lakeland.heightAmplitude)
-      + biome.highlands * (28 + broad * 52 + mountains);
+    const elevation = landform.hills * (BIOME_PROFILES.hills.heightOffset + broad * BIOME_PROFILES.hills.heightAmplitude)
+      + landform.woodland * (BIOME_PROFILES.woodland.heightOffset + broad * BIOME_PROFILES.woodland.heightAmplitude)
+      + landform.moor * (BIOME_PROFILES.moor.heightOffset + broad * BIOME_PROFILES.moor.heightAmplitude)
+      + landform.highlands * (28 + broad * 52 + mountains);
     return { elevation, mountainRegion, biome };
   }
 

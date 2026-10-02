@@ -5,7 +5,7 @@ export const BIOME_SELECTION = {
   hillsWavelength: 16000,
   hillsThreshold: 0.62,
   lakeWavelength: 7000,
-  lakeThreshold: 0.62,
+  lakeThreshold: 0.635,
   woodlandThreshold: 0.5,
   moorThreshold: 0.5,
 } as const;
