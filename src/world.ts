@@ -251,6 +251,9 @@ export class WorldModel {
     if (nearest) {
       const primary = coneOf(nearest);
       const share = second ? 0.5 * (1 - smootherstep(0, 48, second.shoreDist - nearest.shoreDist)) : 0;
+      // The bank shelf must follow the same blended level as its valley floor.
+      // A nearest-reach switch must not raise it abruptly to the other river's level.
+      surface = mix(surface, second?.surface ?? surface, share);
       height = mix(primary, second ? coneOf(second) : primary, share);
       const land = smootherstep(mix(280, 380, highland), mix(900, 1050, highland), Math.max(0, nearest.shoreDist));
       height = mix(height, bare, land);
@@ -324,7 +327,8 @@ export class WorldModel {
     const ridges = biome.highlands > 0 ? 1 - Math.abs(fbm(x / 1550, z / 1550, this.seed + 47, 4)) : 0;
     const ridge = clamp01((ridges - 0.34) / 0.66);
     const mountains = mountainRegion * ridge * ridge * 380;
-    const elevation = biome.hills * (BIOME_PROFILES.hills.heightOffset + broad * BIOME_PROFILES.hills.heightAmplitude)
+    const hillsRelief = biome.hills > 0 ? fbm(x / 8000, z / 8000, this.seed + 7, 4) : 0;
+    const elevation = biome.hills * (BIOME_PROFILES.hills.heightOffset + hillsRelief * BIOME_PROFILES.hills.heightAmplitude)
       + biome.woodland * (BIOME_PROFILES.woodland.heightOffset + broad * BIOME_PROFILES.woodland.heightAmplitude)
       + biome.moor * (BIOME_PROFILES.moor.heightOffset + broad * BIOME_PROFILES.moor.heightAmplitude)
       + (biome.highlands + biome.lakeland) * (28 + broad * 52 + mountains);
