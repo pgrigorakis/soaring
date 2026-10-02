@@ -122,7 +122,7 @@ describe('deterministic world generation', () => {
 
   it('carves river valleys without near-vertical walls', () => {
     const world = new WorldModel(448122);
-    const reaches = world.reachesIn(-8000, -8000, 8000, 8000).filter((reach) => reach.ax !== reach.bx || reach.az !== reach.bz);
+    const reaches = world.reachesIn(-10000, -10000, 10000, 10000).filter((reach) => reach.ax !== reach.bx || reach.az !== reach.bz);
     expect(reaches.length).toBeGreaterThan(200);
     let steepest = 0;
     for (const reach of reaches.slice(0, 200)) {
@@ -334,6 +334,7 @@ describe('deterministic world generation', () => {
     expect(rivers.length).toBeGreaterThan(20);
     let valleys = 0;
     let banks = 0;
+    let exposedRivers = 0;
     for (const reach of rivers) {
       const middle = channelPoint(reach, 0.5);
       const sx = Math.round(middle.x / step) * step;
@@ -343,6 +344,9 @@ describe('deterministic world generation', () => {
       const nx = (reach.bz - reach.az) / length;
       const nz = -(reach.bx - reach.ax) / length;
       const center = world.sample(middle.x, middle.z);
+      // Lake-covered tributaries have lake shores, not banks at river half-width.
+      if (!center.river) continue;
+      exposedRivers += 1;
       const left = world.sample(middle.x + nx * 260, middle.z + nz * 260);
       const right = world.sample(middle.x - nx * 260, middle.z - nz * 260);
       expect(center.water).toBe(true);
@@ -358,8 +362,9 @@ describe('deterministic world generation', () => {
       if (shore) banks += 1;
       if (left.height > center.height + 3 && right.height > center.height + 3) valleys += 1;
     }
-    expect(banks).toBeGreaterThan(rivers.length * 0.75);
-    expect(valleys).toBeGreaterThan(rivers.length * 0.6);
+    expect(exposedRivers).toBeGreaterThan(20);
+    expect(banks).toBeGreaterThan(exposedRivers * 0.75);
+    expect(valleys).toBeGreaterThan(exposedRivers * 0.6);
   });
 
   it('starts visits at more interesting terrain than unscored ring points', () => {

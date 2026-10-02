@@ -14,7 +14,12 @@ import { BIOME_PROFILES } from './biome';
 
 const palettes = Object.fromEntries(Object.entries(BIOME_PROFILES).map(([key, profile]) =>
   [key, profile.palette.map((hex) => new THREE.Color(hex))])) as Record<keyof typeof BIOME_PROFILES, THREE.Color[]>;
-const legacyGround = new THREE.Color(0x6fa03c);
+const lakeMeadow = new THREE.Color(0x6fa03c);
+const lakeBeach = new THREE.Color(0xe3cd8b);
+const lakeReeds = new THREE.Color(0x9fb65a);
+const lakeCliff = new THREE.Color(0x8a8174);
+const shallowWater = new THREE.Color(0x3fb0b8);
+const deepWater = new THREE.Color(0x1d5e8a);
 const graniteGround = new THREE.Color(0x857e72);
 const peatGround = new THREE.Color(0x2e4a4a);
 const hedgeGround = new THREE.Color(0x2e6b34);
@@ -43,7 +48,13 @@ export function terrainColor(sample: LandscapeSample, x: number, z: number, seed
   const snow = biome.highlands > 0 ? snowCover(sample, slope, x, z, seed) / biome.highlands : 0;
   scratch.lerp(highlandPalette[5]!, snow).multiplyScalar(biome.highlands);
   target.add(scratch);
-  scratch.copy(legacyGround).multiplyScalar(biome.lakeland);
+  scratch.copy(lakeMeadow).lerp(palettes.lakeland[1]!, sample.forest);
+  if (!sample.river && sample.bank > 0 && sample.bank < 100) {
+    if (slope > 0.45) scratch.copy(lakeCliff);
+    else if (sample.height - sample.surface <= 3) scratch.copy(lakeBeach);
+    else if (sample.height - sample.surface < 5) scratch.copy(lakeReeds);
+  }
+  scratch.multiplyScalar(biome.lakeland);
   target.add(scratch).lerp(graniteGround, sample.rock * (biome.hills + biome.woodland + biome.moor));
   const jitter = hash2(Math.round(x), Math.round(z), seed + 310);
   if (jitter < 0.012) target.lerp(flecks[jitter < 0.002 ? 1 : 0]!, biome.hills * 0.65);
@@ -343,8 +354,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     }
     const sampleAt = (xIndex: number, zIndex: number) => samples[(zIndex + 1) * row + xIndex + 1]!;
     const heightAt = (xIndex: number, zIndex: number) => sampleAt(xIndex, zIndex).height;
-    const water: boolean[] = [];
-    const surface: number[] = [];
+
     const hedgeBlocks: { x: number; y: number; z: number; turn: number; weight: number }[] = [];
 
     for (let zIndex = 0; zIndex <= segments; zIndex += 1) {
@@ -352,8 +362,6 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         const x = originX + xIndex * step;
         const z = originZ + zIndex * step;
         const sample = sampleAt(xIndex, zIndex);
-        water.push(sample.water);
-        surface.push(sample.water ? sample.surface : this.dryWaterLevel(sampleAt, xIndex, zIndex));
         positions.push(x - originX, sample.height, z - originZ);
         normal.set(
           heightAt(xIndex - 1, zIndex) - heightAt(xIndex + 1, zIndex),
@@ -419,7 +427,25 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     terrain.castShadow = true;
     group.add(terrain);
 
-    const waterGeometry = this.createWaterGeometry(originX, originZ, chunkSize, segments, water, surface);
+    // One world-aligned water grid across every terrain tier prevents LOD water seams.
+    const waterSegments = chunkSize / 36;
+    const waterSamples: LandscapeSample[] = [];
+    for (let iz = -1; iz <= waterSegments + 1; iz += 1) {
+      for (let ix = -1; ix <= waterSegments + 1; ix += 1) {
+        waterSamples.push(this.world.sample(originX + ix * 36, originZ + iz * 36));
+      }
+    }
+    const waterAt = (ix: number, iz: number) => waterSamples[(iz + 1) * (waterSegments + 3) + ix + 1]!;
+    const wet: boolean[] = [];
+    const levels: number[] = [];
+    for (let iz = 0; iz <= waterSegments; iz += 1) {
+      for (let ix = 0; ix <= waterSegments; ix += 1) {
+        const sample = waterAt(ix, iz);
+        wet.push(sample.water);
+        levels.push(sample.water ? sample.surface : this.dryWaterLevel(waterAt, ix, iz));
+      }
+    }
+    const waterGeometry = this.createWaterGeometry(originX, originZ, chunkSize, waterSegments, wet, levels);
     if (waterGeometry) group.add(new THREE.Mesh(waterGeometry, this.waterMaterial));
 
     const treeObjects = treeMode === 'near' ? this.createTrees(originX, originZ, TREE_SPACING)
@@ -499,7 +525,11 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         for (const [dx, dz] of [[0, 0], [step, 0], [0, step], [step, step]]) {
           const sample = this.world.sample(worldX + dx!, worldZ + dz!);
           waterColor.set(0x2a8fa8);
-          if (!sample.river) waterColor.lerp(new THREE.Color(0x2a7fa0), sample.biome.highlands);
+          if (!sample.river) {
+            waterColor.lerp(new THREE.Color(0x2a7fa0), sample.biome.highlands);
+            scratch.copy(shallowWater).lerp(deepWater, THREE.MathUtils.smoothstep(sample.surface - sample.height, 2, 18));
+            waterColor.lerp(scratch, sample.biome.lakeland);
+          }
           if (sample.peat > 0) waterColor.set(0x2e4a4a);
           colors.push(waterColor.r, waterColor.g, waterColor.b);
         }

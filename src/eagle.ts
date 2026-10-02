@@ -85,7 +85,8 @@ export class EagleNavigator {
     this.seedAngle = hash2(0, 0, world.seed + COMPASS_SEED) * Math.PI * 2;
     this.heightRange = normalizeFlightHeight(heightRange.min, heightRange.max);
     const startSample = world.sample(start.x, start.z);
-    const ground = startSample.height + highlandWeight(startSample.mountainRegion) * (this.highestGround(start.x, start.z) - startSample.height);
+    const startGround = startSample.water ? startSample.surface : startSample.height;
+    const ground = startGround + highlandWeight(startSample.mountainRegion) * (this.highestGround(start.x, start.z) - startGround);
     this.smoothedGround = ground;
     this.groundEnvelope = ground;
     this.state = { x: start.x, y: ground + clamp(105, this.heightRange.min, this.heightRange.max), z: start.z, heading: start.heading, bank: 0, behavior: 'gliding', flapping: false };
@@ -117,7 +118,8 @@ export class EagleNavigator {
     }
     const local = this.world.sample(this.state.x, this.state.z);
     const mountain = highlandWeight(local.mountainRegion);
-    const envelope = local.height + mountain * (this.groundEnvelope - local.height);
+    const localGround = local.water ? local.surface : local.height;
+    const envelope = localGround + mountain * (this.groundEnvelope - localGround);
     const easingSeconds = Math.max(0.01, 5 * mountain);
     this.smoothedGround += (envelope - this.smoothedGround) * (1 - Math.exp(-dt / easingSeconds));
     const ground = this.smoothedGround;
@@ -145,7 +147,7 @@ export class EagleNavigator {
       this.flyTowardTarget(dt, ground);
     }
     const current = this.world.sample(this.state.x, this.state.z);
-    this.state.y = Math.max(this.state.y, current.height + TERRAIN_SAFETY_MARGIN);
+    this.state.y = Math.max(this.state.y, Math.max(current.height, current.water ? current.surface : current.height) + TERRAIN_SAFETY_MARGIN);
     return this.state;
   }
 
@@ -336,7 +338,8 @@ export class EagleNavigator {
     let bestScore = -Infinity;
     for (let candidate = 0; candidate < 6; candidate += 1) {
       const variation = (hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.x / 400), this.world.seed + 419) - 0.5) * 1.35;
-      const distance = 720 + hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.z / 400), this.world.seed + 421) * 680;
+      const lakeland = this.world.sample(this.state.x, this.state.z).biome.lakeland;
+      const distance = 720 + hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.z / 400), this.world.seed + 421) * (680 + lakeland * 600);
       const heading = routeHeading + variation;
       const x = this.state.x + Math.sin(heading) * distance;
       const z = this.state.z + Math.cos(heading) * distance;
