@@ -31,6 +31,8 @@ Lakeland replaces the existing biome appearance and basin water. It does not cha
 
 Expanding a basin disc without checking higher tributaries produced lake cliffs and flooded banks. The lake mask now excludes higher water features with a clearance of `348 + 3 × levelDifference` metres. The 348 m base keeps lake ownership changes outside the accepted 150 m river shelf. The original river inlet radius remains unchanged. The river-wall test samples a larger 20 km window and retains its maximum slope below 3. The far-grid river check excludes lake-covered centers and lake-covered side probes, since a lake shore is not a river bank.
 
+The browser suite includes a regression for seed -1214809889, whose largest nominal basin has no visible lake after tributary protection. Hydrology viewpoints now search for actual water and fall back to the next visible feature, rather than returning an island or an empty lake mask. Three additional fresh random-world hydrology runs passed without retries. The merged branch passes all 52 unit/integration tests, type/build validation and all 20 browser smoke tests; `issue-59/validation.json` records the results.
+
 The water mesh uses one world-aligned 36 m grid at every terrain tier. Dry vertices use a fixed-neighborhood water level, capped below dry ground after the 0.15 m render offset. The browser test compares actual water heights and colours at shared near/mid/far edges, with zero error. Water materials remain plain; this branch adds no glints.
 
 ## One-hour navigation
@@ -39,9 +41,9 @@ The audit starts beside a real lake at `(7647.127558763605, -11252.509786414448)
 
 The audit runs 36,000 navigation updates at 0.1 s:
 
-- Travel: 100,951.8 m; displacement: 47,997.3 m, above the retained 35% requirement.
-- Longest uninterrupted water crossing: 1,132.8 m.
-- Water updates: 5,121; minimum clearance above land or water: 73.28 m.
+- Travel: 100,960.6 m; displacement: 47,992.1 m, above the retained 35% requirement.
+- Longest uninterrupted water crossing: 1,129.6 m.
+- Water updates: 5,130; minimum clearance above land or water: 73.34 m.
 - Old-route returns after ten minutes: zero, below the retained maximum of five.
 - 100 scenic starts are on land; all sampled nearby thermal placements are on land.
 

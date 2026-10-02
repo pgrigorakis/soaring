@@ -36,7 +36,8 @@ export const BIOME_PROFILES = {
     rockBias: 0.02, palette: [0x1f5a34, 0x2e7a3e, 0x5c9443, 0x7fae45, 0x2f6b3a], species: [0.3, 0.6, 0.1], thermalOdds: 1.6, scenicBonus: 0.2 },
   moor: { heightAmplitude: 60, heightOffset: 150, forestDensity: 0.02, treeDensity: 1, crownScale: 0.85,
     rockBias: 0.12, palette: [0x8a5a8c, 0xb06fa6, 0xb0763a, 0xa6a25a], species: [0.2, 0.6, 0.2], thermalOdds: 1.2, scenicBonus: 0.25 },
-  lakeland: { heightAmplitude: 52, heightOffset: 55, forestDensity: 0.55, treeDensity: 1, crownScale: 1,
+  // Appearance only: WorldModel.relief retains the pre-59 blended drainage landform.
+  lakeland: { heightAmplitude: 75, heightOffset: 150, forestDensity: 0.55, treeDensity: 1, crownScale: 1,
     rockBias: 0.02, palette: [0x6fa03c, 0x2f6b3a], species: [0.45, 0.35, 0.2], thermalOdds: 1, scenicBonus: 0.3 },
 } satisfies Record<'hills' | 'woodland' | 'moor' | 'lakeland', BiomeProfile>;
 
@@ -55,7 +56,7 @@ export function biomeWeights(relief: number, climate: number, elevation: number,
   return { hills: 1 - highlands - lakeland - woodland - moor, woodland, moor, highlands, lakeland };
 }
 
-/** Reserved biome weights use today's neutral values, not a speculative future profile. */
+/** Highlands keeps its existing parameters until it receives a full profile. */
 export function blendParameter(weights: BiomeWeights, key: 'forestDensity' | 'treeDensity' | 'crownScale' | 'rockBias' | 'thermalOdds' | 'scenicBonus', fallback: number): number {
   return weights.hills * BIOME_PROFILES.hills[key] + weights.woodland * BIOME_PROFILES.woodland[key]
     + weights.moor * BIOME_PROFILES.moor[key] + weights.lakeland * BIOME_PROFILES.lakeland[key] + weights.highlands * fallback;

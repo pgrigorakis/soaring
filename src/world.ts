@@ -319,7 +319,9 @@ export class WorldModel {
       bank = wet.shoreDist;
       const depth = wet.lake ? 3.6 + Math.max(0, wet.half - MAX_LAKE_RADIUS) * 0.025 : 2.7;
       const inward = Math.min(-wet.shoreDist, wet.islandRadius ? Math.max(0, wet.islandDistance! - wet.islandRadius) : Infinity);
-      const bowl = wet.lake ? mix(0.08, 1, smootherstep(0, Math.max(80, wet.half * 0.35), inward)) : 1;
+      const bowl = !wet.lake ? 1 : wet.half > MAX_LAKE_RADIUS
+        ? mix(0.08, 1, smootherstep(0, Math.max(80, wet.half * 0.35), inward))
+        : 0.7 + 0.3 * (1 - wet.distance / Math.max(wet.half, 1));
       height = surface - depth * bowl;
     } else if (bank < SHELF && bank > 0) {
       height = Math.max(height, surface + 0.85);
@@ -494,29 +496,33 @@ export class WorldModel {
   landmarkNear(x: number, z: number, radius = 10): { x: number; z: number; surface: number; lake: boolean } | null {
     const ci = Math.round(x / DRAINAGE_SPACING - 0.5);
     const cj = Math.round(z / DRAINAGE_SPACING - 0.5);
-    let best: DrainageNode | null = null;
+    const candidates: DrainageNode[] = [];
     for (let j = cj - radius; j <= cj + radius; j += 1) {
       for (let i = ci - radius; i <= ci + radius; i += 1) {
         const node = this.drainageAt(i, j);
         const useful = node.lake || (node.downstreamI !== null && node.flow >= RIVER_MIN_FLOW);
         if (!useful) continue;
-        if (!best || Number(node.lake) > Number(best.lake) || (node.lake === best.lake && node.flow > best.flow)) best = node;
+        candidates.push(node);
       }
     }
-    if (!best) return null;
-    const wetPoint = (px: number, pz: number) => {
-      const sample = this.sample(px, pz);
-      return sample.water && (!best.lake || !sample.river)
-        ? { x: px, z: pz, surface: sample.surface, lake: best.lake } : null;
-    };
-    const center = wetPoint(best.x, best.z);
-    if (center) return center;
-    // A basin's center can now be an island. Return actual water for viewpoints.
-    for (const radius of [300, 600, 900, 1200]) {
-      for (let direction = 0; direction < 16; direction += 1) {
-        const angle = direction * Math.PI / 8;
-        const point = wetPoint(best.x + Math.cos(angle) * radius, best.z + Math.sin(angle) * radius);
-        if (point) return point;
+    candidates.sort((a, b) => Number(b.lake) - Number(a.lake) || b.flow - a.flow);
+    for (const node of candidates) {
+      const wetPoint = (px: number, pz: number) => {
+        const sample = this.sample(px, pz);
+        return sample.water && (!node.lake || !sample.river)
+          ? { x: px, z: pz, surface: sample.surface, lake: !sample.river } : null;
+      };
+      const center = wetPoint(node.x, node.z);
+      if (center) return center;
+      // A lake's center can be an island, or its entire mask can be clipped by
+      // higher tributaries. Try actual lake water, then the next visible feature.
+      if (!node.lake) continue;
+      for (const distance of [300, 600, 900, 1200]) {
+        for (let direction = 0; direction < 16; direction += 1) {
+          const angle = direction * Math.PI / 8;
+          const point = wetPoint(node.x + Math.cos(angle) * distance, node.z + Math.sin(angle) * distance);
+          if (point) return point;
+        }
       }
     }
     return null;

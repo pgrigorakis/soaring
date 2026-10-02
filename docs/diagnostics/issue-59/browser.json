@@ -21,9 +21,5 @@
   "islandTrees": 41,
   "waterRing": 32,
   "dryThermals": true,
-  "timing": {
-    "chunks": 0,
-    "meanMs": 0,
-    "maxMs": 0
-  }
+  "landmarkWater": true
 }

@@ -331,14 +331,15 @@ export class EagleNavigator {
   private chooseScenicTarget(): void {
     this.scenicIndex += 1;
     const bearing = this.seedAngle + fbm1d(this.totalTime / 300, this.world.seed + COMPASS_SEED) * Math.PI / 2;
-    const mountain = highlandWeight(this.world.sample(this.state.x, this.state.z).mountainRegion);
+    const local = this.world.sample(this.state.x, this.state.z);
+    const mountain = highlandWeight(local.mountainRegion);
+    const lakeland = local.biome.lakeland;
     // Keep the long-lived compass through a pass; do not let a thermal's exit yaw
     // turn valley preference into repeated trips around the same basin.
     const routeHeading = bearing;
     let bestScore = -Infinity;
     for (let candidate = 0; candidate < 6; candidate += 1) {
       const variation = (hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.x / 400), this.world.seed + 419) - 0.5) * 1.35;
-      const lakeland = this.world.sample(this.state.x, this.state.z).biome.lakeland;
       const distance = 720 + hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.z / 400), this.world.seed + 421) * (680 + lakeland * 600);
       const heading = routeHeading + variation;
       const x = this.state.x + Math.sin(heading) * distance;

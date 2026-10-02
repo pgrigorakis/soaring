@@ -24,11 +24,11 @@
   "deep": 18.156814823768443,
   "flight": {
     "seconds": 3600,
-    "distance": 100951.79609863186,
-    "netDistance": 47997.26710606532,
-    "minimumClearance": 73.28292913838726,
-    "wetTicks": 5121,
-    "longestCrossing": 1132.8000000000322,
+    "distance": 100960.63051495087,
+    "netDistance": 47992.06454685171,
+    "minimumClearance": 73.34062100191812,
+    "wetTicks": 5130,
+    "longestCrossing": 1129.59999999999,
     "revisits": 0
   }
 }

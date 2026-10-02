@@ -66,17 +66,22 @@ test('renders a long valley lake with a wooded island, beach and seamless water 
     });
     const thermals = world.nearbyThermals(x, z, 3);
     const dryThermals = thermals.every((t: any) => !world.sample(t.x, t.z).water);
+    // This seed's largest nominal basin is entirely removed by tributary protection.
+    const maskedWorld = new WorldModel(-1214809889);
+    const maskedLandmark = maskedWorld.landmarkNear(-147, -3730);
+    const landmarkWater = !!maskedLandmark && maskedWorld.sample(maskedLandmark.x, maskedLandmark.z).water;
     chunks.forEach((chunk) => chunk.dispose());
     terrain.dispose();
     window.__SOARING__.setTimeOfDay(.5);
     window.__SOARING__.setViewpoint({ x: x - 1100, y: 630, z: z + 1300, lookX: x, lookY: 85, lookZ: z });
-    return { seed: world.seed, lake, seamError, sharedVertices, islandTrees: islandTrees.length, waterRing: ring.filter(Boolean).length, dryThermals };
+    return { seed: world.seed, lake, seamError, sharedVertices, islandTrees: islandTrees.length, waterRing: ring.filter(Boolean).length, dryThermals, landmarkWater };
   });
   expect(evidence.sharedVertices).toBeGreaterThan(10);
   expect(evidence.seamError).toBe(0);
   expect(evidence.islandTrees).toBeGreaterThan(10);
   expect(evidence.waterRing).toBe(32);
   expect(evidence.dryThermals).toBe(true);
+  expect(evidence.landmarkWater).toBe(true);
   expect(errors).toEqual([]);
   await page.waitForFunction(() => window.__SOARING__.snapshot().pending === 0);
   const rendered = await page.evaluate(() => window.__SOARING__.snapshot().renderedFrames);
