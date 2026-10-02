@@ -1,18 +1,18 @@
-# Biome weights — decisions for review
+# Biome weights: design decisions for review
 
-## Failure modes to verify before implementation
+These choices implement issue #58. Decision B (independent Hills territory and broader fields) and Woodland-related flapping were authorized by the captain through firstmate. Numeric settings remain easy to change in `src/biome.ts` and the named world-generation rules.
 
-- Non-normalized or negative weights; selection priority lost at overlap.
-- Recursive height/weight evaluation (drainage needs biome height before rendered height exists).
-- Chunk-local randomness, mismatched shared-edge colours, or placement changes at chunk boundaries.
-- Moor disappears because the existing low-relief land is mostly below 90 m.
-- Woodland glades inherit canopy tree density or canopy thermals.
-- Species proportions or autumn tint depend on chunk traversal order.
-- Added noise and tree sampling exceed the 20% chunk-build budget.
-- Coverage and region span fail across seeds, despite attractive hand-picked screenshots.
+1. **Selection territory:** independent Hills field, threshold 0.62; Woodland/Moor split at climate 0.50. Highlands retains relief threshold 0.55. Rejected: the original narrow moisture remainder and a wider 0.36–0.64 middle band; neither gave Hills a 6–10 km median span.
+2. **Field sizes and relief phase:** Climate/Hills 16 km; relief 18 km, relief seed offset 61 instead of 59. Rejected: smaller tested wavelength pairs that failed and larger pairs that were not needed. The old relief phase put the entire nearby mixed-tree fixture in core Highlands after broadening; the new phase preserves mixed terrain near that seed's origin.
+3. **Height selection:** evaluate pre-drainage candidate elevation, then blend final profile height into `relief()`. Hills is `65 ± 45 m`, Woodland `100 ± 60 m`, Moor `150 ± 60 m` before drainage/detail. The 90 m eligibility gate uses normalized elevation/150, giving a ±9 m transition. Rejected: carved-height selection (drainage recursion and riverbank biome stripes), today's unmodified lowland height (almost no Moor), and a literal ±0.06 m height transition (an abrupt elevation contour).
+4. **Hills fields and hedges:** fixed 300 m square cells with one of the three specified tints, edge-colour bands and edge-biased trees; lone trees are oaks. Rejected: variable cell sizes or rotated boundaries, which were not needed for the requested patchwork. Base tree occupancy is 0.018, plus 0.45 times the edge mask.
+5. **Glades:** keep 300 m, two-octave noise and smootherstep thresholds 0.28–0.43. A trial at 0.26–0.41 reduced wide-band flapping from 1,822 to 1,331 ticks, but the captain rejected increasing glade frequency. Both thresholds were restored; forest remains 0.92 outside glades. Woodland tree density is 2.5× a 0.35 reference occupancy, below saturation.
+6. **Moor details:** smoothly interpolate the four specified patch colours on 250 m noise. Sparse tree occupancy is 0.004 plus rare 100–150 m groves in 25% of 1 km cells (mean candidate occupancy below 1%, well below 3%). Tors use three stacked granite blocks. Pools have 32–54 m radii, on flat tops above 110 m and away from drainage channels. Rejected: uniform 2% trees (lost adjacent open cells in the existing fixture), flat unshaped dark paint for pools, and single rounded boulders as tors.
+7. **Thermal profiles:** Hills 1.0, Woodland 1.6 and Moor 1.2 score multipliers. Woodland canopy suppresses lift; glades provide it. Rejected: letting ordinary canopy scores compete equally with glades, and increasing glade frequency to meet an old global flapping budget.
+8. **Navigation through wider regions:** scenic targets and thermal preference follow the persistent compass; its noise amplitude is π/2 instead of π. Thermal forward bias stays at the existing 0.28. Rejected: retaining thermal-exit yaw, full-amplitude reversals, and a stronger 0.8 thermal bias; those failed route persistence or caused excessive flapping.
+9. **River bends:** reduce bend fractions to 0.06–0.09 plus a 0.05 second harmonic range. Rejected: the old 0.16–0.24 / 0.14 bends, which crossed adjacent reaches under the new drainage elevations. This preserves non-crossing water at the cost of gentler meanders.
+10. **Woodland flapping allowance:** only the wide-band test gets its original 1,622.5-tick ceiling multiplied by `1 + 0.5 × woodlandTimeFraction`, including fractional blend weights. The measured 27.51% Woodland exposure gives 1,845.64 allowed ticks versus 1,822 actual. Rejected: raising the global constant, changing either narrow-band ceiling, or counting only flaps directly above Woodland (missed the energy deficit after an exit). Route persistence and all other assertions stay unchanged.
 
-## Design decisions for review
+## Failure modes checked
 
-1. Selection uses broad pre-drainage elevation, not river-carved vertex height. Profiles contribute a candidate elevation before the height eligibility test, then the final profile is blended by the resulting weights. This avoids a height/weight cycle and lets dry uplands reach the board's 90–220 m range. Rejected: selecting against today's unmodified height (moor virtually disappears); selecting against carved height (riverbanks introduce biome stripes and drainage recursion).
-
-Measurements and any further choices will be recorded here and in the PR.
+Weights stay normalized and deterministic across cache eviction and traversal order. Chunk partitions preserve tree placement. Shared mesh edges match height, normal and colour exactly in the browser test. Drainage sees blended profile heights. River count, wall slope and non-crossing assertions remain intact. Canopy/glade thermal placement remains seed-based. Final span, dry-land coverage and build-time evidence is in `docs/diagnostics/issue-58-biome-spans.md`.

@@ -9,7 +9,7 @@ test('Highlands snow caps remain visible from the default chase camera', async (
   });
   await page.goto('/?smoke');
   await page.evaluate(() => {
-    window.__SOARING__.reviewFlight!({ x: -24750, z: 3000, heading: 0 });
+    window.__SOARING__.reviewFlight!({ x: 16250, z: 31250, heading: 0 });
     window.__SOARING__.setVisibility(1800);
     document.querySelector('#intro')?.classList.add('hidden');
     document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
@@ -21,13 +21,14 @@ test('Highlands snow caps remain visible from the default chase camera', async (
     const { snowCover } = await import(/* @vite-ignore */ terrainPath) as typeof import('../src/terrain');
     const { WorldModel } = await import(/* @vite-ignore */ worldPath) as typeof import('../src/world');
     const world = new WorldModel(57);
-    const peak = world.sample(-24750, 3750);
-    const cirque = world.reachesIn(-27000, 0, -22000, 6000).find((reach) => reach.lake
+    // #58's approved broad fields relocate Highlands; keep the same snow/cirque assertions.
+    const peak = world.sample(16250, 32000);
+    const cirque = world.reachesIn(13500, 28000, 20000, 35500).find((reach) => reach.lake
       && world.drainageAt(Math.floor(reach.ax / 500), Math.floor(reach.az / 500)).downstreamI !== null);
     return { cirque: cirque ? { water: world.sample(cirque.ax, cirque.az).water, radius: cirque.aWidth / 2 } : null,
-      height: peak.height, cap: snowCover(peak, 0.2, -24750, 3750, 57),
-      cliff: snowCover(peak, 1, -24750, 3750, 57),
-      below: snowCover({ ...peak, height: 379 }, 0.2, -24750, 3750, 57) };
+      height: peak.height, cap: snowCover(peak, 0.2, 16250, 32000, 57),
+      cliff: snowCover(peak, 1, 16250, 32000, 57),
+      below: snowCover({ ...peak, height: 379 }, 0.2, 16250, 32000, 57) };
   });
   expect(cover.cirque?.water).toBe(true);
   expect(cover.cirque?.radius).toBeLessThanOrEqual(200);

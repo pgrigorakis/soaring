@@ -1,0 +1,1462 @@
+{
+  "coverage": {
+    "extentMeters": 240000,
+    "stepMeters": 2500,
+    "offset": [
+      123.75,
+      -231.5
+    ],
+    "rows": [
+      {
+        "seed": 80231,
+        "dry": 7923,
+        "water": 1293,
+        "maxSumError": 1.1102230246251565e-16,
+        "weights": {
+          "hills": 0.23368900619164878,
+          "woodland": 0.31541292460044085,
+          "moor": 0.2743771674309481,
+          "highlands": 0.1765209017769622,
+          "lakeland": 0
+        }
+      },
+      {
+        "seed": 42,
+        "dry": 7929,
+        "water": 1287,
+        "maxSumError": 1.1102230246251565e-16,
+        "weights": {
+          "hills": 0.2946436121207089,
+          "woodland": 0.2731763457493141,
+          "moor": 0.26258075097695577,
+          "highlands": 0.1695992911530212,
+          "lakeland": 0
+        }
+      },
+      {
+        "seed": 123456,
+        "dry": 7908,
+        "water": 1308,
+        "maxSumError": 2.220446049250313e-16,
+        "weights": {
+          "hills": 0.2760725840356008,
+          "woodland": 0.23418441759753,
+          "moor": 0.3050787130057673,
+          "highlands": 0.18466428536110172,
+          "lakeland": 0
+        }
+      }
+    ]
+  },
+  "benchmark": {
+    "baselineRef": "bb19112",
+    "spots": [
+      [
+        -8000,
+        -40000
+      ],
+      [
+        -36000,
+        -40000
+      ],
+      [
+        -40000,
+        -40000
+      ],
+      [
+        11000,
+        -40000
+      ]
+    ],
+    "rows": [
+      {
+        "baseline": {
+          "chunks": 100,
+          "meanMs": 12.340999999642372,
+          "maxMs": 31.900000035762787
+        },
+        "current": {
+          "chunks": 100,
+          "meanMs": 12.611000000238418,
+          "maxMs": 45.80000001192093
+        }
+      },
+      {
+        "baseline": {
+          "chunks": 100,
+          "meanMs": 12.235999998450279,
+          "maxMs": 31.599999964237213
+        },
+        "current": {
+          "chunks": 100,
+          "meanMs": 12.63099999845028,
+          "maxMs": 44.19999998807907
+        }
+      },
+      {
+        "baseline": {
+          "chunks": 100,
+          "meanMs": 12.385000000596046,
+          "maxMs": 31.69999998807907
+        },
+        "current": {
+          "chunks": 100,
+          "meanMs": 12.540000000596047,
+          "maxMs": 45.30000001192093
+        }
+      },
+      {
+        "baseline": {
+          "chunks": 100,
+          "meanMs": 12.225,
+          "maxMs": 32.5
+        },
+        "current": {
+          "chunks": 100,
+          "meanMs": 12.598999999761581,
+          "maxMs": 45.30000001192093
+        }
+      },
+      {
+        "baseline": {
+          "chunks": 100,
+          "meanMs": 12.125,
+          "maxMs": 31.399999976158142
+        },
+        "current": {
+          "chunks": 100,
+          "meanMs": 12.691000000834466,
+          "maxMs": 46.60000002384186
+        }
+      }
+    ],
+    "baselineMeanMs": 12.26239999973774,
+    "currentMeanMs": 12.614399999976158,
+    "increasePercent": 2.870563676327187
+  },
+  "peatPool": {
+    "found": {
+      "x": -23809.276039828546,
+      "z": -42646.417326061055,
+      "sample": {
+        "height": 144.20361551296378,
+        "mountainRegion": 0,
+        "surface": 145.90361551296377,
+        "bank": -46.18154366873205,
+        "moisture": 0.7267298161276343,
+        "forest": 0,
+        "rock": 0.11963600852618686,
+        "water": true,
+        "river": false,
+        "biome": {
+          "hills": 0,
+          "woodland": 0.0036433690351597835,
+          "moor": 0.9963566309648402,
+          "highlands": 0,
+          "lakeland": 0
+        },
+        "glade": 0,
+        "field": 0.6808317268732935,
+        "hedge": 0,
+        "moorPatch": 0.6520095879504948,
+        "peat": 1
+      }
+    },
+    "candidates": 2
+  },
+  "route": {
+    "gladeShift": 0,
+    "seed": 448122,
+    "start": {
+      "x": -4804.329426881198,
+      "z": -1931.278897154048
+    },
+    "netDistance": 51075.500515999396,
+    "requiredNetDistance": 36198.90433101736,
+    "distance": 103425.44094576388,
+    "revisitPasses": 0,
+    "flappingTicks": 1822,
+    "flappingOutsideWoodland": 1731.7677096826644,
+    "woodlandTicks": 9902.251411431605,
+    "originalFlappingLimit": 1622.5,
+    "allowedFlappingTicks": 1845.644484931219,
+    "seekEntries": 28,
+    "backwardSeekEntries": 10,
+    "stalledTicks": 0,
+    "mostVisitedThermals": [
+      [
+        "-9099,-1305",
+        1
+      ],
+      [
+        "-11381,-608",
+        1
+      ],
+      [
+        "-11387,-601",
+        1
+      ],
+      [
+        "-13762,-189",
+        1
+      ],
+      [
+        "-17006,4246",
+        1
+      ],
+      [
+        "-17075,8410",
+        1
+      ],
+      [
+        "-21737,11993",
+        1
+      ],
+      [
+        "-23970,12779",
+        1
+      ]
+    ],
+    "snapshots": [
+      {
+        "seconds": 300,
+        "position": [
+          -11376.000479228946,
+          -720.387813690772
+        ],
+        "behavior": "thermal-seeking",
+        "biome": {
+          "hills": 0,
+          "woodland": 0,
+          "moor": 1,
+          "highlands": 0,
+          "lakeland": 0
+        },
+        "netDistance": 6682.298828717271,
+        "distance": 8877.374371428446,
+        "flappingTicks": 441
+      },
+      {
+        "seconds": 600,
+        "position": [
+          -14528.599075725628,
+          1048.7337039866845
+        ],
+        "behavior": "thermal-seeking",
+        "biome": {
+          "hills": 0,
+          "woodland": 0,
+          "moor": 0,
+          "highlands": 1,
+          "lakeland": 0
+        },
+        "netDistance": 10170.638883885049,
+        "distance": 16729.002603523833,
+        "flappingTicks": 486
+      },
+      {
+        "seconds": 900,
+        "position": [
+          -17090.308004288447,
+          8477.258162988495
+        ],
+        "behavior": "gliding",
+        "biome": {
+          "hills": 0,
+          "woodland": 0,
+          "moor": 0,
+          "highlands": 1,
+          "lakeland": 0
+        },
+        "netDistance": 16102.264230128338,
+        "distance": 25826.110187026297,
+        "flappingTicks": 963
+      },
+      {
+        "seconds": 1200,
+        "position": [
+          -23661.04046975907,
+          12758.221370126288
+        ],
+        "behavior": "thermal-seeking",
+        "biome": {
+          "hills": 0,
+          "woodland": 0,
+          "moor": 0,
+          "highlands": 1,
+          "lakeland": 0
+        },
+        "netDistance": 23903.074477083934,
+        "distance": 34627.38258142347,
+        "flappingTicks": 1044
+      },
+      {
+        "seconds": 1500,
+        "position": [
+          -29052.734350986713,
+          11264.982962061718
+        ],
+        "behavior": "gliding",
+        "biome": {
+          "hills": 0,
+          "woodland": 1,
+          "moor": 0,
+          "highlands": 0,
+          "lakeland": 0
+        },
+        "netDistance": 27606.638122386023,
+        "distance": 43422.45247702416,
+        "flappingTicks": 1080
+      },
+      {
+        "seconds": 1800,
+        "position": [
+          -30683.594143102164,
+          7796.506476786289
+        ],
+        "behavior": "thermal-seeking",
+        "biome": {
+          "hills": 0,
+          "woodland": 1,
+          "moor": 0,
+          "highlands": 0,
+          "lakeland": 0
+        },
+        "netDistance": 27647.172559480416,
+        "distance": 51619.672822675675,
+        "flappingTicks": 1116
+      },
+      {
+        "seconds": 2100,
+        "position": [
+          -35514.0431234497,
+          2752.4260993585617
+        ],
+        "behavior": "gliding",
+        "biome": {
+          "hills": 0.19476464965087847,
+          "woodland": 0.8052353503491215,
+          "moor": 0,
+          "highlands": 0,
+          "lakeland": 0
+        },
+        "netDistance": 31064.82911299472,
+        "distance": 60112.67925075354,
+        "flappingTicks": 1298
+      },
+      {
+        "seconds": 2400,
+        "position": [
+          -41293.49226392724,
+          -12.086613218316144
+        ],
+        "behavior": "gliding",
+        "biome": {
+          "hills": 0.053260095895484416,
+          "woodland": 0.9467399041045156,
+          "moor": 0,
+          "highlands": 0,
+          "lakeland": 0
+        },
+        "netDistance": 36539.59911618052,
+        "distance": 68758.28643077852,
+        "flappingTicks": 1343
+      },
+      {
+        "seconds": 2700,
+        "position": [
+          -47152.178633088115,
+          -604.5211112177843
+        ],
+        "behavior": "gliding",
+        "biome": {
+          "hills": 1,
+          "woodland": 0,
+          "moor": 0,
+          "highlands": 0,
+          "lakeland": 0
+        },
+        "netDistance": 42368.62776411554,
+        "distance": 77536.99484515682,
+        "flappingTicks": 1444
+      },
+      {
+        "seconds": 3000,
+        "position": [
+          -50025.90497588464,
+          -3621.916874661049
+        ],
+        "behavior": "thermal-seeking",
+        "biome": {
+          "hills": 1,
+          "woodland": 0,
+          "moor": 0,
+          "highlands": 0,
+          "lakeland": 0
+        },
+        "netDistance": 45253.167313517566,
+        "distance": 86048.03049050854,
+        "flappingTicks": 1556
+      },
+      {
+        "seconds": 3300,
+        "position": [
+          -52060.530841053565,
+          -5435.725785455563
+        ],
+        "behavior": "thermal-seeking",
+        "biome": {
+          "hills": 1,
+          "woodland": 0,
+          "moor": 0,
+          "highlands": 0,
+          "lakeland": 0
+        },
+        "netDistance": 47385.9654337627,
+        "distance": 94950.27570631671,
+        "flappingTicks": 1754
+      },
+      {
+        "seconds": 3600,
+        "position": [
+          -55483.661512112536,
+          -8280.456194623033
+        ],
+        "behavior": "thermal-seeking",
+        "biome": {
+          "hills": 0.9999214468964039,
+          "woodland": 7.855310359609525e-05,
+          "moor": 0,
+          "highlands": 0,
+          "lakeland": 0
+        },
+        "netDistance": 51075.500515999396,
+        "distance": 103425.44094576388,
+        "flappingTicks": 1822
+      }
+    ]
+  },
+  "spanSweep": {
+    "metric": "dominant-biome contiguous flight-line chord, excluding boundary-truncated runs",
+    "coverageMetric": "mean pre-drainage biome weights (not dry-land-only vertex coverage)",
+    "stepMeters": 100,
+    "extentMeters": 240000,
+    "options": [
+      {
+        "climateMeters": 12000,
+        "reliefMeters": 12000,
+        "seeds": [
+          {
+            "seed": 80231,
+            "weights": {
+              "hills": 0.2554243524991297,
+              "woodland": 0.30860219308742953,
+              "moor": 0.2591609625176224,
+              "highlands": 0.17681249189582274
+            },
+            "spans": {
+              "hills": {
+                "runs": 1296,
+                "medianMeters": 5300,
+                "meanMeters": 7061.95987654321
+              },
+              "woodland": {
+                "runs": 1637,
+                "medianMeters": 4800,
+                "meanMeters": 6936.896762370189
+              },
+              "moor": {
+                "runs": 1444,
+                "medianMeters": 4300,
+                "meanMeters": 6439.058171745152
+              },
+              "highlands": {
+                "runs": 885,
+                "medianMeters": 6200,
+                "meanMeters": 7460.90395480226
+              }
+            }
+          },
+          {
+            "seed": 42,
+            "weights": {
+              "hills": 0.2687301190236276,
+              "woodland": 0.2672277514663326,
+              "moor": 0.29120790549237174,
+              "highlands": 0.17283422401766996
+            },
+            "spans": {
+              "hills": {
+                "runs": 1284,
+                "medianMeters": 5700,
+                "meanMeters": 7480.685358255451
+              },
+              "woodland": {
+                "runs": 1459,
+                "medianMeters": 4800,
+                "meanMeters": 6683.0020562028785
+              },
+              "moor": {
+                "runs": 1561,
+                "medianMeters": 4900,
+                "meanMeters": 6945.739910313901
+              },
+              "highlands": {
+                "runs": 879,
+                "medianMeters": 5700,
+                "meanMeters": 7088.1683731513085
+              }
+            }
+          },
+          {
+            "seed": 123456,
+            "weights": {
+              "hills": 0.28660557802858805,
+              "woodland": 0.24617334676430605,
+              "moor": 0.28981212844721,
+              "highlands": 0.17740894675989552
+            },
+            "spans": {
+              "hills": {
+                "runs": 1315,
+                "medianMeters": 5700,
+                "meanMeters": 7805.475285171103
+              },
+              "woodland": {
+                "runs": 1436,
+                "medianMeters": 4300,
+                "meanMeters": 6144.359331476323
+              },
+              "moor": {
+                "runs": 1616,
+                "medianMeters": 4600,
+                "meanMeters": 6652.042079207921
+              },
+              "highlands": {
+                "runs": 836,
+                "medianMeters": 6100,
+                "meanMeters": 7576.794258373206
+              }
+            }
+          }
+        ]
+      },
+      {
+        "climateMeters": 14000,
+        "reliefMeters": 15000,
+        "seeds": [
+          {
+            "seed": 80231,
+            "weights": {
+              "hills": 0.2514643290974737,
+              "woodland": 0.31313360687125485,
+              "moor": 0.25331698531081626,
+              "highlands": 0.18208507872045374
+            },
+            "spans": {
+              "hills": {
+                "runs": 1037,
+                "medianMeters": 6700,
+                "meanMeters": 8603.953712632594
+              },
+              "woodland": {
+                "runs": 1357,
+                "medianMeters": 5500,
+                "meanMeters": 8122.991893883566
+              },
+              "moor": {
+                "runs": 1154,
+                "medianMeters": 5800,
+                "meanMeters": 8221.490467937609
+              },
+              "highlands": {
+                "runs": 709,
+                "medianMeters": 7700,
+                "meanMeters": 9288.716502115656
+              }
+            }
+          },
+          {
+            "seed": 42,
+            "weights": {
+              "hills": 0.2954790094438196,
+              "woodland": 0.2632022806754869,
+              "moor": 0.27348913026387517,
+              "highlands": 0.16782957961681894
+            },
+            "spans": {
+              "hills": {
+                "runs": 1149,
+                "medianMeters": 7800,
+                "meanMeters": 9246.475195822455
+              },
+              "woodland": {
+                "runs": 1208,
+                "medianMeters": 6100,
+                "meanMeters": 8074.254966887417
+              },
+              "moor": {
+                "runs": 1241,
+                "medianMeters": 5400,
+                "meanMeters": 7948.67042707494
+              },
+              "highlands": {
+                "runs": 672,
+                "medianMeters": 7400,
+                "meanMeters": 8852.380952380952
+              }
+            }
+          },
+          {
+            "seed": 123456,
+            "weights": {
+              "hills": 0.3004767553903225,
+              "woodland": 0.22885298512750746,
+              "moor": 0.297558358978955,
+              "highlands": 0.17311190050321368
+            },
+            "spans": {
+              "hills": {
+                "runs": 1113,
+                "medianMeters": 7400,
+                "meanMeters": 9558.490566037735
+              },
+              "woodland": {
+                "runs": 1140,
+                "medianMeters": 5400,
+                "meanMeters": 7256.403508771929
+              },
+              "moor": {
+                "runs": 1361,
+                "medianMeters": 5600,
+                "meanMeters": 7831.667891256429
+              },
+              "highlands": {
+                "runs": 691,
+                "medianMeters": 7600,
+                "meanMeters": 9250.651230101303
+              }
+            }
+          }
+        ]
+      },
+      {
+        "climateMeters": 16000,
+        "reliefMeters": 15000,
+        "seeds": [
+          {
+            "seed": 80231,
+            "weights": {
+              "hills": 0.24947003136726967,
+              "woodland": 0.31288320566826844,
+              "moor": 0.2555616842440083,
+              "highlands": 0.18208507872045374
+            },
+            "spans": {
+              "hills": {
+                "runs": 948,
+                "medianMeters": 6600,
+                "meanMeters": 9309.599156118144
+              },
+              "woodland": {
+                "runs": 1169,
+                "medianMeters": 6500,
+                "meanMeters": 9521.813515825492
+              },
+              "moor": {
+                "runs": 1019,
+                "medianMeters": 6100,
+                "meanMeters": 8850.343473994111
+              },
+              "highlands": {
+                "runs": 709,
+                "medianMeters": 7700,
+                "meanMeters": 9289.562764456981
+              }
+            }
+          },
+          {
+            "seed": 42,
+            "weights": {
+              "hills": 0.2981967238960702,
+              "woodland": 0.2749712422458191,
+              "moor": 0.25900245424129087,
+              "highlands": 0.16782957961681894
+            },
+            "spans": {
+              "hills": {
+                "runs": 1047,
+                "medianMeters": 7800,
+                "meanMeters": 10031.327602674308
+              },
+              "woodland": {
+                "runs": 1049,
+                "medianMeters": 7100,
+                "meanMeters": 9090.848427073402
+              },
+              "moor": {
+                "runs": 1091,
+                "medianMeters": 6300,
+                "meanMeters": 8875.802016498625
+              },
+              "highlands": {
+                "runs": 672,
+                "medianMeters": 7400,
+                "meanMeters": 8853.27380952381
+              }
+            }
+          },
+          {
+            "seed": 123456,
+            "weights": {
+              "hills": 0.2948039839960101,
+              "woodland": 0.23022672637265149,
+              "moor": 0.30185738912812543,
+              "highlands": 0.17311190050321368
+            },
+            "spans": {
+              "hills": {
+                "runs": 1004,
+                "medianMeters": 8300,
+                "meanMeters": 10653.386454183266
+              },
+              "woodland": {
+                "runs": 1083,
+                "medianMeters": 5300,
+                "meanMeters": 7332.779316712835
+              },
+              "moor": {
+                "runs": 1236,
+                "medianMeters": 6400,
+                "meanMeters": 8991.019417475729
+              },
+              "highlands": {
+                "runs": 691,
+                "medianMeters": 7600,
+                "meanMeters": 9252.532561505064
+              }
+            }
+          }
+        ]
+      },
+      {
+        "climateMeters": 18000,
+        "reliefMeters": 15000,
+        "seeds": [
+          {
+            "seed": 80231,
+            "weights": {
+              "hills": 0.2738151456535077,
+              "woodland": 0.3031414116490432,
+              "moor": 0.24095836397699277,
+              "highlands": 0.18208507872045374
+            },
+            "spans": {
+              "hills": {
+                "runs": 849,
+                "medianMeters": 8600,
+                "meanMeters": 10978.209658421672
+              },
+              "woodland": {
+                "runs": 1080,
+                "medianMeters": 7000,
+                "meanMeters": 10160
+              },
+              "moor": {
+                "runs": 921,
+                "medianMeters": 5900,
+                "meanMeters": 9476.547231270359
+              },
+              "highlands": {
+                "runs": 710,
+                "medianMeters": 7700,
+                "meanMeters": 9277.18309859155
+              }
+            }
+          },
+          {
+            "seed": 42,
+            "weights": {
+              "hills": 0.3076033790988385,
+              "woodland": 0.26637222925123183,
+              "moor": 0.258194812033111,
+              "highlands": 0.16782957961681894
+            },
+            "spans": {
+              "hills": {
+                "runs": 971,
+                "medianMeters": 9100,
+                "meanMeters": 11109.371781668384
+              },
+              "woodland": {
+                "runs": 954,
+                "medianMeters": 7100,
+                "meanMeters": 9690.77568134172
+              },
+              "moor": {
+                "runs": 962,
+                "medianMeters": 7100,
+                "meanMeters": 9821.829521829522
+              },
+              "highlands": {
+                "runs": 673,
+                "medianMeters": 7400,
+                "meanMeters": 8841.010401188707
+              }
+            }
+          },
+          {
+            "seed": 123456,
+            "weights": {
+              "hills": 0.28623618895666775,
+              "woodland": 0.22924295431323516,
+              "moor": 0.3114089562268831,
+              "highlands": 0.17311190050321368
+            },
+            "spans": {
+              "hills": {
+                "runs": 862,
+                "medianMeters": 8400,
+                "meanMeters": 11264.385150812064
+              },
+              "woodland": {
+                "runs": 969,
+                "medianMeters": 6500,
+                "meanMeters": 8646.8524251806
+              },
+              "moor": {
+                "runs": 1133,
+                "medianMeters": 6900,
+                "meanMeters": 10202.206531332746
+              },
+              "highlands": {
+                "runs": 691,
+                "medianMeters": 7600,
+                "meanMeters": 9254.413892908828
+              }
+            }
+          }
+        ]
+      },
+      {
+        "climateMeters": 20000,
+        "reliefMeters": 15000,
+        "seeds": [
+          {
+            "seed": 80231,
+            "weights": {
+              "hills": 0.2828007045644059,
+              "woodland": 0.2972837674402542,
+              "moor": 0.2378304492748829,
+              "highlands": 0.18208507872045374
+            },
+            "spans": {
+              "hills": {
+                "runs": 743,
+                "medianMeters": 9700,
+                "meanMeters": 12294.616419919246
+              },
+              "woodland": {
+                "runs": 981,
+                "medianMeters": 6800,
+                "meanMeters": 10323.445463812437
+              },
+              "moor": {
+                "runs": 854,
+                "medianMeters": 6800,
+                "meanMeters": 10127.166276346605
+              },
+              "highlands": {
+                "runs": 709,
+                "medianMeters": 7700,
+                "meanMeters": 9291.678420310296
+              }
+            }
+          },
+          {
+            "seed": 42,
+            "weights": {
+              "hills": 0.3105409201672284,
+              "woodland": 0.2704787616647396,
+              "moor": 0.25115073855121467,
+              "highlands": 0.16782957961681894
+            },
+            "spans": {
+              "hills": {
+                "runs": 868,
+                "medianMeters": 9600,
+                "meanMeters": 11882.718894009216
+              },
+              "woodland": {
+                "runs": 892,
+                "medianMeters": 8600,
+                "meanMeters": 10930.381165919283
+              },
+              "moor": {
+                "runs": 912,
+                "medianMeters": 7500,
+                "meanMeters": 9926.535087719298
+              },
+              "highlands": {
+                "runs": 674,
+                "medianMeters": 7400,
+                "meanMeters": 8825.964391691394
+              }
+            }
+          },
+          {
+            "seed": 123456,
+            "weights": {
+              "hills": 0.2701021569111642,
+              "woodland": 0.22610458268167366,
+              "moor": 0.3306813599039478,
+              "highlands": 0.17311190050321368
+            },
+            "spans": {
+              "hills": {
+                "runs": 800,
+                "medianMeters": 8300,
+                "meanMeters": 11129.375
+              },
+              "woodland": {
+                "runs": 920,
+                "medianMeters": 6100,
+                "meanMeters": 8572.391304347826
+              },
+              "moor": {
+                "runs": 1056,
+                "medianMeters": 8100,
+                "meanMeters": 11569.223484848484
+              },
+              "highlands": {
+                "runs": 691,
+                "medianMeters": 7600,
+                "meanMeters": 9252.532561505064
+              }
+            }
+          }
+        ]
+      },
+      {
+        "climateMeters": 16000,
+        "reliefMeters": 18000,
+        "seeds": [
+          {
+            "seed": 80231,
+            "weights": {
+              "hills": 0.24807941631314953,
+              "woodland": 0.31689033948670275,
+              "moor": 0.264612230232215,
+              "highlands": 0.1704180139679324
+            },
+            "spans": {
+              "hills": {
+                "runs": 893,
+                "medianMeters": 7600,
+                "meanMeters": 9758.678611422172
+              },
+              "woodland": {
+                "runs": 1118,
+                "medianMeters": 7000,
+                "meanMeters": 10108.318425760286
+              },
+              "moor": {
+                "runs": 948,
+                "medianMeters": 6800,
+                "meanMeters": 9693.565400843881
+              },
+              "highlands": {
+                "runs": 586,
+                "medianMeters": 9100,
+                "meanMeters": 10660.921501706485
+              }
+            }
+          },
+          {
+            "seed": 42,
+            "weights": {
+              "hills": 0.30709008593373066,
+              "woodland": 0.27702637478513187,
+              "moor": 0.2541403276502676,
+              "highlands": 0.16174321163086844
+            },
+            "spans": {
+              "hills": {
+                "runs": 1026,
+                "medianMeters": 8900,
+                "meanMeters": 10476.413255360623
+              },
+              "woodland": {
+                "runs": 1001,
+                "medianMeters": 7700,
+                "meanMeters": 9580.21978021978
+              },
+              "moor": {
+                "runs": 1053,
+                "medianMeters": 6200,
+                "meanMeters": 8856.79012345679
+              },
+              "highlands": {
+                "runs": 577,
+                "medianMeters": 8500,
+                "meanMeters": 10630.50259965338
+              }
+            }
+          },
+          {
+            "seed": 123456,
+            "weights": {
+              "hills": 0.29372268831525256,
+              "woodland": 0.23486906791936576,
+              "moor": 0.29502891334143505,
+              "highlands": 0.17637933042394577
+            },
+            "spans": {
+              "hills": {
+                "runs": 912,
+                "medianMeters": 8500,
+                "meanMeters": 11410.197368421053
+              },
+              "woodland": {
+                "runs": 1025,
+                "medianMeters": 6100,
+                "meanMeters": 8094.1463414634145
+              },
+              "moor": {
+                "runs": 1192,
+                "medianMeters": 6700,
+                "meanMeters": 9148.909395973154
+              },
+              "highlands": {
+                "runs": 565,
+                "medianMeters": 9200,
+                "meanMeters": 10846.725663716814
+              }
+            }
+          }
+        ]
+      },
+      {
+        "climateMeters": 18000,
+        "reliefMeters": 18000,
+        "seeds": [
+          {
+            "seed": 80231,
+            "weights": {
+              "hills": 0.26386817501946935,
+              "woodland": 0.30470380154257,
+              "moor": 0.26101000947002756,
+              "highlands": 0.1704180139679324
+            },
+            "spans": {
+              "hills": {
+                "runs": 844,
+                "medianMeters": 8000,
+                "meanMeters": 10773.341232227489
+              },
+              "woodland": {
+                "runs": 1034,
+                "medianMeters": 7300,
+                "meanMeters": 10798.065764023211
+              },
+              "moor": {
+                "runs": 889,
+                "medianMeters": 7100,
+                "meanMeters": 10441.057367829022
+              },
+              "highlands": {
+                "runs": 586,
+                "medianMeters": 9200,
+                "meanMeters": 10658.361774744028
+              }
+            }
+          },
+          {
+            "seed": 42,
+            "weights": {
+              "hills": 0.31102748889009163,
+              "woodland": 0.26940504789255215,
+              "moor": 0.25782425158648997,
+              "highlands": 0.16174321163086844
+            },
+            "spans": {
+              "hills": {
+                "runs": 928,
+                "medianMeters": 8700,
+                "meanMeters": 11186.314655172413
+              },
+              "woodland": {
+                "runs": 930,
+                "medianMeters": 7300,
+                "meanMeters": 9883.655913978495
+              },
+              "moor": {
+                "runs": 957,
+                "medianMeters": 6600,
+                "meanMeters": 9899.895506792058
+              },
+              "highlands": {
+                "runs": 577,
+                "medianMeters": 8600,
+                "meanMeters": 10628.94280762565
+              }
+            }
+          },
+          {
+            "seed": 123456,
+            "weights": {
+              "hills": 0.2829399788066727,
+              "woodland": 0.22028060093823,
+              "moor": 0.32040008983115026,
+              "highlands": 0.17637933042394577
+            },
+            "spans": {
+              "hills": {
+                "runs": 800,
+                "medianMeters": 10200,
+                "meanMeters": 12254.375
+              },
+              "woodland": {
+                "runs": 950,
+                "medianMeters": 6000,
+                "meanMeters": 8451.263157894737
+              },
+              "moor": {
+                "runs": 1103,
+                "medianMeters": 7600,
+                "meanMeters": 10849.320036264733
+              },
+              "highlands": {
+                "runs": 564,
+                "medianMeters": 9200,
+                "meanMeters": 10863.475177304965
+              }
+            }
+          }
+        ]
+      },
+      {
+        "climateMeters": 20000,
+        "reliefMeters": 18000,
+        "seeds": [
+          {
+            "seed": 80231,
+            "weights": {
+              "hills": 0.2629535194332944,
+              "woodland": 0.31187887598675346,
+              "moor": 0.25474959061201813,
+              "highlands": 0.1704180139679324
+            },
+            "spans": {
+              "hills": {
+                "runs": 751,
+                "medianMeters": 8900,
+                "meanMeters": 11153.92809587217
+              },
+              "woodland": {
+                "runs": 944,
+                "medianMeters": 7600,
+                "meanMeters": 11472.457627118643
+              },
+              "moor": {
+                "runs": 823,
+                "medianMeters": 7000,
+                "meanMeters": 10960.14580801944
+              },
+              "highlands": {
+                "runs": 587,
+                "medianMeters": 9100,
+                "meanMeters": 10640.374787052811
+              }
+            }
+          },
+          {
+            "seed": 42,
+            "weights": {
+              "hills": 0.3157205556632249,
+              "woodland": 0.270866689288325,
+              "moor": 0.2516695434175813,
+              "highlands": 0.16174321163086844
+            },
+            "spans": {
+              "hills": {
+                "runs": 800,
+                "medianMeters": 10000,
+                "meanMeters": 12613.75
+              },
+              "woodland": {
+                "runs": 861,
+                "medianMeters": 9100,
+                "meanMeters": 11123.461091753774
+              },
+              "moor": {
+                "runs": 867,
+                "medianMeters": 7000,
+                "meanMeters": 10336.216839677047
+              },
+              "highlands": {
+                "runs": 576,
+                "medianMeters": 8600,
+                "meanMeters": 10647.395833333334
+              }
+            }
+          },
+          {
+            "seed": 123456,
+            "weights": {
+              "hills": 0.2772727263575698,
+              "woodland": 0.2243378583195419,
+              "moor": 0.32201008489894073,
+              "highlands": 0.17637933042394577
+            },
+            "spans": {
+              "hills": {
+                "runs": 725,
+                "medianMeters": 9600,
+                "meanMeters": 12637.655172413793
+              },
+              "woodland": {
+                "runs": 819,
+                "medianMeters": 7100,
+                "meanMeters": 9500.976800976801
+              },
+              "moor": {
+                "runs": 1008,
+                "medianMeters": 8300,
+                "meanMeters": 11832.142857142857
+              },
+              "highlands": {
+                "runs": 564,
+                "medianMeters": 9200,
+                "meanMeters": 10861.879432624113
+              }
+            }
+          }
+        ]
+      },
+      {
+        "climateMeters": 22000,
+        "reliefMeters": 15000,
+        "seeds": [
+          {
+            "seed": 80231,
+            "weights": {
+              "hills": 0.27300852395618586,
+              "woodland": 0.3007587565630028,
+              "moor": 0.24414764076035567,
+              "highlands": 0.18208507872045374
+            },
+            "spans": {
+              "hills": {
+                "runs": 766,
+                "medianMeters": 9000,
+                "meanMeters": 12264.490861618799
+              },
+              "woodland": {
+                "runs": 879,
+                "medianMeters": 9000,
+                "meanMeters": 12108.532423208191
+              },
+              "moor": {
+                "runs": 828,
+                "medianMeters": 6500,
+                "meanMeters": 9939.734299516907
+              },
+              "highlands": {
+                "runs": 709,
+                "medianMeters": 7700,
+                "meanMeters": 9288.152327221438
+              }
+            }
+          },
+          {
+            "seed": 42,
+            "weights": {
+              "hills": 0.31001355788893914,
+              "woodland": 0.27163863936122606,
+              "moor": 0.25051822313301486,
+              "highlands": 0.16782957961681894
+            },
+            "spans": {
+              "hills": {
+                "runs": 865,
+                "medianMeters": 10100,
+                "meanMeters": 12616.99421965318
+              },
+              "woodland": {
+                "runs": 822,
+                "medianMeters": 7800,
+                "meanMeters": 10987.226277372263
+              },
+              "moor": {
+                "runs": 885,
+                "medianMeters": 7900,
+                "meanMeters": 10416.497175141243
+              },
+              "highlands": {
+                "runs": 672,
+                "medianMeters": 7400,
+                "meanMeters": 8854.761904761905
+              }
+            }
+          },
+          {
+            "seed": 123456,
+            "weights": {
+              "hills": 0.26581919419099526,
+              "woodland": 0.22465864337713506,
+              "moor": 0.33641026192865564,
+              "highlands": 0.17311190050321368
+            },
+            "spans": {
+              "hills": {
+                "runs": 722,
+                "medianMeters": 9200,
+                "meanMeters": 12287.534626038781
+              },
+              "woodland": {
+                "runs": 804,
+                "medianMeters": 7400,
+                "meanMeters": 9651.865671641792
+              },
+              "moor": {
+                "runs": 983,
+                "medianMeters": 8600,
+                "meanMeters": 12265.106815869787
+              },
+              "highlands": {
+                "runs": 691,
+                "medianMeters": 7600,
+                "meanMeters": 9254.269175108539
+              }
+            }
+          }
+        ]
+      },
+      {
+        "climateMeters": 24000,
+        "reliefMeters": 15000,
+        "seeds": [
+          {
+            "seed": 80231,
+            "weights": {
+              "hills": 0.2750538072223898,
+              "woodland": 0.30114793622147795,
+              "moor": 0.241713177835676,
+              "highlands": 0.18208507872045374
+            },
+            "spans": {
+              "hills": {
+                "runs": 716,
+                "medianMeters": 9400,
+                "meanMeters": 13756.145251396649
+              },
+              "woodland": {
+                "runs": 830,
+                "medianMeters": 7900,
+                "meanMeters": 12240.602409638554
+              },
+              "moor": {
+                "runs": 726,
+                "medianMeters": 7200,
+                "meanMeters": 11287.603305785124
+              },
+              "highlands": {
+                "runs": 709,
+                "medianMeters": 7700,
+                "meanMeters": 9288.152327221438
+              }
+            }
+          },
+          {
+            "seed": 42,
+            "weights": {
+              "hills": 0.32009924479945506,
+              "woodland": 0.2569053679588117,
+              "moor": 0.2551658076249116,
+              "highlands": 0.16782957961681894
+            },
+            "spans": {
+              "hills": {
+                "runs": 819,
+                "medianMeters": 11700,
+                "meanMeters": 14262.637362637362
+              },
+              "woodland": {
+                "runs": 775,
+                "medianMeters": 7900,
+                "meanMeters": 11249.290322580646
+              },
+              "moor": {
+                "runs": 862,
+                "medianMeters": 7200,
+                "meanMeters": 10763.22505800464
+              },
+              "highlands": {
+                "runs": 673,
+                "medianMeters": 7400,
+                "meanMeters": 8842.050520059436
+              }
+            }
+          },
+          {
+            "seed": 123456,
+            "weights": {
+              "hills": 0.2739977848109841,
+              "woodland": 0.22414347622604228,
+              "moor": 0.32874683845976005,
+              "highlands": 0.17311190050321368
+            },
+            "spans": {
+              "hills": {
+                "runs": 680,
+                "medianMeters": 10900,
+                "meanMeters": 13200.29411764706
+              },
+              "woodland": {
+                "runs": 733,
+                "medianMeters": 7700,
+                "meanMeters": 10610.368349249658
+              },
+              "moor": {
+                "runs": 971,
+                "medianMeters": 8400,
+                "meanMeters": 12167.147270854788
+              },
+              "highlands": {
+                "runs": 692,
+                "medianMeters": 7600,
+                "meanMeters": 9240.317919075145
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "highlands": {
+    "baseline": {
+      "commit": "184df89de4f05087194fdc25e36ddd83a7ba0181",
+      "start": {
+        "x": -24000,
+        "z": 3750
+      },
+      "peakVerticalSpeed": 511.63911809568475,
+      "flappingSeconds": 164.8
+    },
+    "metrics": {
+      "seed": 57,
+      "start": {
+        "x": -84000,
+        "z": 122000,
+        "heading": 0
+      },
+      "seconds": 3600,
+      "minClearance": 48.302926147229925,
+      "peakVerticalSpeed": 4.000000000000057,
+      "flappingSeconds": 130.89999999999685,
+      "safetyCorrections": 0,
+      "highlandSeconds": 2175.499999999117
+    }
+  }
+}

@@ -8,7 +8,7 @@ const pairs = process.argv.includes('--sweep')
   ? [[12000, 12000], [14000, 15000], [16000, 15000], [18000, 15000], [20000, 15000],
     [16000, 18000], [18000, 18000], [20000, 18000], [22000, 15000], [24000, 15000]]
   : [[16000, 18000]];
-const extent = process.argv.includes('--sweep') ? 240000 : 80000;
+const extent = 240000;
 const report = { metric: 'dominant-biome contiguous flight-line chord, excluding boundary-truncated runs',
   coverageMetric: 'mean pre-drainage biome weights (not dry-land-only vertex coverage)',
   stepMeters: 100, extentMeters: extent, options: [] };
