@@ -89,12 +89,16 @@ describe('autonomous eagle navigation', () => {
       let circleEntries = 0;
       let flappingTicks = 0;
       let woodlandTicks = 0;
+      let episodeTicks = 0;
+      let longestEpisodeTicks = 0;
       for (let step = 0; step < 36_000; step += 1) {
         const before = navigator.state.behavior;
         const previousY = navigator.state.y;
         const heading = navigator.state.heading;
         const state = navigator.update(0.1);
         behaviors.add(state.behavior);
+        episodeTicks = state.behavior === before ? episodeTicks + 1 : 1;
+        longestEpisodeTicks = Math.max(longestEpisodeTicks, episodeTicks);
         const sample = world.sample(state.x, state.z);
         woodlandTicks += sample.biome.woodland;
         if (state.flapping) flappingTicks += 1;
@@ -103,12 +107,13 @@ describe('autonomous eagle navigation', () => {
         if (state.behavior === 'thermal-seeking' && Math.abs(state.heading - heading) > 0.001) seekingTurns += 1;
         if (state.behavior === 'thermal-riding' && before === 'thermal-seeking') circleEntries += 1;
         // Cap climbing against the smoothed envelope, without teleporting down over a crest.
-        if (state.behavior === 'thermal-riding') {
+        if (state.behavior === 'thermal-riding' || state.behavior === 'ridge-soaring') {
           expect(state.flapping).toBe(false);
           expect(state.y).toBeLessThanOrEqual(Math.max(previousY, navigator.flightGround + range.max) + 0.001);
         }
       }
       expect(minimumClearance).toBeGreaterThanOrEqual(TERRAIN_SAFETY_MARGIN - 0.001);
+      expect(longestEpisodeTicks * 0.1).toBeLessThanOrEqual(240); // no behaviour runs four minutes
       expect(seekingTurns).toBeGreaterThan(10);
       expect(circleEntries).toBeGreaterThan(0);
       // Woodland has less lift; its energy deficit can require flaps after an exit too.
@@ -119,7 +124,10 @@ describe('autonomous eagle navigation', () => {
       expect(Math.hypot(navigator.state.x - start.x, navigator.state.z - start.z)).toBeGreaterThan(700);
       expect(behaviors.has('thermal-seeking')).toBe(true);
       expect(behaviors.has('thermal-riding')).toBe(true);
-      expect(behaviors.size).toBe(3);
+      // Highland faces may add ridge-soaring; nothing else is allowed.
+      for (const behavior of behaviors) {
+        expect(['gliding', 'thermal-seeking', 'thermal-riding', 'ridge-soaring']).toContain(behavior);
+      }
     },
     20_000,
   );
