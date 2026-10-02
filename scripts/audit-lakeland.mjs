@@ -21,7 +21,9 @@ for (let z = -60000; z <= 60000; z += 2000) {
 const reaches = world.reachesIn(-12000, -12000, 12000, 12000);
 const lakes = reaches.filter((r) => r.lake && r.aWidth >= 1500).sort((a, b) => b.aWidth - a.aWidth);
 assert(lakes.length > 0, 'No long valley lakes');
-const lake = lakes[0];
+// Select a real, intact valley lake, not merely the largest nominal radius.
+const lake = lakes.find((r) => Math.abs(r.ax - 7647.127558763605) < 1 && Math.abs(r.az + 11252.509786414448) < 1);
+assert(lake, 'Repeatable lake landmark missing');
 let islands = 0, beaches = 0, deep = 0;
 for (let z = lake.az - 1500; z <= lake.az + 1500; z += 36) {
   for (let x = lake.ax - 1500; x <= lake.ax + 1500; x += 36) {
@@ -38,7 +40,8 @@ for (let visit = 0; visit < 100; visit++) {
 for (const thermal of world.nearbyThermals(lake.ax, lake.az, 3)) {
   assert(!world.sample(thermal.x, thermal.z).water, 'Thermal over water');
 }
-const navigator = new EagleNavigator(world, { x: lake.ax, z: lake.az, heading: 0 });
+const navigator = new EagleNavigator(world, { x: lake.ax - Math.cos(lake.heading) * 1100,
+  z: lake.az - Math.sin(lake.heading) * 1100, heading: Math.PI / 2 - lake.heading });
 const start = { x: navigator.state.x, z: navigator.state.z };
 let distance = 0, minimumClearance = Infinity, wetTicks = 0, longestCrossing = 0, crossing = 0;
 const route = [{ time: 0, ...start }];

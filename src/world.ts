@@ -503,7 +503,23 @@ export class WorldModel {
         if (!best || Number(node.lake) > Number(best.lake) || (node.lake === best.lake && node.flow > best.flow)) best = node;
       }
     }
-    return best ? { x: best.x, z: best.z, surface: best.level, lake: best.lake } : null;
+    if (!best) return null;
+    const wetPoint = (px: number, pz: number) => {
+      const sample = this.sample(px, pz);
+      return sample.water && (!best.lake || !sample.river)
+        ? { x: px, z: pz, surface: sample.surface, lake: best.lake } : null;
+    };
+    const center = wetPoint(best.x, best.z);
+    if (center) return center;
+    // A basin's center can now be an island. Return actual water for viewpoints.
+    for (const radius of [300, 600, 900, 1200]) {
+      for (let direction = 0; direction < 16; direction += 1) {
+        const angle = direction * Math.PI / 8;
+        const point = wetPoint(best.x + Math.cos(angle) * radius, best.z + Math.sin(angle) * radius);
+        if (point) return point;
+      }
+    }
+    return null;
   }
 
   /** Four altitude viewpoints: a confluence, a basin lake, a multi-segment run, and a wide network. */
