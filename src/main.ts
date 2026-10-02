@@ -7,6 +7,7 @@ import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS,
 import { DEFAULT_VISIBILITY, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
 import { THERMAL_MARKER_RANGE, ThermalMarker } from './thermal-marker';
 import { AuroraSchedule, auroraAmount, DAY_SECONDS, daylight, nightCycle, type Daylight } from './sky-cycle';
+import { FrameProfiler, type ProfileReport } from './profile';
 import { WORLD_CACHE_LIMIT, WorldModel } from './world';
 
 type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; lowPower: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
@@ -64,6 +65,8 @@ function nextVisit(): number {
 // terrain visibility for fresh storage. Saved settings still take the normal migration path,
 // including the 5 km product default when a legacy record has no visibility value.
 const smokeMode = import.meta.env.DEV && new URLSearchParams(location.search).has('smoke');
+// Development-only `?profile` arms the frame profiler and holds quality steady for held-vantage benches.
+const profileMode = import.meta.env.DEV && new URLSearchParams(location.search).has('profile');
 const hasSavedSettings = localStorage.getItem(SETTINGS_KEY) != null;
 const settings = loadSettings();
 let qualityStep = 0;
@@ -642,6 +645,7 @@ function previousQualityStep(): number {
   return 0;
 }
 function updateAdaptiveQuality(elapsed: number): void {
+  if (profileMode) return;
   if (fpsSmoothed < 40) {
     headroomSeconds = 0;
     if (qualityStep >= 3) return;
@@ -766,6 +770,7 @@ function updateFlight(delta: number, now: number): void {
 }
 
 let renderedFrames = 0;
+const profiler = profileMode ? new FrameProfiler(renderer) : null;
 let smokeFrameIndex = 0;
 function frame(now: number): void {
   const cap = currentFrameCap();
@@ -773,6 +778,7 @@ function frame(now: number): void {
     requestAnimationFrame(frame);
     return;
   }
+  profiler?.frameBegin(now);
   const elapsed = Math.max(0, (now - lastTime) / 1000);
   const rawDelta = Math.min(0.1, elapsed);
   lastTime = now;
@@ -840,7 +846,9 @@ function frame(now: number): void {
   // Keep input, streaming and simulation responsive between costly software-WebGL draws.
   // The scene and shaders stay real; only the dev-only smoke render cadence changes.
   if (!smokeMode || smokeFrameIndex++ % 4 === 0) {
+    profiler?.renderBegin();
     renderer.render(scene, camera);
+    profiler?.renderEnd();
     renderedFrames += 1;
   }
   const measuredFps = elapsed > 0 ? 1 / elapsed : 60;
@@ -876,6 +884,7 @@ function frame(now: number): void {
       `time scale   ${timeScale.toFixed(1)}×`,
     ].join('\n');
   }
+  profiler?.frameEnd();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -890,6 +899,7 @@ window.addEventListener('resize', () => {
 window.addEventListener('beforeunload', () => {
   lensflare.dispose();
   fogSampleDisposed = true;
+  profiler?.dispose();
   fogTarget.dispose();
   thermalMarker.dispose();
   terrain.dispose();
@@ -900,6 +910,7 @@ declare global {
     __SOARING__: {
       snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
       advanceSimulation?: (seconds: number) => void;
+      profile?: { begin: () => void; end: () => void; report: () => ProfileReport };
       reviewFlight?: (start: { x: number; z: number; heading: number } | null) => void;
       setTimeScale: (scale: number) => void;
       setTimeOfDay: (phase: number) => void;
@@ -915,6 +926,7 @@ declare global {
   }
 }
 window.__SOARING__ = {
+  ...(profiler ? { profile: { begin: () => profiler.begin(), end: () => profiler.end(), report: () => profiler.report() } } : {}),
   ...(import.meta.env.DEV ? {
     // Freeze only navigation for repeatable lighting comparisons. The normal
     // chase camera, renderer, streaming and light loop remain unchanged.

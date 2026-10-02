@@ -44,6 +44,7 @@ For an accelerated resource/stability check, run `window.__SOARING__.setTimeScal
 ```sh
 npm test             # deterministic generation and long-flight navigation
 npm run test:smoke  # real Chromium render/stream/control smoke test
+npm run bench       # dev-only held-vantage perf bench; see docs/perf-notes.md
 npm run check        # unit tests and production type/build check
 ```
 
