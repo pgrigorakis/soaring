@@ -720,7 +720,8 @@ function updateFlight(delta: number, now: number): void {
   }
   eagle.update(state, delta);
   thermalMarker.update(state, navigator.activeThermal, settings.showThermal, now / 1000);
-  soundscape.update(state.behavior, state.flapping);
+  const audioBiome = soundscape.isMuted ? undefined : world.sample(state.x, state.z).biome;
+  soundscape.update(state.behavior, state.flapping, audioBiome);
 }
 
 let renderedFrames = 0;
