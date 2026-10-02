@@ -13,7 +13,7 @@ test('renders a long valley lake with a wooded island, beach and seamless water 
     const worldPath = '/src/world.ts';
     const terrainPath = '/src/terrain.ts';
     const threePath = '/node_modules/.vite/deps/three.js';
-    const { WorldModel } = await import(worldPath);
+    const { WorldModel, lakeShorePoint } = await import(worldPath);
     const { TerrainStream } = await import(terrainPath);
     const THREE = await import(threePath);
     const world = new WorldModel(448122);
@@ -64,6 +64,11 @@ test('renders a long valley lake with a wooded island, beach and seamless water 
       const angle = index * Math.PI / 16;
       return world.sample(x + Math.cos(angle) * (lake.islandRadius + 90), z + Math.sin(angle) * (lake.islandRadius + 90)).water;
     });
+    // Main's accepted shore-following behavior must use the new ellipse outline.
+    const shoreTargets = Array.from({ length: 32 }, (_, index) => lakeShorePoint(lake, index * Math.PI / 16, 60));
+    const dryShoreTargets = shoreTargets.every((point: any) => !world.sample(point.x, point.z).water);
+    const minorPoint = lakeShorePoint(lake, lake.heading + Math.PI / 2);
+    const minorRadius = Math.hypot(minorPoint.x - x, minorPoint.z - z);
     const thermals = world.nearbyThermals(x, z, 3);
     const dryThermals = thermals.every((t: any) => !world.sample(t.x, t.z).water);
     // This seed's largest nominal basin is entirely removed by tributary protection.
@@ -74,7 +79,7 @@ test('renders a long valley lake with a wooded island, beach and seamless water 
     terrain.dispose();
     window.__SOARING__.setTimeOfDay(.5);
     window.__SOARING__.setViewpoint({ x: x - 1100, y: 630, z: z + 1300, lookX: x, lookY: 85, lookZ: z });
-    return { seed: world.seed, lake, seamError, sharedVertices, islandTrees: islandTrees.length, waterRing: ring.filter(Boolean).length, dryThermals, landmarkWater };
+    return { seed: world.seed, lake, seamError, sharedVertices, islandTrees: islandTrees.length, waterRing: ring.filter(Boolean).length, dryThermals, landmarkWater, dryShoreTargets, minorRadius };
   });
   expect(evidence.sharedVertices).toBeGreaterThan(10);
   expect(evidence.seamError).toBe(0);
@@ -82,6 +87,8 @@ test('renders a long valley lake with a wooded island, beach and seamless water 
   expect(evidence.waterRing).toBe(32);
   expect(evidence.dryThermals).toBe(true);
   expect(evidence.landmarkWater).toBe(true);
+  expect(evidence.dryShoreTargets).toBe(true);
+  expect(evidence.minorRadius).toBeLessThan(evidence.lake.aWidth * 0.35);
   expect(errors).toEqual([]);
   await page.waitForFunction(() => window.__SOARING__.snapshot().pending === 0);
   const rendered = await page.evaluate(() => window.__SOARING__.snapshot().renderedFrames);

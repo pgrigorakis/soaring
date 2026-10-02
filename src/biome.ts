@@ -26,19 +26,27 @@ export type BiomeProfile = {
   species: readonly [number, number, number];
   thermalOdds: number;
   scenicBonus: number;
+  /** Scenic weight of a glade edge: open glade and canopy within 170 m of a target. */
+  gladeEdgeScenic: number;
+  /** Scenic weight of a granite tor on the target. */
+  torScenic: number;
 };
 
 // Highlands retains its existing landform; Lakeland uses wooded low shores.
 export const BIOME_PROFILES = {
   hills: { heightAmplitude: 75, heightOffset: 150, forestDensity: 0.025, treeDensity: 1, crownScale: 1,
-    rockBias: 0, palette: [0x6fa03c, 0x86b83f, 0xb3b04a], species: [0, 1, 0], thermalOdds: 1, scenicBonus: 0.1 },
+    rockBias: 0, palette: [0x6fa03c, 0x86b83f, 0xb3b04a], species: [0, 1, 0], thermalOdds: 1, scenicBonus: 0.1,
+    gladeEdgeScenic: 0, torScenic: 0 },
   woodland: { heightAmplitude: 60, heightOffset: 100, forestDensity: 0.92, treeDensity: 2.5, crownScale: 1.5,
-    rockBias: 0.02, palette: [0x1f5a34, 0x2e7a3e, 0x5c9443, 0x7fae45, 0x2f6b3a], species: [0.3, 0.6, 0.1], thermalOdds: 1.6, scenicBonus: 0.2 },
+    rockBias: 0.02, palette: [0x1f5a34, 0x2e7a3e, 0x5c9443, 0x7fae45, 0x2f6b3a], species: [0.3, 0.6, 0.1], thermalOdds: 1.6, scenicBonus: 0.2,
+    gladeEdgeScenic: 0.5, torScenic: 0 },
   moor: { heightAmplitude: 60, heightOffset: 150, forestDensity: 0.02, treeDensity: 1, crownScale: 0.85,
-    rockBias: 0.12, palette: [0x8a5a8c, 0xb06fa6, 0xb0763a, 0xa6a25a], species: [0.2, 0.6, 0.2], thermalOdds: 1.2, scenicBonus: 0.25 },
+    rockBias: 0.12, palette: [0x8a5a8c, 0xb06fa6, 0xb0763a, 0xa6a25a], species: [0.2, 0.6, 0.2], thermalOdds: 1.2, scenicBonus: 0.25,
+    gladeEdgeScenic: 0, torScenic: 0.5 },
   // Appearance only: WorldModel.relief retains the pre-59 blended drainage landform.
   lakeland: { heightAmplitude: 75, heightOffset: 150, forestDensity: 0.55, treeDensity: 1, crownScale: 1,
-    rockBias: 0.02, palette: [0x6fa03c, 0x2f6b3a], species: [0.45, 0.35, 0.2], thermalOdds: 1, scenicBonus: 0.3 },
+    rockBias: 0.02, palette: [0x6fa03c, 0x2f6b3a], species: [0.45, 0.35, 0.2], thermalOdds: 1, scenicBonus: 0.3,
+    gladeEdgeScenic: 0, torScenic: 0 },
 } satisfies Record<'hills' | 'woodland' | 'moor' | 'lakeland', BiomeProfile>;
 
 export const transition = (threshold: number, value: number) => {
@@ -57,7 +65,7 @@ export function biomeWeights(relief: number, climate: number, elevation: number,
 }
 
 /** Highlands keeps its existing parameters until it receives a full profile. */
-export function blendParameter(weights: BiomeWeights, key: 'forestDensity' | 'treeDensity' | 'crownScale' | 'rockBias' | 'thermalOdds' | 'scenicBonus', fallback: number): number {
+export function blendParameter(weights: BiomeWeights, key: 'forestDensity' | 'treeDensity' | 'crownScale' | 'rockBias' | 'thermalOdds' | 'scenicBonus' | 'gladeEdgeScenic' | 'torScenic', fallback: number): number {
   return weights.hills * BIOME_PROFILES.hills[key] + weights.woodland * BIOME_PROFILES.woodland[key]
     + weights.moor * BIOME_PROFILES.moor[key] + weights.lakeland * BIOME_PROFILES.lakeland[key] + weights.highlands * fallback;
 }

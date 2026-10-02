@@ -192,6 +192,22 @@ export const meanderOffset = (reach: Reach, t: number) => {
   return length * (reach.meander * Math.sin(Math.PI * t) + reach.bend * Math.sin(2 * Math.PI * t));
 };
 
+/** Outline scale in the lake's local disc/ellipse coordinates. */
+const lakeWarp = (reach: Reach, angle: number) => reach.aspect
+  ? 1 + 0.05 * Math.sin(3 * angle + reach.bend)
+  : Math.max(0.7, 1 + 0.2 * Math.sin(2 * angle + reach.meander) + 0.11 * Math.sin(5 * angle + reach.bend));
+
+/** Shore point at a world-space angle (0 points +x), pushed `outward` metres onto land. */
+export function lakeShorePoint(reach: Reach, angle: number, outward = 0): { x: number; z: number } {
+  const localAngle = angle - (reach.heading ?? 0);
+  const dx = Math.cos(localAngle);
+  const dz = Math.sin(localAngle) / (reach.aspect ?? 1);
+  const radius = (reach.aWidth / 2) * (reach.aspect
+    ? lakeWarp(reach, Math.atan2(dz, dx)) / Math.hypot(dx, dz)
+    : lakeWarp(reach, angle)) + outward;
+  return { x: reach.ax + Math.cos(angle) * radius, z: reach.az + Math.sin(angle) * radius };
+}
+
 function reachDistance(reach: Reach, x: number, z: number): { distance: number; t: number } {
   const dx = reach.bx - reach.ax;
   const dz = reach.bz - reach.az;
@@ -202,10 +218,7 @@ function reachDistance(reach: Reach, x: number, z: number): { distance: number; 
     const rz = z - reach.az;
     const dx = rx * Math.cos(angle) + rz * Math.sin(angle);
     const dz = (-rx * Math.sin(angle) + rz * Math.cos(angle)) / (reach.aspect ?? 1);
-    const outlineAngle = Math.atan2(dz, dx);
-    const warp = reach.aspect ? 1 + 0.05 * Math.sin(3 * outlineAngle + reach.bend)
-      : 1 + 0.2 * Math.sin(2 * outlineAngle + reach.meander) + 0.11 * Math.sin(5 * outlineAngle + reach.bend);
-    return { distance: Math.hypot(dx, dz) / Math.max(0.7, warp), t: 0 };
+    return { distance: Math.hypot(dx, dz) / lakeWarp(reach, Math.atan2(dz, dx)), t: 0 };
   }
   const along = ((x - reach.ax) * dx + (z - reach.az) * dz) / length;
   const t = clamp01(along / length);
@@ -453,6 +466,17 @@ export class WorldModel {
       this.nearbyReaches.set(key, reaches);
     }
     return reaches;
+  }
+
+  /** Nearest lake disc (basin or cirque) and the distance from its shore; negative inside the water. */
+  nearestLake(x: number, z: number): { reach: Reach; shoreDist: number } | null {
+    let best: { reach: Reach; shoreDist: number } | null = null;
+    for (const reach of this.reachesNear(x, z)) {
+      if (!reach.lake) continue;
+      const shoreDist = reachDistance(reach, x, z).distance - reach.aWidth / 2;
+      if (!best || shoreDist < best.shoreDist) best = { reach, shoreDist };
+    }
+    return best;
   }
 
   /** All reaches starting at nodes whose centers lie in a rectangle of world space. */
@@ -989,14 +1013,22 @@ export class WorldModel {
     let low = center.height;
     let high = center.height;
     let water = center.water;
+    let openGlade = center.glade;
+    let closedGlade = center.glade;
     for (const [dx, dz] of [[170, 0], [-170, 0], [0, 170], [0, -170]] as const) {
       const around = this.sample(x + dx, z + dz);
       low = Math.min(low, around.height);
       high = Math.max(high, around.height);
       water ||= around.water;
+      openGlade = Math.max(openGlade, around.glade);
+      closedGlade = Math.min(closedGlade, around.glade);
     }
+    // Per-biome features: a glade edge has open glade and closed canopy in reach; a tor sits on the moor's high rock mask.
+    const gladeEdge = openGlade - closedGlade;
+    const tor = smootherstep(0.45, 0.6, center.rock);
     return Math.min(1, (high - low) / 120) + (water ? 0.8 : 0) + center.rock * 0.35 + Math.min(center.forest, 1 - center.forest) * 0.5
-      + blendParameter(center.biome, 'scenicBonus', 0) + center.biome.woodland * center.glade * 0.4;
+      + blendParameter(center.biome, 'scenicBonus', 0)
+      + blendParameter(center.biome, 'gladeEdgeScenic', 0) * gladeEdge + blendParameter(center.biome, 'torScenic', 0) * tor;
   }
 
   scenicStart(visit: number): { x: number; z: number; heading: number } {
