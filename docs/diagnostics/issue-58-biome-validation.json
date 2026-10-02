@@ -9,40 +9,40 @@
     "rows": [
       {
         "seed": 80231,
-        "dry": 7923,
-        "water": 1293,
+        "dry": 7955,
+        "water": 1261,
         "maxSumError": 1.1102230246251565e-16,
         "weights": {
-          "hills": 0.23368900619164878,
-          "woodland": 0.31541292460044085,
-          "moor": 0.2743771674309481,
-          "highlands": 0.1765209017769622,
+          "hills": 0.25030648328285615,
+          "woodland": 0.3049124317996038,
+          "moor": 0.2701971695725668,
+          "highlands": 0.1745839153449732,
           "lakeland": 0
         }
       },
       {
         "seed": 42,
-        "dry": 7929,
-        "water": 1287,
+        "dry": 7948,
+        "water": 1268,
         "maxSumError": 1.1102230246251565e-16,
         "weights": {
-          "hills": 0.2946436121207089,
-          "woodland": 0.2731763457493141,
-          "moor": 0.26258075097695577,
-          "highlands": 0.1695992911530212,
+          "hills": 0.3102489059425863,
+          "woodland": 0.2616511897183067,
+          "moor": 0.2603182198381908,
+          "highlands": 0.1677816845009163,
           "lakeland": 0
         }
       },
       {
         "seed": 123456,
-        "dry": 7908,
-        "water": 1308,
+        "dry": 7934,
+        "water": 1282,
         "maxSumError": 2.220446049250313e-16,
         "weights": {
-          "hills": 0.2760725840356008,
-          "woodland": 0.23418441759753,
-          "moor": 0.3050787130057673,
-          "highlands": 0.18466428536110172,
+          "hills": 0.29415769115149465,
+          "woodland": 0.2213692708814235,
+          "moor": 0.3009784685134326,
+          "highlands": 0.18349456945364873,
           "lakeland": 0
         }
       }
@@ -72,81 +72,81 @@
       {
         "baseline": {
           "chunks": 100,
-          "meanMs": 12.288999999165535,
-          "maxMs": 31.80000001192093
+          "meanMs": 12.261000000238418,
+          "maxMs": 31.69999998807907
         },
         "current": {
           "chunks": 100,
-          "meanMs": 12.706999999880791,
-          "maxMs": 44.60000002384186
+          "meanMs": 13.760999999642372,
+          "maxMs": 41.5
         }
       },
       {
         "baseline": {
           "chunks": 100,
-          "meanMs": 12.173999999761582,
-          "maxMs": 32
-        },
-        "current": {
-          "chunks": 100,
-          "meanMs": 12.700999998450278,
-          "maxMs": 45.09999996423721
-        }
-      },
-      {
-        "baseline": {
-          "chunks": 100,
-          "meanMs": 12.200000000596047,
+          "meanMs": 12.143999999761581,
           "maxMs": 31.5
         },
         "current": {
           "chunks": 100,
-          "meanMs": 12.681999998688697,
-          "maxMs": 44.5
+          "meanMs": 13.835999999642372,
+          "maxMs": 40.39999997615814
         }
       },
       {
         "baseline": {
           "chunks": 100,
-          "meanMs": 12.210000000596047,
-          "maxMs": 33.19999998807907
+          "meanMs": 12.206999999880791,
+          "maxMs": 31.400000035762787
         },
         "current": {
           "chunks": 100,
-          "meanMs": 12.444000000357628,
-          "maxMs": 44.5
+          "meanMs": 13.629000000357628,
+          "maxMs": 39.89999997615814
         }
       },
       {
         "baseline": {
           "chunks": 100,
-          "meanMs": 12.163000000715256,
+          "meanMs": 12.252999999523162,
           "maxMs": 31.5
         },
         "current": {
           "chunks": 100,
-          "meanMs": 12.54800000011921,
-          "maxMs": 44.89999997615814
+          "meanMs": 13.845,
+          "maxMs": 41.39999997615814
+        }
+      },
+      {
+        "baseline": {
+          "chunks": 100,
+          "meanMs": 12.22,
+          "maxMs": 32.19999998807907
+        },
+        "current": {
+          "chunks": 100,
+          "meanMs": 13.851000000238418,
+          "maxMs": 44.80000001192093
         }
       }
     ],
-    "baselineMeanMs": 12.207200000166894,
-    "currentMeanMs": 12.61639999949932,
-    "increasePercent": 3.352120054777763
+    "baselineMeanMs": 12.216999999880791,
+    "currentMeanMs": 13.784399999976156,
+    "increasePercent": 12.829663584436911
   },
   "peatPool": {
     "found": {
       "x": -23809.276039828546,
       "z": -42646.417326061055,
       "sample": {
-        "height": 144.20361551296378,
+        "height": 147.01170966899858,
         "mountainRegion": 0,
-        "surface": 145.90361551296377,
-        "bank": -46.18154366873205,
-        "moisture": 0.7267298161276343,
-        "forest": 0,
+        "surface": 131.26906763836695,
+        "bank": 978.917180550949,
+        "moisture": 0.42672981612763433,
+        "forest": 0.023279032131643805,
         "rock": 0.11963600852618686,
-        "water": true,
+        "water": false,
         "river": false,
         "biome": {
           "hills": 0,
@@ -156,13 +156,13 @@
           "lakeland": 0
         },
         "glade": 0,
-        "field": 0.6808317268732935,
+        "field": 0,
         "hedge": 0,
+        "fieldEdge": null,
         "moorPatch": 0.6520095879504948,
-        "peat": 1
+        "peat": 0
       }
-    },
-    "candidates": 2
+    }
   },
   "route": {
     "gladeShift": 0,
@@ -171,49 +171,49 @@
       "x": -4804.329426881198,
       "z": -1931.278897154048
     },
-    "netDistance": 51075.500515999396,
-    "requiredNetDistance": 36198.90433101736,
-    "distance": 103425.44094576388,
+    "netDistance": 49046.86471393214,
+    "requiredNetDistance": 35673.64128415794,
+    "distance": 101924.68938330839,
     "revisitPasses": 0,
-    "flappingTicks": 1822,
-    "flappingOutsideWoodland": 1731.7677096826644,
-    "woodlandTicks": 9902.251411431605,
+    "flappingTicks": 1283,
+    "flappingOutsideWoodland": 1141.4330615369365,
+    "woodlandTicks": 3951.1387647137644,
     "originalFlappingLimit": 1622.5,
-    "allowedFlappingTicks": 1845.644484931219,
-    "seekEntries": 28,
-    "backwardSeekEntries": 10,
+    "allowedFlappingTicks": 1711.537814524279,
+    "seekEntries": 30,
+    "backwardSeekEntries": 14,
     "stalledTicks": 0,
     "mostVisitedThermals": [
       [
-        "-9099,-1305",
+        "-6029,-2756",
         1
       ],
       [
-        "-11381,-608",
+        "-9102,-3879",
         1
       ],
       [
-        "-11387,-601",
+        "-9110,-3875",
         1
       ],
       [
-        "-13762,-189",
+        "-12336,-3106",
         1
       ],
       [
-        "-17006,4246",
+        "-14499,-1898",
         1
       ],
       [
-        "-17075,8410",
+        "-16303,112",
         1
       ],
       [
-        "-21737,11993",
+        "-16303,118",
         1
       ],
       [
-        "-23970,12779",
+        "-16302,125",
         1
       ]
     ],
@@ -221,28 +221,28 @@
       {
         "seconds": 300,
         "position": [
-          -11376.000479228946,
-          -720.387813690772
+          -9479.190374379328,
+          -3972.517273083327
         ],
-        "behavior": "thermal-seeking",
+        "behavior": "gliding",
         "biome": {
-          "hills": 0,
+          "hills": 0.9973685430307545,
           "woodland": 0,
-          "moor": 1,
+          "moor": 0.0026314569692454937,
           "highlands": 0,
           "lakeland": 0
         },
-        "netDistance": 6682.298828717271,
-        "distance": 8877.374371428446,
-        "flappingTicks": 441
+        "netDistance": 5101.076257595991,
+        "distance": 8343.706008297464,
+        "flappingTicks": 189
       },
       {
         "seconds": 600,
         "position": [
-          -14528.599075725628,
-          1048.7337039866845
+          -14562.351806439987,
+          -1884.7511968813021
         ],
-        "behavior": "thermal-seeking",
+        "behavior": "thermal-riding",
         "biome": {
           "hills": 0,
           "woodland": 0,
@@ -250,15 +250,15 @@
           "highlands": 1,
           "lakeland": 0
         },
-        "netDistance": 10170.638883885049,
-        "distance": 16729.002603523833,
-        "flappingTicks": 486
+        "netDistance": 9758.13330442164,
+        "distance": 16746.777055705006,
+        "flappingTicks": 332
       },
       {
         "seconds": 900,
         "position": [
-          -17090.308004288447,
-          8477.258162988495
+          -16371.399838398122,
+          60.27711893167675
         ],
         "behavior": "gliding",
         "biome": {
@@ -268,15 +268,33 @@
           "highlands": 1,
           "lakeland": 0
         },
-        "netDistance": 16102.264230128338,
-        "distance": 25826.110187026297,
-        "flappingTicks": 963
+        "netDistance": 11737.266004917736,
+        "distance": 24563.179638665537,
+        "flappingTicks": 332
       },
       {
         "seconds": 1200,
         "position": [
-          -23661.04046975907,
-          12758.221370126288
+          -17765.944770895825,
+          461.35240976950234
+        ],
+        "behavior": "gliding",
+        "biome": {
+          "hills": 0,
+          "woodland": 0,
+          "moor": 0,
+          "highlands": 1,
+          "lakeland": 0
+        },
+        "netDistance": 13180.597744300752,
+        "distance": 33178.91210109954,
+        "flappingTicks": 332
+      },
+      {
+        "seconds": 1500,
+        "position": [
+          -22996.372730122086,
+          -759.2717834253198
         ],
         "behavior": "thermal-seeking",
         "biome": {
@@ -286,87 +304,123 @@
           "highlands": 1,
           "lakeland": 0
         },
-        "netDistance": 23903.074477083934,
-        "distance": 34627.38258142347,
-        "flappingTicks": 1044
-      },
-      {
-        "seconds": 1500,
-        "position": [
-          -29052.734350986713,
-          11264.982962061718
-        ],
-        "behavior": "gliding",
-        "biome": {
-          "hills": 0,
-          "woodland": 1,
-          "moor": 0,
-          "highlands": 0,
-          "lakeland": 0
-        },
-        "netDistance": 27606.638122386023,
-        "distance": 43422.45247702416,
-        "flappingTicks": 1080
+        "netDistance": 18229.75699842492,
+        "distance": 42775.70952148405,
+        "flappingTicks": 467
       },
       {
         "seconds": 1800,
         "position": [
-          -30683.594143102164,
-          7796.506476786289
+          -24870.599339370398,
+          -6259.38066482719
         ],
-        "behavior": "thermal-seeking",
+        "behavior": "gliding",
         "biome": {
           "hills": 0,
-          "woodland": 1,
+          "woodland": 0,
           "moor": 0,
-          "highlands": 0,
+          "highlands": 1,
           "lakeland": 0
         },
-        "netDistance": 27647.172559480416,
-        "distance": 51619.672822675675,
-        "flappingTicks": 1116
+        "netDistance": 20527.72888344457,
+        "distance": 50508.062553109536,
+        "flappingTicks": 755
       },
       {
         "seconds": 2100,
         "position": [
-          -35514.0431234497,
-          2752.4260993585617
+          -27239.669235645095,
+          -12207.033719570018
         ],
-        "behavior": "gliding",
+        "behavior": "thermal-seeking",
         "biome": {
-          "hills": 0.19476464965087847,
-          "woodland": 0.8052353503491215,
+          "hills": 1,
+          "woodland": 0,
           "moor": 0,
           "highlands": 0,
           "lakeland": 0
         },
-        "netDistance": 31064.82911299472,
-        "distance": 60112.67925075354,
-        "flappingTicks": 1298
+        "netDistance": 24676.620706756243,
+        "distance": 59312.327494961435,
+        "flappingTicks": 863
       },
       {
         "seconds": 2400,
         "position": [
-          -41293.49226392724,
-          -12.086613218316144
+          -29905.243626130854,
+          -11119.023052171293
         ],
         "behavior": "gliding",
         "biome": {
-          "hills": 0.053260095895484416,
-          "woodland": 0.9467399041045156,
+          "hills": 1,
+          "woodland": 0,
           "moor": 0,
           "highlands": 0,
           "lakeland": 0
         },
-        "netDistance": 36539.59911618052,
-        "distance": 68758.28643077852,
-        "flappingTicks": 1343
+        "netDistance": 26729.581670803353,
+        "distance": 67577.68375844046,
+        "flappingTicks": 872
       },
       {
         "seconds": 2700,
         "position": [
-          -47152.178633088115,
-          -604.5211112177843
+          -35562.146763725636,
+          -7835.04513818075
+        ],
+        "behavior": "gliding",
+        "biome": {
+          "hills": 0.3157642258500861,
+          "woodland": 0.6842357741499139,
+          "moor": 0,
+          "highlands": 0,
+          "lakeland": 0
+        },
+        "netDistance": 31319.28771788041,
+        "distance": 76630.81213442677,
+        "flappingTicks": 1037
+      },
+      {
+        "seconds": 3000,
+        "position": [
+          -41639.5932280712,
+          -10913.345849103704
+        ],
+        "behavior": "gliding",
+        "biome": {
+          "hills": 0.288902141807022,
+          "woodland": 0.711097858192978,
+          "moor": 0,
+          "highlands": 0,
+          "lakeland": 0
+        },
+        "netDistance": 37914.56429965357,
+        "distance": 85416.08703150913,
+        "flappingTicks": 1130
+      },
+      {
+        "seconds": 3300,
+        "position": [
+          -47008.043324842285,
+          -13182.510907679762
+        ],
+        "behavior": "thermal-riding",
+        "biome": {
+          "hills": 0.13375796673896811,
+          "woodland": 0.005713884012416952,
+          "moor": 0.860528149248615,
+          "highlands": 0,
+          "lakeland": 0
+        },
+        "netDistance": 43677.72531320321,
+        "distance": 93594.7831889747,
+        "flappingTicks": 1229
+      },
+      {
+        "seconds": 3600,
+        "position": [
+          -51819.273397205296,
+          -15902.319722162298
         ],
         "behavior": "gliding",
         "biome": {
@@ -376,63 +430,9 @@
           "highlands": 0,
           "lakeland": 0
         },
-        "netDistance": 42368.62776411554,
-        "distance": 77536.99484515682,
-        "flappingTicks": 1444
-      },
-      {
-        "seconds": 3000,
-        "position": [
-          -50025.90497588464,
-          -3621.916874661049
-        ],
-        "behavior": "thermal-seeking",
-        "biome": {
-          "hills": 1,
-          "woodland": 0,
-          "moor": 0,
-          "highlands": 0,
-          "lakeland": 0
-        },
-        "netDistance": 45253.167313517566,
-        "distance": 86048.03049050854,
-        "flappingTicks": 1556
-      },
-      {
-        "seconds": 3300,
-        "position": [
-          -52060.530841053565,
-          -5435.725785455563
-        ],
-        "behavior": "thermal-seeking",
-        "biome": {
-          "hills": 1,
-          "woodland": 0,
-          "moor": 0,
-          "highlands": 0,
-          "lakeland": 0
-        },
-        "netDistance": 47385.9654337627,
-        "distance": 94950.27570631671,
-        "flappingTicks": 1754
-      },
-      {
-        "seconds": 3600,
-        "position": [
-          -55483.661512112536,
-          -8280.456194623033
-        ],
-        "behavior": "thermal-seeking",
-        "biome": {
-          "hills": 0.9999214468964039,
-          "woodland": 7.855310359609525e-05,
-          "moor": 0,
-          "highlands": 0,
-          "lakeland": 0
-        },
-        "netDistance": 51075.500515999396,
-        "distance": 103425.44094576388,
-        "flappingTicks": 1822
+        "netDistance": 49046.86471393214,
+        "distance": 101924.68938330839,
+        "flappingTicks": 1283
       }
     ]
   },
@@ -1452,11 +1452,26 @@
         "heading": 0
       },
       "seconds": 3600,
-      "minClearance": 48.302926147229925,
+      "minClearance": 27.430655914283022,
       "peakVerticalSpeed": 4.000000000000057,
-      "flappingSeconds": 130.89999999999685,
+      "flappingSeconds": 143.09999999999616,
       "safetyCorrections": 0,
-      "highlandSeconds": 2175.499999999117
+      "highlandSeconds": 2771.9999999985744
     }
+  },
+  "finalProfile": {
+    "hills": {
+      "heightOffset": 150,
+      "heightAmplitude": 75
+    },
+    "rivers": "original validated model restored with new commits",
+    "farmland": "jittered polygonal parcels with physical hedgerows",
+    "woodland": "colour variation and sparse glade flowers; thresholds unchanged"
+  },
+  "farmlandBrowserEvidence": {
+    "fields": 58,
+    "angles": 56,
+    "deterministic": true,
+    "hedgeInstances": 1063
   }
 }

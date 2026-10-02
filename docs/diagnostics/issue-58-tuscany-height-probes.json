@@ -146,5 +146,36 @@
       "npm run test:smoke"
     ],
     "localNumericalWallTrace": "node .diagnostics/probe-walls.mjs"
-  }
+  },
+  "captainDecision": "013.msg selects 150 +/-75 m on original rivers. Failed repairs were undone by a new commit, without rewriting pushed history.",
+  "requested250Probes": [
+    {
+      "heightOffset": 250,
+      "heightAmplitude": 125,
+      "riverSource": "980469c",
+      "riverSlope": 8.966628423986776,
+      "checkTestsPassed": 49,
+      "browserTestsPassed": 18,
+      "riverCrossings": 0,
+      "flappingTicks": 1412,
+      "allowedFlappingTicks": 1966.2789253297149,
+      "netDistance": 60072.122834758695,
+      "requiredNetDistance": 35948.57443894144,
+      "browserFailure": null
+    },
+    {
+      "heightOffset": 250,
+      "heightAmplitude": 125,
+      "riverSource": "5315bfb",
+      "riverSlope": 4.9631148470326565,
+      "checkTestsPassed": 48,
+      "browserTestsPassed": 17,
+      "riverCrossings": 1,
+      "flappingTicks": 1700,
+      "allowedFlappingTicks": 2033.0063683642052,
+      "netDistance": 58444.816885226304,
+      "requiredNetDistance": 36166.40061609853,
+      "browserFailure": "Blur displacement 10.121 m, required <10 m"
+    }
+  ]
 }

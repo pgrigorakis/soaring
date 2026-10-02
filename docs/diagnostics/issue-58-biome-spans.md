@@ -61,9 +61,9 @@ Measured in the real browser with `WorldModel.sample()`, not just the relief fie
 
 | Seed | Dry samples | Hills | Woodland | Moor | Highlands |
 | --- | --- | --- | --- | --- | --- |
-| 80231 | 7,923 | 23.37% | 31.54% | 27.44% | 17.65% |
-| 42 | 7,929 | 29.46% | 27.32% | 26.26% | 16.96% |
-| 123456 | 7,908 | 27.61% | 23.42% | 30.51% | 18.47% |
+| 80231 | 7,955 | 25.03% | 30.49% | 27.02% | 17.46% |
+| 42 | 7,948 | 31.02% | 26.17% | 26.03% | 16.78% |
+| 123456 | 7,934 | 29.42% | 22.14% | 30.10% | 18.35% |
 
 All land biomes pass 10–35%. Maximum normalization error is `2.22e-16`; Lakeland is zero. Reproduce in the running dev app:
 
@@ -76,9 +76,9 @@ CHROME_DEVTOOLS_AXI_SESSION=soaring-biome-weights chrome-devtools-axi eval \
 
 Compared against immutable main commit `5103c32` (Highlands plus floating origin), in the same real Chrome session. Four locations cover Hills, Woodland, Moor and a blend zone. Each run builds 100 near chunks. After one warm-up per version, five paired runs alternate version order (500 measured chunks per version). Timers observe `createChunk`, the boundary used by the production `buildTiming` diagnostic.
 
-- Baseline mean: **12.2072 ms/chunk**.
-- New mean: **12.6164 ms/chunk** (**+3.35%**, within the +20% limit).
-- Observed cold-chunk maxima: baseline 31.5–33.2 ms; new 44.5–45.1 ms. The mean passes; worst cold chunks are slower. This is reported explicitly, not hidden by the average.
+- Baseline mean: **12.2170 ms/chunk**.
+- New mean: **13.7844 ms/chunk** (**+12.83%**, within the +20% limit).
+- Observed cold-chunk maxima: baseline 31.4–32.2 ms; new 39.9–44.8 ms. The mean passes; worst cold chunks are slower. This is reported explicitly, not hidden by the average.
 
 Reproduce baseline setup inside this worktree, then call `benchmark()` in the live app:
 
@@ -96,9 +96,13 @@ The visible diagnostics panel and `snapshot().buildTiming` also expose mean/max 
 
 The complete ten-choice list, including rejected alternatives, is in `docs/design/biome-decisions.md` and the PR description. The captain explicitly chose broader independent territories and later accepted fewer Woodland thermals and more flapping, instead of increasing glade frequency.
 
+## Height review
+
+The captain selected **Hills 150 ±75 m** with original rivers after the 400 ±200 m and 250 ±125 m variants failed bounded checks. Their evidence remains in `issue-58-tuscany-height-probes.json`; failed repairs were undone through new commits. No accepted selection, Moor/Highlands, thermal, navigation, river-bend or flapping decision changed. D4 adds varied polygonal parcels and physical hedgerows; D5 adds Woodland colour variation and glade flower flecks without changing glade thresholds or density.
+
 ## Validation
 
-`npm run check` passes all 50 existing unit assertions plus production type/build validation. `npm run test:smoke` passes all 18 browser tests, including the new deterministic biome/shared-edge test. Browser evidence is repeatable and attached by the test runner. The original grove, river-count, route-persistence and narrow-band flapping assertions remain intact.
+`npm run check` passes all 50 existing unit assertions plus production type/build validation. `npm run test:smoke` passes all 19 browser tests, including deterministic biome/shared edges and real hedgerow instances with varied field orientations. Browser evidence is repeatable and attached by the test runner. The original grove, river-count, route-persistence and narrow-band flapping assertions remain intact.
 
 ### Bounded navigation experiment
 
@@ -112,9 +116,9 @@ The baseline had no terrain stalls and 12 backward thermal approaches in 33 seek
 | 1: scenic targets use compass directly | 21,000.96 | 35,828.93 | 2 | 1,922 |
 | 2: compass thermal seeking, forward bias 0.8 | 25,919.53 | 36,238.07 | 2 | 2,127 |
 | 3: compass noise amplitude π/2 | 66,160.74 | 37,190.94 | 0 | 3,149 |
-| **4: restore thermal forward bias 0.28 (current)** | **51,075.50** | **36,198.90** | **0** | **1,822** |
+| **4: restore thermal forward bias 0.28 (historical, before height/farmland review)** | **51,075.50** | **36,198.90** | **0** | **1,822** |
 
-Full navigation tests confirm candidate 4 passes the route contract and fails only the wide-band flapping ceiling. The trace still has zero terrain stalls. Progress is no longer trapped in the enlarged regions; supporting that progress with enough lift remains unresolved.
+At that historical stage, candidate 4 passed the route contract and failed only the old wide-band flapping ceiling. The captain subsequently approved the Woodland exposure allowance below. The final 150 ±75 m Hills and varied farmland produce **49,046.86 m net versus 35,673.64 m required**, **zero revisits**, **zero stalls**, and **1,283 flap ticks versus 1,711.54 allowed**. All navigation assertions pass. The accepted compass and thermal-bias settings are unchanged.
 
 ### Captain-approved flapping contract
 
@@ -126,14 +130,14 @@ The wide-band test now scales the original allowance by actual, fractionally wei
 allowed = original 1,622.5 ticks × (1 + 0.5 × Woodland time fraction)
 ```
 
-Measured exposure is 9,902.25 equivalent ticks / 36,000 = **27.51%**. This gives **1,845.64 allowed ticks**, versus **1,822 actual**. A flight with no Woodland gets the unchanged 1,622.5 limit; both narrow-band assertions remain unchanged. Directly excluding only flaps above Woodland was rejected because it missed the carried energy deficit after leaving a forest.
+The pre-review exposure was 9,902.25 equivalent ticks / 36,000 = **27.51%**, giving **1,845.64 allowed ticks**, versus **1,822 actual**. Final exposure is **3,951.14 / 36,000 = 10.98%**, giving **1,711.54 allowed**, versus **1,283 actual**. The formula did not change. A flight with no Woodland gets the unchanged 1,622.5 limit; both narrow-band assertions remain unchanged. Directly excluding only flaps above Woodland was rejected because it missed the carried energy deficit after leaving a forest.
 
-Route persistence passes at **51,075.50 m net versus 36,198.90 m required**, with zero revisits. All navigation assertions now pass.
+Final route persistence passes at **49,046.86 m net versus 35,673.64 m required**, with zero revisits. All navigation assertions now pass.
 
 ### Relocated Highlands fixtures
 
-The approved larger fields and relief phase invalidate the old fixed Highlands coordinates. The smoke fixtures now target measured Highlands, without changing any snow, cirque, clearance, energy or duration assertions. Seed 57 snow/cirque uses peak `(16250, 32000)` with height **420.60 m** and a 150 m cirque. The hour flight starts at `(-84000, 122000)`: **2,175.5 s Highlands exposure**, **130.9 s flapping** against the original 206 s ceiling, **48.30 m minimum clearance**, **4 m/s peak vertical speed**, and **zero safety corrections**.
+The approved larger fields and relief phase invalidate the old fixed Highlands coordinates. The smoke fixtures now target measured Highlands, without changing any snow, cirque, clearance, energy or duration assertions. Seed 57 snow/cirque uses peak `(16250, 32000)` with height **420.60 m** and a 150 m cirque. The hour flight starts at `(-84000, 122000)`: **2,772.0 s Highlands exposure**, **143.1 s flapping** against the original 206 s ceiling, **27.43 m minimum clearance**, **4 m/s peak vertical speed**, and **zero safety corrections**.
 
 ### Screenshots
 
-Real normal-mode app captures (not the low-resolution smoke mode) show each shipped biome, a Woodland/Moor blend, and a dark peat pool. See `docs/design/biome-evidence/README.md` for seed, lighting, camera poses and repeatable capture instructions.
+Real normal-mode app captures (not the low-resolution smoke mode) show each shipped biome, a Woodland/Moor blend, a dark peat pool and a flower-coloured glade. See `docs/design/biome-evidence/README.md` for seed, lighting, camera poses and repeatable capture instructions.

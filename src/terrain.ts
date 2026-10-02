@@ -18,6 +18,7 @@ const legacyGround = new THREE.Color(0x6fa03c);
 const graniteGround = new THREE.Color(0x857e72);
 const peatGround = new THREE.Color(0x2e4a4a);
 const hedgeGround = new THREE.Color(0x2e6b34);
+const gladeFlowers = [0xe6c43a, 0xd2553f, 0xb06fa6].map((hex) => new THREE.Color(hex));
 const flecks = [0xe6c43a, 0xd2553f, 0xe1b93a].map((hex) => new THREE.Color(hex));
 const scratch = new THREE.Color();
 const highlandPalette = [0x7da548, 0x1e4e3a, 0x6e685e, 0xafa28a, 0x9a9489, 0xf2f4f7].map((hex) => new THREE.Color(hex));
@@ -25,9 +26,11 @@ const highlandPalette = [0x7da548, 0x1e4e3a, 0x6e685e, 0xafa28a, 0x9a9489, 0xf2f
 /** All palette choices are world-sample based, including the shared vertices of adjacent chunks. */
 export function terrainColor(sample: LandscapeSample, x: number, z: number, seed: number, target: THREE.Color, slope = 0, normalY = 1): THREE.Color {
   const { biome } = sample;
-  const hill = palettes.hills[Math.min(2, Math.floor(sample.field * 3))]!;
+  const hill = palettes.hills[sample.field < 0.55 ? 2 : sample.field < 0.85 ? 0 : 1]!;
   target.copy(hill).lerp(hedgeGround, sample.hedge).multiplyScalar(biome.hills);
-  scratch.copy(palettes.woodland[4]!).lerp(palettes.woodland[3]!, sample.glade).multiplyScalar(biome.woodland);
+  const woodlandPatch = biome.woodland > 0 ? 0.5 + fbm(x / 180, z / 180, seed + 162, 2) * 0.5 : 0;
+  scratch.copy(palettes.woodland[0]!).lerp(palettes.woodland[2]!, woodlandPatch)
+    .lerp(palettes.woodland[3]!, sample.glade).multiplyScalar(biome.woodland);
   target.add(scratch);
   const patch = sample.moorPatch * 3;
   const index = Math.min(2, Math.floor(patch));
@@ -45,6 +48,10 @@ export function terrainColor(sample: LandscapeSample, x: number, z: number, seed
   const jitter = hash2(Math.round(x), Math.round(z), seed + 310);
   if (jitter < 0.012) target.lerp(flecks[jitter < 0.002 ? 1 : 0]!, biome.hills * 0.65);
   if (jitter > 0.985) target.lerp(flecks[2]!, biome.moor * 0.7);
+  if (biome.woodland * sample.glade > 0.1 && jitter < 0.2
+    && fbm(x / 65, z / 65, seed + 163, 2) > 0.22) {
+    target.lerp(gladeFlowers[Math.floor(jitter * 15)]!, biome.woodland * sample.glade * 0.7);
+  }
   target.lerp(peatGround, sample.peat);
   if (sample.water) target.set(sample.peat > 0 ? 0x2e4a4a : 0x2f6e6a);
   return target;
@@ -124,6 +131,8 @@ export class TerrainStream {
   ];
   private readonly rockGeometry = new THREE.DodecahedronGeometry(4.5, 0);
   private readonly torGeometry = new THREE.BoxGeometry(6, 3.2, 5);
+  private readonly hedgeGeometry = new THREE.DodecahedronGeometry(1, 0);
+  private readonly hedgeMaterial = new THREE.MeshStandardMaterial({ color: 0x2e6b34, roughness: 1, flatShading: true });
   // Distant trees keep the near placement, trunks, and colors with two draw calls per tile.
   private readonly farCrownGeometry = new THREE.IcosahedronGeometry(5.4, 0);
   private readonly farFoliageMaterial = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });
@@ -302,6 +311,8 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     this.crownGeometries.forEach((geometry) => geometry.dispose());
     this.rockGeometry.dispose();
     this.torGeometry.dispose();
+    this.hedgeGeometry.dispose();
+    this.hedgeMaterial.dispose();
     this.farCrownGeometry.dispose();
     this.farFoliageMaterial.dispose();
   }
@@ -334,6 +345,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     const heightAt = (xIndex: number, zIndex: number) => sampleAt(xIndex, zIndex).height;
     const water: boolean[] = [];
     const surface: number[] = [];
+    const hedgeBlocks: { x: number; y: number; z: number; turn: number; weight: number }[] = [];
 
     for (let zIndex = 0; zIndex <= segments; zIndex += 1) {
       for (let xIndex = 0; xIndex <= segments; xIndex += 1) {
@@ -350,6 +362,12 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         ).normalize();
         normals.push(normal.x, normal.y, normal.z);
         const slope = Math.hypot(normal.x, normal.z) / normal.y;
+        const edge = sample.fieldEdge;
+        if (detailed && edge && sample.biome.hills > 0 && !sample.water && sample.bank > 20 && slope < 0.45
+          && edge.x >= originX && edge.x < originX + chunkSize && edge.z >= originZ && edge.z < originZ + chunkSize) {
+          hedgeBlocks.push({ x: edge.x - originX, y: sample.height + 1.6 * sample.biome.hills,
+            z: edge.z - originZ, turn: edge.turn, weight: sample.biome.hills });
+        }
         terrainColor(sample, x, z, this.world.seed, color, slope, normal.y);
         const hueJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 311) - 0.5) * 0.03;
         const saturationJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 312) - 0.5) * 0.12;
@@ -412,6 +430,22 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     if (rocks) group.add(rocks);
     const tors = detailed ? this.createTors(chunkX, chunkZ) : null;
     if (tors) group.add(tors);
+    const hedges = hedgeBlocks.length ? new THREE.InstancedMesh(this.hedgeGeometry, this.hedgeMaterial, hedgeBlocks.length) : null;
+    if (hedges) {
+      hedges.name = 'hedgerows';
+      const dummy = new THREE.Object3D();
+      hedgeBlocks.forEach((block, index) => {
+        dummy.position.set(block.x, block.y, block.z);
+        dummy.rotation.set(0, block.turn, 0);
+        dummy.scale.set(1.3 * block.weight, 1.8 * block.weight, 7);
+        dummy.updateMatrix();
+        hedges.setMatrixAt(index, dummy.matrix);
+      });
+      hedges.instanceMatrix.needsUpdate = true;
+      hedges.castShadow = true;
+      hedges.receiveShadow = true;
+      group.add(hedges);
+    }
 
     this.scene.add(group);
     return {
@@ -424,6 +458,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         treeObjects.forEach((object) => object.dispose());
         rocks?.dispose();
         tors?.dispose();
+        hedges?.dispose();
       },
     };
   }

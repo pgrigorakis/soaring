@@ -5,6 +5,7 @@ export type LandscapeSample = {
   glade: number;
   field: number;
   hedge: number;
+  fieldEdge?: { x: number; z: number; turn: number } | null;
   moorPatch: number;
   peat: number;
   height: number;
@@ -99,6 +100,33 @@ export function hash2(x: number, z: number, seed: number): number {
   h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
   h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/** Jittered parcels have different sizes, orientations and polygonal boundaries. */
+export function farmland(x: number, z: number, seed: number) {
+  const size = 300;
+  const cx = Math.floor(x / size);
+  const cz = Math.floor(z / size);
+  let first = { x: 0, z: 0, distance: Infinity, field: 0 };
+  let second = first;
+  for (let dz = -1; dz <= 1; dz += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      const i = cx + dx;
+      const j = cz + dz;
+      const sx = (i + 0.2 + hash2(i, j, seed + 153) * 0.6) * size;
+      const sz = (j + 0.2 + hash2(i, j, seed + 154) * 0.6) * size;
+      const site = { x: sx, z: sz, distance: (x - sx) ** 2 + (z - sz) ** 2, field: hash2(i, j, seed + 156) };
+      if (site.distance < first.distance) { second = first; first = site; }
+      else if (site.distance < second.distance) second = site;
+    }
+  }
+  const dx = second.x - first.x;
+  const dz = second.z - first.z;
+  const separation = Math.hypot(dx, dz);
+  const distance = (second.distance - first.distance) / (2 * separation);
+  return { field: first.field, hedge: 1 - smootherstep(1, 3, distance),
+    fieldEdge: distance < 6 ? { x: x + dx / separation * distance,
+      z: z + dz / separation * distance, turn: Math.atan2(-dz, dx) } : null };
 }
 
 function valueNoise(x: number, z: number, seed: number): number {
@@ -294,11 +322,8 @@ export class WorldModel {
       + fbm(x / 290, z / 290, this.seed + 149, 3) * 0.25
       + (moisture - 0.5) * 0.18 : 0;
     const glade = biome.woodland > 0 ? smootherstep(WOODLAND_GLADES.start, WOODLAND_GLADES.end, fbm(x / WOODLAND_GLADES.wavelength, z / WOODLAND_GLADES.wavelength, this.seed + 151, 2)) : 0;
-    const cx = Math.floor(x / 300);
-    const cz = Math.floor(z / 300);
-    const field = hash2(cx, cz, this.seed + 153);
-    const edge = Math.min(x - cx * 300, (cx + 1) * 300 - x, z - cz * 300, (cz + 1) * 300 - z);
-    const hedge = 1 - smootherstep(3, 16, edge);
+    const { field, hedge, fieldEdge } = biome.hills > 0
+      ? farmland(x, z, this.seed) : { field: 0, hedge: 0, fieldEdge: null };
     const legacyForest = Math.max(smootherstep(-0.04, 0.05, woodland), riverside * 0.62) * (1 - mountainRegion * 0.5);
     const forest = (biome.hills * (BIOME_PROFILES.hills.forestDensity + hedge * 0.55) + biome.woodland * BIOME_PROFILES.woodland.forestDensity * (1 - glade)
       + biome.moor * BIOME_PROFILES.moor.forestDensity + (biome.highlands + biome.lakeland) * legacyForest) * ((river || lake) ? 0 : 1);
@@ -307,7 +332,7 @@ export class WorldModel {
     const rock = clamp01((biome.highlands + biome.lakeland) * (mountainRegion * 0.74 + smootherstep(96, 170, height))
       + blendParameter(biome, 'rockBias', 0) + biome.moor * localHigh * 0.7);
 
-    return { height, mountainRegion, surface, bank, moisture, forest, rock, water: lake || river, river, biome, glade, field, hedge, moorPatch, peat };
+    return { height, mountainRegion, surface, bank, moisture, forest, rock, water: lake || river, river, biome, glade, field, hedge, fieldEdge, moorPatch, peat };
   }
 
   /** Broad landform. Drainage and the rendered hills share this field, so rivers follow the visible relief. */
@@ -791,7 +816,9 @@ export class WorldModel {
         const kind = species < conifer ? 0 : species > 1 - birch ? 2 : 1;
         const autumn = hash2(cx, cz, this.seed + 355) < sample.biome.woodland * 0.04;
         const tint = autumn ? (hash2(cx, cz, this.seed + 356) < 0.25 ? 0xd9a441 : 0xc9772e)
-          : kind === 2 ? 0x9dbf4e : kind === 0 ? 0x1f5a34 : 0x2e7a3e;
+          : kind === 2 ? 0x9dbf4e : kind === 0 ? 0x1f5a34
+          : sample.biome.woodland > hash2(cx, cz, this.seed + 358)
+            ? BIOME_PROFILES.woodland.palette[Math.floor(hash2(cx, cz, this.seed + 357) * 3)]! : 0x2e7a3e;
         trees.push({
           x, y: sample.height, z, kind, tint, biome: sample.biome,
           scale: (0.8 + hash2(cx, cz, this.seed + 359) * 0.4) * blendParameter(sample.biome, 'crownScale', 1),

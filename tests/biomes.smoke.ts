@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { writeFile } from 'node:fs/promises';
 
 // Failure modes: weights depend on cache/order, profile blending recurses through drainage,
 // adjacent meshes disagree on colour/height, pool water floats above dry ground, or rendering fails.
@@ -62,4 +63,52 @@ test('renders blended biome terrain with deterministic shared chunk edges', asyn
   expect(errors).toEqual([]);
   await testInfo.attach('biome-evidence', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' });
   await testInfo.attach('biome-render', { body: await page.screenshot(), contentType: 'image/png' });
+});
+
+// Failure modes: parcels remain aligned squares, hedges remain painted stripes,
+// negative coordinates change field ownership, or colour changes alter glade/density rules.
+test('renders varied farmland with physical hedgerows', async ({ page }, testInfo) => {
+  await page.addInitScript(() => localStorage.setItem('soaring.world-seed.v1', '80231'));
+  await page.goto('/?smoke');
+  await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0);
+  const evidence = await page.evaluate(async () => {
+    const worldPath = '/src/world.ts';
+    const terrainPath = '/src/terrain.ts';
+    const threePath = '/node_modules/.vite/deps/three.js';
+    const { WorldModel, farmland } = await import(worldPath);
+    const { TerrainStream } = await import(terrainPath);
+    const THREE = await import(threePath);
+    const fields = new Set();
+    const angles = new Set();
+    let deterministic = true;
+    for (let z = -41000; z < -39000; z += 30) {
+      for (let x = -9000; x < -7000; x += 30) {
+        const field = farmland(x, z, 80231);
+        deterministic &&= JSON.stringify(field) === JSON.stringify(farmland(x, z, 80231));
+        fields.add(field.field);
+        if (field.fieldEdge) angles.add(Math.round(field.fieldEdge.turn * 10));
+      }
+    }
+    const scene = new THREE.Scene();
+    const terrain = new TerrainStream(scene, new WorldModel(80231));
+    terrain.update(-8000, -40000, 9);
+    let hedgeInstances = 0;
+    scene.traverse((object: any) => { if (object.name === 'hedgerows') hedgeInstances += object.count; });
+    terrain.dispose();
+    window.__SOARING__.setTimeOfDay(.5);
+    window.__SOARING__.setViewpoint({ x: -8200, y: 290, z: -39500, lookX: -8000, lookY: 140, lookZ: -40300 });
+    return { fields: fields.size, angles: angles.size, deterministic, hedgeInstances };
+  });
+  expect(evidence.deterministic).toBe(true);
+  expect(evidence.fields).toBeGreaterThan(20);
+  expect(evidence.angles).toBeGreaterThan(8);
+  expect(evidence.hedgeInstances).toBeGreaterThan(30);
+  await page.waitForTimeout(500);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().pending === 0);
+  const imagePath = testInfo.outputPath('farmland-render.png');
+  const evidencePath = testInfo.outputPath('farmland-evidence.json');
+  await page.screenshot({ path: imagePath });
+  await writeFile(evidencePath, JSON.stringify(evidence, null, 2));
+  await testInfo.attach('farmland-evidence', { path: evidencePath, contentType: 'application/json' });
+  await testInfo.attach('farmland-render', { path: imagePath, contentType: 'image/png' });
 });
