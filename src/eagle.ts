@@ -294,8 +294,9 @@ export class EagleNavigator {
   private seekThermal(): void {
     // Two 1.8 km cells give the eagle a 3.6 km thermal search reach.
     const thermals = this.world.nearbyThermals(this.state.x, this.state.z, 2);
-    const aheadX = Math.sin(this.state.heading);
-    const aheadZ = Math.cos(this.state.heading);
+    const bearing = this.seedAngle + fbm1d(this.totalTime / 300, this.world.seed + COMPASS_SEED) * Math.PI / 2;
+    const aheadX = Math.sin(bearing);
+    const aheadZ = Math.cos(bearing);
     thermals.sort((a, b) => {
       const score = (thermal: Thermal) => {
         const dx = thermal.x - this.state.x;
@@ -327,11 +328,11 @@ export class EagleNavigator {
 
   private chooseScenicTarget(): void {
     this.scenicIndex += 1;
-    const bearing = this.seedAngle + fbm1d(this.totalTime / 300, this.world.seed + COMPASS_SEED) * Math.PI;
+    const bearing = this.seedAngle + fbm1d(this.totalTime / 300, this.world.seed + COMPASS_SEED) * Math.PI / 2;
     const mountain = highlandWeight(this.world.sample(this.state.x, this.state.z).mountainRegion);
     // Keep the long-lived compass through a pass; do not let a thermal's exit yaw
     // turn valley preference into repeated trips around the same basin.
-    const routeHeading = this.state.heading + wrapAngle(bearing - this.state.heading) * (0.35 + mountain * 0.65);
+    const routeHeading = bearing;
     let bestScore = -Infinity;
     for (let candidate = 0; candidate < 6; candidate += 1) {
       const variation = (hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.x / 400), this.world.seed + 419) - 0.5) * 1.35;

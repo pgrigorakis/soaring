@@ -63,12 +63,30 @@ The selected pair is the lowest Climate/Hills wavelength among tested passing pa
 4. Candidate pre-drainage elevation resolves height/selection recursion; see `docs/design/biome-decisions.md`.
 5. Moor trees are rare isolated trees plus rare small groves, still well under 3% candidate density by construction (0.4% base plus sparse 100–150 m grove masks). Rejected uniform 2% placement, which erased adjacent open cells in the existing biome-transition fixture.
 6. River bend amplitude is reduced to keep newly shaped adjacent drainage reaches from crossing. This changes river appearance and needs review.
-7. Woodland thermal odds are provisionally 1.6, and lowland scenic heading retains 35% compass bias. These are regression-fix experiments, not approved shipping values; route persistence still fails.
+7. Woodland thermal odds remain provisionally 1.6. Scenic targets now follow the persistent compass in every biome, and its noise amplitude is halved (π/2 rather than π). Thermal seeking uses that compass with the original 0.28 forward bias. This fixes route persistence but still exceeds the wide-band flapping budget; see the bounded experiment below.
 
 ## WIP validation state / current blocker
 
 World-model tests now pass all 17 assertions, including grove presence, river count, non-crossing rivers and river-wall slope. Last terrain-only check passed all five assertions before the final 16/18 km tuning; it still needs rerunning on the final candidate.
 
-Latest navigation run passes 12 of 13 assertions, including all original flapping baselines. **One-hour route persistence still fails:** net distance 20,304.55 m versus required 35,577.20 m. Previous run without the compass/thermal adjustment failed at 26,175.67 m versus required 36,028.91 m. Neither assertion was relaxed. This is the repeated obstacle reported to firstmate under `biome-route-contract`.
+Latest navigation run passes 12 of 13 assertions, **including route persistence** and both narrow-band flapping baselines. The 65–210 m band fails: **1,822 flapping ticks versus maximum 1,622.5**. No assertion was relaxed.
+
+### Bounded navigation experiment
+
+Reproduce the current one-hour trace with `node scripts/audit-route.mjs`. It writes `test-results/biome-route.json` with progress, repeated visits, backward thermal approaches, stalls and 300-second snapshots. The exact existing assertions are exercised by `npx vitest run tests/navigation.test.ts`.
+
+The baseline had no terrain stalls and 12 backward thermal approaches in 33 seeks. Four bounded candidates were tested; field sizes and profile heights stayed fixed.
+
+| Candidate | Net distance (m) | Required net distance (m) | Revisit passes (limit 5) | Flapping ticks (limit 1,622.5) |
+| --- | --- | --- | --- | --- |
+| Baseline: 35% lowland compass, full amplitude | 20,304.55 | 35,577.20 | 2 | 1,400 |
+| 1: scenic targets use compass directly | 21,000.96 | 35,828.93 | 2 | 1,922 |
+| 2: compass thermal seeking, forward bias 0.8 | 25,919.53 | 36,238.07 | 2 | 2,127 |
+| 3: compass noise amplitude π/2 | 66,160.74 | 37,190.94 | 0 | 3,149 |
+| **4: restore thermal forward bias 0.28 (current)** | **51,075.50** | **36,198.90** | **0** | **1,822** |
+
+Full navigation tests confirm candidate 4 passes the route contract and fails only the wide-band flapping ceiling. The trace still has zero terrain stalls. Progress is no longer trapped in the enlarged regions; supporting that progress with enough lift remains unresolved.
+
+**One design choice requested:** permit more frequent Woodland glades (still 150–400 m) to provide more lift along forward routes, rather than restoring broad compass reversals. This is a proposed next experiment, not a verified diagnosis of the remaining 199.5-tick excess. Both route and flapping assertions must remain unchanged. No further tuning was attempted after this bounded round.
 
 No PR is open. Browser smoke, final type/build check, dry-land coverage, performance comparison, biome screenshots and CI remain incomplete. No shipping or full acceptance success is claimed.
