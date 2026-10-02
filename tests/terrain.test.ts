@@ -128,7 +128,10 @@ describe('terrain streaming', () => {
       position.setFromMatrixPosition(matrix);
       return [position.x, position.z];
     });
-    expect(renderedPositions).toEqual(trees.map((tree) => [Math.fround(tree.x), Math.fround(tree.z)]));
+    expect(renderedPositions).toEqual(trees.map((tree) => [
+      Math.fround(tree.x - chunk.position.x),
+      Math.fround(tree.z - chunk.position.z),
+    ]));
     terrain.dispose();
   });
 
@@ -143,10 +146,17 @@ describe('terrain streaming', () => {
       const scene = new THREE.Scene();
       const terrain = new TerrainStream(scene, new WorldModel(448122));
       terrain.update((chunkX + 0.5) * CHUNK_SIZE, (chunkZ + 0.5) * CHUNK_SIZE, 1);
-      const [ground, water] = scene.getObjectByName(`land ${chunkX},${chunkZ}`)!.children as THREE.Mesh[];
+      const chunk = scene.getObjectByName(`land ${chunkX},${chunkZ}`)!;
+      expect(chunk.position.x).toBe(chunkX * CHUNK_SIZE);
+      expect(chunk.position.z).toBe(chunkZ * CHUNK_SIZE);
+      const [ground, water] = chunk.children as THREE.Mesh[];
       const points = (mesh: THREE.Mesh) => {
         const position = mesh.geometry.getAttribute('position');
-        return new Map(Array.from({ length: position.count }, (_, i) => [position.getX(i), position.getY(i), position.getZ(i)])
+        return new Map(Array.from({ length: position.count }, (_, i) => [
+          position.getX(i) + chunk.position.x,
+          position.getY(i) + chunk.position.y,
+          position.getZ(i) + chunk.position.z,
+        ])
           .filter(([px]) => px === x).map(([, y, z]) => [z!, y!]));
       };
       const result = { ground: points(ground!), water: points(water!) };

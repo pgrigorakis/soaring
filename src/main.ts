@@ -14,6 +14,7 @@ const CAMERA_DISTANCE = { min: 10, max: 100, default: 100 } as const;
 const CAMERA_CLOSE_HEIGHT = 3;
 // The previous 178 m default sat 31% of its follow distance above the eagle.
 const CAMERA_FAR_HEIGHT = 178 * 0.31;
+const RENDER_ORIGIN_DISTANCE = 10_000;
 const SETTINGS_KEY = 'soaring.settings.v1';
 const SEED_KEY = 'soaring.world-seed.v1';
 const VISIT_KEY = 'soaring.scenic-visit.v1';
@@ -87,6 +88,10 @@ const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('Missing application root');
 
 const scene = new THREE.Scene();
+const worldRoot = new THREE.Group();
+const renderOrigin = new THREE.Vector3(navigator.state.x, navigator.state.y, navigator.state.z);
+worldRoot.position.copy(renderOrigin).negate();
+scene.add(worldRoot);
 
 const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.5, MAX_VISIBILITY + 500);
 const renderer = new THREE.WebGLRenderer({ antialias: !smokeMode, powerPreference: 'high-performance' });
@@ -101,7 +106,7 @@ renderer.domElement.setAttribute('aria-label', 'Autonomous golden eagle flying a
 app.append(renderer.domElement);
 
 const hemisphere = new THREE.HemisphereLight(0xcfe3f0, 0x5e7a3a, 2.25);
-scene.add(hemisphere);
+worldRoot.add(hemisphere);
 // One shadow caster. Its direction follows whichever body is higher. Both intensities are zero
 // on the horizon, so the direction can flip there without a visible shadow pop.
 const keyLight = new THREE.DirectionalLight(0xffe1ab, 3.6);
@@ -109,7 +114,7 @@ keyLight.castShadow = !smokeMode && !settings.lowPower;
 keyLight.shadow.camera.near = 1;
 keyLight.shadow.bias = -0.0005;
 keyLight.shadow.normalBias = 0.8;
-scene.add(keyLight, keyLight.target);
+worldRoot.add(keyLight, keyLight.target);
 
 const sky = new Sky();
 sky.scale.setScalar(450000);
@@ -244,9 +249,9 @@ lensflare.addElement(flareRingElement);
 // An anchor at camera + sunDirection stays on the same infinite direction as the sky disc.
 const sunFlareAnchor = new THREE.Object3D();
 sunFlareAnchor.add(lensflare);
-scene.add(sunFlareAnchor);
+worldRoot.add(sunFlareAnchor);
 
-scene.add(eagle.group);
+worldRoot.add(eagle.group);
 // Fog uses view depth, not distance. A point at horizontal distance d can have a depth as small
 // as d · cos(half-diagonal FOV), so terrain loads out to visibility / cos(half-diagonal FOV).
 // Reach stops growing past 16:9; wider windows get a shorter haze instead of more tiles.
@@ -261,8 +266,8 @@ function effectiveTerrainVisibility(): number {
 function terrainReach(): number {
   return effectiveTerrainVisibility() / depthPerDistance(Math.min(camera.aspect, MAX_REACH_ASPECT));
 }
-const terrain = new TerrainStream(scene, world, terrainReach());
-const thermalMarker = new ThermalMarker(scene, world);
+const terrain = new TerrainStream(worldRoot, world, terrainReach());
+const thermalMarker = new ThermalMarker(worldRoot, world);
 function applyRenderQuality(): void {
   const pixelRatio = pixelRatioForStep();
   if (renderer.getPixelRatio() !== pixelRatio) renderer.setPixelRatio(pixelRatio);
@@ -288,6 +293,7 @@ function followCameraHeight(distance: number): number {
 }
 const cameraPosition = new THREE.Vector3(navigator.state.x, navigator.state.y + followCameraHeight(settings.cameraDistance), navigator.state.z - settings.cameraDistance);
 const lookAt = new THREE.Vector3();
+const renderLookAt = new THREE.Vector3();
 let cameraHeading = navigator.state.heading;
 let rideBlend = 0;
 
@@ -686,7 +692,7 @@ function applyDaylight(body: Daylight, delta: number, forceFog: boolean): void {
   flareRingElement.color.setRGB(flare * 0.55, flare * 0.62, flare * 0.8);
   sunFlareAnchor.visible = flare > 0.01;
   if (sunFlareAnchor.visible) {
-    sunFlareAnchor.position.copy(camera.position).addScaledVector(sunDir, camera.far * 0.82);
+    sunFlareAnchor.position.copy(cameraPosition).addScaledVector(sunDir, camera.far * 0.82);
   }
 
   veil.style.setProperty('--veil-top', 'rgba(0, 0, 0, 0)');
@@ -733,6 +739,11 @@ function frame(now: number): void {
   clampNextSimulationDelta = false;
   updateFlight(delta, now);
   const state = navigator.state;
+  if (Math.hypot(state.x - renderOrigin.x, state.y - renderOrigin.y, state.z - renderOrigin.z) > RENDER_ORIGIN_DISTANCE) {
+    renderOrigin.set(state.x, state.y, state.z);
+    // One parent translation rebases every world object together; the camera is rebased below.
+    worldRoot.position.copy(renderOrigin).negate();
+  }
 
   if (skyLook) {
     const sky = currentDaylight();
@@ -765,15 +776,15 @@ function frame(now: number): void {
     const lookAhead = 38 - rideBlend * 22;
     lookAt.set(state.x + Math.sin(cameraHeading) * lookAhead, state.y - 9 - orbitPitch * 24, state.z + Math.cos(cameraHeading) * lookAhead);
   }
-  camera.position.copy(cameraPosition);
-  camera.lookAt(lookAt);
+  camera.position.copy(cameraPosition).sub(renderOrigin);
+  camera.lookAt(renderLookAt.copy(lookAt).sub(renderOrigin));
   lastChunkBuilds = terrain.update(cameraPosition.x, cameraPosition.z, settings.lowPower ? 1 : 2);
   updateFog();
   if (!skyPaused) skySeconds += rawDelta;
   const body = currentDaylight();
   applyDaylight(body, rawDelta, false);
 
-  keyLight.target.position.set(camera.position.x, world.sample(camera.position.x, camera.position.z).height, camera.position.z);
+  keyLight.target.position.set(cameraPosition.x, world.sample(cameraPosition.x, cameraPosition.z).height, cameraPosition.z);
   updateShadowBasis(keyDir);
   snapToShadowGrid(keyLight.target.position);
   keyLight.position.copy(keyDir).multiplyScalar(SHADOW_EXTENT + 300).add(keyLight.target.position);
@@ -811,6 +822,7 @@ function frame(now: number): void {
       `behavior     ${state.behavior}${state.flapping ? ' (flapping)' : ''}`,
       `clearance    ${(state.y - world.sample(state.x, state.z).height).toFixed(0)} m`,
       `position     ${state.x.toFixed(0)}, ${state.z.toFixed(0)}`,
+      `render origin ${renderOrigin.x.toFixed(0)}, ${renderOrigin.y.toFixed(0)}, ${renderOrigin.z.toFixed(0)}`,
       `thermal      ${navigator.activeThermal ? `${navigator.activeThermal.x.toFixed(0)}, ${navigator.activeThermal.z.toFixed(0)}` : 'none selected'}`,
       `markers      ${thermalMarker.count} within ${THERMAL_MARKER_RANGE} m`,
       `nearby       ${nearby}`,
@@ -839,7 +851,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean };
+      snapshot: () => { renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean };
       advanceSimulation?: (seconds: number) => void;
       reviewFlight?: (start: { x: number; z: number; heading: number } | null) => void;
       setTimeScale: (scale: number) => void;
@@ -907,6 +919,7 @@ window.__SOARING__ = {
       bank: navigator.state.bank,
       heading: navigator.state.heading,
       position: [navigator.state.x, navigator.state.y, navigator.state.z],
+      renderOrigin: [renderOrigin.x, renderOrigin.y, renderOrigin.z],
       geometries: renderer.info.memory.geometries,
       activeThermal: navigator.activeThermal ? [navigator.activeThermal.x, navigator.activeThermal.z] : null,
       marker: activeMarker ? [activeMarker.x, activeMarker.z] : null,

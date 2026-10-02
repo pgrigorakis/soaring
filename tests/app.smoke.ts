@@ -142,6 +142,26 @@ function expectMarkersInRange(snapshot: {
   expect([activeMarks[0]?.[0], activeMarks[0]?.[1]]).toEqual(snapshot.activeThermal);
 }
 
+test('rebases render coordinates while navigation stays in world coordinates', async ({ page }) => {
+  const errors = captureErrors(page);
+  await page.goto('/?smoke');
+  await expect(page.locator('canvas')).toBeVisible();
+  const before = await page.evaluate(() => window.__SOARING__.snapshot());
+  const pose = await page.evaluate(() => {
+    const { renderOrigin, heading } = window.__SOARING__.snapshot();
+    return { x: renderOrigin[0]! + 10_001, z: renderOrigin[2]!, heading };
+  });
+  await page.evaluate((start) => window.__SOARING__.reviewFlight?.(start), pose);
+  await page.waitForFunction((x) => {
+    const { position, renderOrigin } = window.__SOARING__.snapshot();
+    return renderOrigin[0] === x && position[0] === x;
+  }, pose.x);
+  const after = await page.evaluate(() => window.__SOARING__.snapshot());
+  expect(after.renderOrigin).toEqual(after.position);
+  expect(after.renderedFrames).toBeGreaterThan(before.renderedFrames);
+  expect(errors).toEqual([]);
+});
+
 test('tracks the active thermal and persists the visibility setting', async ({ page }) => {
   test.setTimeout(90_000);
   const errors = captureErrors(page);
