@@ -331,7 +331,7 @@ export class EagleNavigator {
     const mountain = highlandWeight(this.world.sample(this.state.x, this.state.z).mountainRegion);
     // Keep the long-lived compass through a pass; do not let a thermal's exit yaw
     // turn valley preference into repeated trips around the same basin.
-    const routeHeading = this.state.heading + wrapAngle(bearing - this.state.heading) * mountain;
+    const routeHeading = this.state.heading + wrapAngle(bearing - this.state.heading) * (0.35 + mountain * 0.65);
     let bestScore = -Infinity;
     for (let candidate = 0; candidate < 6; candidate += 1) {
       const variation = (hash2(this.scenicIndex * 6 + candidate, Math.floor(this.state.x / 400), this.world.seed + 419) - 0.5) * 1.35;

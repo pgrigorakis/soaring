@@ -1,4 +1,4 @@
-import { BIOME_PROFILES, biomeWeights, blendParameter, transition, type BiomeWeights } from './biome';
+import { BIOME_PROFILES, BIOME_SELECTION, biomeWeights, blendParameter, transition, type BiomeWeights } from './biome';
 
 export type LandscapeSample = {
   biome: BiomeWeights;
@@ -180,7 +180,7 @@ function smootherstep(edge0: number, edge1: number, value: number): number {
 }
 
 /** Keep transitional/lowland terrain unchanged; apply Highlands fully in its core. */
-export const highlandWeight = (region: number): number => smootherstep(0.5, 0.8, region);
+export const highlandWeight = (region: number): number => transition(0.55, region);
 
 export type WorldCacheSizes = { thermals: number; riverNodes: number; nearbyReaches: number };
 
@@ -273,10 +273,10 @@ export class WorldModel {
 
     const riverside = 1 - smootherstep(6, 80, bank);
     const moisture = clamp01(0.5 + fbm(x / 650, z / 650, this.seed + 121, 4) * 0.42 + ((lake || river) ? 0.3 : riverside * 0.22));
-    const woodland = fbm(x / 1450, z / 1450, this.seed + 139, 4) * 0.86
+    const woodland = biome.highlands > 0 ? fbm(x / 1450, z / 1450, this.seed + 139, 4) * 0.86
       + fbm(x / 290, z / 290, this.seed + 149, 3) * 0.25
-      + (moisture - 0.5) * 0.18;
-    const glade = smootherstep(0.28, 0.43, fbm(x / 300, z / 300, this.seed + 151, 2));
+      + (moisture - 0.5) * 0.18 : 0;
+    const glade = biome.woodland > 0 ? smootherstep(0.28, 0.43, fbm(x / 300, z / 300, this.seed + 151, 2)) : 0;
     const cx = Math.floor(x / 300);
     const cz = Math.floor(z / 300);
     const field = hash2(cx, cz, this.seed + 153);
@@ -285,7 +285,7 @@ export class WorldModel {
     const legacyForest = Math.max(smootherstep(-0.04, 0.05, woodland), riverside * 0.62) * (1 - mountainRegion * 0.5);
     const forest = (biome.hills * (0.025 + hedge * 0.55) + biome.woodland * BIOME_PROFILES.woodland.forestDensity * (1 - glade)
       + biome.moor * BIOME_PROFILES.moor.forestDensity + (biome.highlands + biome.lakeland) * legacyForest) * ((river || lake) ? 0 : 1);
-    const moorPatch = clamp01(0.5 + fbm(x / 250, z / 250, this.seed + 155, 2));
+    const moorPatch = biome.moor > 0 ? clamp01(0.5 + fbm(x / 250, z / 250, this.seed + 155, 2)) : 0;
     const localHigh = smootherstep(0.6, 2.8, detail);
     const rock = clamp01((biome.highlands + biome.lakeland) * (mountainRegion * 0.74 + smootherstep(96, 170, height))
       + blendParameter(biome, 'rockBias', 0) + biome.moor * localHigh * 0.7);
@@ -297,16 +297,17 @@ export class WorldModel {
   /** Broad landform. Drainage and the rendered hills share this field, so rivers follow the visible relief. */
   private relief(x: number, z: number) {
     const broad = fbm(x / 3200, z / 3200, this.seed + 7, 4);
-    const ridges = 1 - Math.abs(fbm(x / 1550, z / 1550, this.seed + 47, 4));
-    const mountainRegion = smootherstep(0.04, 0.48, fbm(x / 5400, z / 5400, this.seed + 59, 3));
-    const ridge = clamp01((ridges - 0.34) / 0.66);
-    const mountains = mountainRegion * Math.pow(ridge, 2) * 380;
-    const climate = clamp01(0.5 + fbm(x / 4000, z / 4000, this.seed + 127, 3));
+    const mountainRegion = smootherstep(0.04, 0.48, fbm(x / BIOME_SELECTION.reliefWavelength, z / BIOME_SELECTION.reliefWavelength, this.seed + 61, 3));
+    const climate = clamp01(0.5 + fbm(x / BIOME_SELECTION.climateWavelength, z / BIOME_SELECTION.climateWavelength, this.seed + 127, 3));
     // Candidate upland profile resolves height eligibility before final blending. Drainage
     // sees this same blended elevation; carved river height never feeds back into selection.
-    const dry = 1 - transition(0.42, climate);
+    const dry = 1 - transition(BIOME_SELECTION.moorThreshold, climate);
     const candidate = 65 + broad * 45 + dry * (85 + broad * 15);
-    const biome = biomeWeights(mountainRegion, climate, candidate);
+    const hillsField = clamp01(0.5 + fbm(x / BIOME_SELECTION.hillsWavelength, z / BIOME_SELECTION.hillsWavelength, this.seed + 129, 3));
+    const biome = biomeWeights(mountainRegion, climate, candidate, hillsField);
+    const ridges = biome.highlands > 0 ? 1 - Math.abs(fbm(x / 1550, z / 1550, this.seed + 47, 4)) : 0;
+    const ridge = clamp01((ridges - 0.34) / 0.66);
+    const mountains = mountainRegion * ridge * ridge * 380;
     const elevation = biome.hills * (BIOME_PROFILES.hills.heightOffset + broad * BIOME_PROFILES.hills.heightAmplitude)
       + biome.woodland * (BIOME_PROFILES.woodland.heightOffset + broad * BIOME_PROFILES.woodland.heightAmplitude)
       + biome.moor * (BIOME_PROFILES.moor.heightOffset + broad * BIOME_PROFILES.moor.heightAmplitude)
@@ -550,8 +551,8 @@ export class WorldModel {
     const right = this.relief(midX + dz / length * 160, midZ - dx / length * 160).elevation;
     const sign = left === right ? (hash2(node.i, node.j, this.seed + 179) < 0.5 ? -1 : 1) : left < right ? 1 : -1;
     return {
-      meander: sign * (0.16 + hash2(node.i, node.j, this.seed + 181) * 0.08),
-      bend: (hash2(node.i, node.j, this.seed + 183) - 0.5) * 0.14,
+      meander: sign * (0.06 + hash2(node.i, node.j, this.seed + 181) * 0.03),
+      bend: (hash2(node.i, node.j, this.seed + 183) - 0.5) * 0.05,
     };
   }
 
@@ -728,11 +729,17 @@ export class WorldModel {
         const z = (cz + 0.15 + hash2(cx, cz, this.seed + 347) * 0.7) * spacing;
         if (x < minX || x >= minX + size || z < minZ || z >= minZ + size) continue;
         const sample = this.sample(x, z);
-        const clumping = 0.5 + fbm(x / 120, z / 120, this.seed + 157, 2) * 1.2;
+        const clumping = sample.biome.highlands > 0 ? 0.5 + fbm(x / 120, z / 120, this.seed + 157, 2) * 1.2 : 0;
         const density = blendParameter(sample.biome, 'treeDensity', 1);
+        const groveX = Math.floor(x / 1000);
+        const groveZ = Math.floor(z / 1000);
+        const groveCenterX = (groveX + 0.3 + hash2(groveX, groveZ, this.seed + 158) * 0.4) * 1000;
+        const groveCenterZ = (groveZ + 0.3 + hash2(groveX, groveZ, this.seed + 159) * 0.4) * 1000;
+        const moorGrove = hash2(groveX, groveZ, this.seed + 160) < 0.25
+          ? 1 - smootherstep(100, 150, Math.hypot(x - groveCenterX, z - groveCenterZ)) : 0;
         const chance = sample.biome.hills * (0.018 + sample.hedge * 0.2)
           + sample.biome.woodland * (1 - sample.glade) * 0.5 * density
-          + sample.biome.moor * 0.02
+          + sample.biome.moor * (0.004 + moorGrove * 0.3)
           + (sample.biome.highlands + sample.biome.lakeland) * (0.018 + sample.forest * clumping);
         if (sample.water || (sample.height >= 320 && sample.biome.highlands > 0.5)
           || sample.rock > mix(0.72, 1, sample.biome.highlands)
@@ -740,7 +747,7 @@ export class WorldModel {
         if (sample.bank < TREE_BANK_CLEARANCE) continue;
         const slope = Math.hypot(this.sample(x + 3, z).height - sample.height, this.sample(x, z + 3).height - sample.height) / 3;
         if (slope > MAX_TREE_SLOPE) continue;
-        const reserved = sample.biome.highlands + sample.biome.lakeland;
+        const reserved = sample.biome.lakeland;
         const conifer = sample.biome.woodland * 0.3 + sample.biome.moor * 0.2 + sample.biome.highlands + sample.biome.lakeland / 3;
         const birch = sample.biome.woodland * 0.1 + sample.biome.moor * 0.2 + reserved / 3;
         const species = hash2(cx, cz, this.seed + 353);

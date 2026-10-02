@@ -5,10 +5,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 await mkdir('test-results', { recursive: true });
 const names = ['hills', 'woodland', 'moor', 'highlands'];
 const pairs = process.argv.includes('--sweep')
-  ? [[4000, 5400], [8000, 5400], [8000, 9000], [12000, 5400], [12000, 9000],
-    [16000, 18000], [24000, 27000], [32000, 36000], [40000, 45000], [48000, 54000],
-    [40000, 12000], [48000, 12000], [48000, 15000], [56000, 12000], [56000, 15000], [64000, 15000]]
-  : [[4000, 5400]];
+  ? [[12000, 12000], [14000, 15000], [16000, 15000], [18000, 15000], [20000, 15000],
+    [16000, 18000], [18000, 18000], [20000, 18000], [22000, 15000], [24000, 15000]]
+  : [[16000, 18000]];
 const extent = process.argv.includes('--sweep') ? 240000 : 80000;
 const report = { metric: 'dominant-biome contiguous flight-line chord, excluding boundary-truncated runs',
   coverageMetric: 'mean pre-drainage biome weights (not dry-land-only vertex coverage)',
@@ -17,9 +16,11 @@ for (const [climateMeters, reliefMeters] of pairs) {
   const outfile = `test-results/biome-world-${climateMeters}-${reliefMeters}.mjs`;
   await build({ entryPoints: ['src/world.ts'], outfile, bundle: true, platform: 'node', format: 'esm',
     plugins: [{ name: 'audit-wavelengths', setup(builder) {
-      builder.onLoad({ filter: /\/world\.ts$/ }, async ({ path }) => ({
+      builder.onLoad({ filter: /\/biome\.ts$/ }, async ({ path }) => ({
         contents: (await readFile(path, 'utf8'))
-          .replaceAll('/ 4000', `/ ${climateMeters}`).replaceAll('/ 5400', `/ ${reliefMeters}`), loader: 'ts',
+          .replace(/climateWavelength: \d+/, `climateWavelength: ${climateMeters}`)
+          .replace(/reliefWavelength: \d+/, `reliefWavelength: ${reliefMeters}`)
+          .replace(/hillsWavelength: \d+/, `hillsWavelength: ${climateMeters}`), loader: 'ts',
       }));
     } }],
   });
