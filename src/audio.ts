@@ -1,3 +1,4 @@
+import type { BiomeWeights } from './biome';
 import type { EagleBehavior } from './eagle';
 
 // Four original eight-bar D-major phrases. Phrases, arpeggio shapes, and
@@ -12,11 +13,46 @@ const PHRASES = [
   [[43, MAJOR], [45, MAJOR], [42, MINOR], [47, MINOR], [40, MINOR], [45, MAJOR], [43, MAJOR], [50, MAJOR]],
 ] as const;
 const ARPEGGIOS = [[0, 1, 2, 1, 2, 1], [0, 2, 1, 2, 1, 0], [2, 1, 0, 1, 2, 3], [0, 1, 2, 3, 2, 1]] as const;
-const BEAT = 0.42;
-const BAR = BEAT * 6;
+const BEATS_PER_BAR = 6;
+const BIOME_KEYS = ['hills', 'woodland', 'lakeland', 'highlands', 'moor'] as const;
+const HILLS_ONLY: BiomeWeights = { hills: 1, woodland: 0, moor: 0, highlands: 0, lakeland: 0 };
 
 function frequency(midi: number): number {
   return 440 * 2 ** ((midi - 69) / 12);
+}
+
+function normalizeWeights(weights?: BiomeWeights): BiomeWeights {
+  if (!weights) return HILLS_ONLY;
+  const safe = Object.fromEntries(BIOME_KEYS.map((key) => [
+    key, Number.isFinite(weights[key]) ? Math.max(0, weights[key]) : 0,
+  ])) as BiomeWeights;
+  const total = BIOME_KEYS.reduce((sum, key) => sum + safe[key], 0);
+  if (total <= 0) return HILLS_ONLY;
+  for (const key of BIOME_KEYS) safe[key] /= total;
+  return safe;
+}
+
+type MusicFeel = {
+  beat: number;
+  register: number;
+  openMajor: number;
+  warmth: number;
+  spaciousness: number;
+  modal: number;
+  sparse: number;
+};
+
+function musicFeel(weights: BiomeWeights): MusicFeel {
+  return {
+    beat: 0.42 * weights.hills + 0.47 * weights.woodland + 0.60 * weights.lakeland
+      + 0.50 * weights.highlands + 0.56 * weights.moor,
+    register: -5 * weights.woodland - 2 * weights.lakeland - weights.moor,
+    openMajor: weights.hills,
+    warmth: weights.woodland,
+    spaciousness: weights.lakeland,
+    modal: weights.highlands,
+    sparse: weights.moor,
+  };
 }
 
 export class Soundscape {
@@ -25,6 +61,7 @@ export class Soundscape {
   private ambience: GainNode | null = null;
   private music: GainNode | null = null;
   private wind: AudioBufferSourceNode | null = null;
+  private ambienceLayers: Record<keyof BiomeWeights, GainNode> | null = null;
   private nextBar = 0;
   private bar = 0;
   private phrase = 0;
@@ -79,13 +116,16 @@ export class Soundscape {
     this.applyVolume();
   }
 
-  update(behavior: EagleBehavior, flapping: boolean): void {
+  update(behavior: EagleBehavior, flapping: boolean, biome?: BiomeWeights): void {
     if (!this.context || !this.music || this.muted) return;
     const now = this.context.currentTime;
+    const weights = normalizeWeights(biome);
+    this.updateAmbience(weights, now);
+    const feel = musicFeel(weights);
     if (now >= this.nextBar - 0.08) {
       const start = Math.max(now + 0.04, this.nextBar);
-      this.playBar(start, behavior);
-      this.nextBar = start + BAR;
+      this.playBar(start, behavior, feel);
+      this.nextBar = start + feel.beat * BEATS_PER_BAR;
       this.bar += 1;
     }
     if (!flapping) {
@@ -96,25 +136,59 @@ export class Soundscape {
     }
   }
 
-  private playBar(start: number, behavior: EagleBehavior): void {
+  private updateAmbience(weights: BiomeWeights, now: number): void {
+    if (!this.ambienceLayers) return;
+    const gust = Math.max(0, Math.sin(now * 0.22 + 0.7)) ** 2;
+    const lap = 0.5 + 0.5 * Math.sin(now * 0.42);
+    const setLayer = (biome: keyof BiomeWeights, level: number) => {
+      this.ambienceLayers![biome].gain.setTargetAtTime(level, now, 0.28);
+    };
+    // Each target follows the world's existing visual weights. The short gain ramp
+    // only removes clicks; it does not add a second biome boundary.
+    setLayer('hills', 0.075 * weights.hills * (1 - 0.55 * weights.lakeland));
+    setLayer('woodland', 0.052 * weights.woodland * (0.08 + 0.92 * gust));
+    setLayer('lakeland', 0.046 * weights.lakeland * (0.2 + 0.8 * lap));
+    setLayer('highlands', 0.04 * weights.highlands);
+    setLayer('moor', 0.042 * weights.moor * (0.7 + 0.3 * gust));
+  }
+
+  private playBar(start: number, behavior: EagleBehavior, feel: MusicFeel): void {
+    const barLength = feel.beat * BEATS_PER_BAR;
     const step = this.bar % 8;
     if (step === 0 && this.bar > 0) this.phrase = (this.phrase + 1 + Math.floor(Math.random() * (PHRASES.length - 1))) % PHRASES.length;
     const [bass, chord] = PHRASES[this.phrase]![step]!;
-    const notes = [...chord, 12].map((interval) => bass + 12 + interval);
-    this.playTone(frequency(bass), start, BAR * 0.93, 0.28, 'sine', 0.18);
+    const notes = [...chord, 12].map((interval, index) => {
+      const openVoicing = index > 0 && index < 3 ? 12 * feel.openMajor : 0;
+      return this.stylePitch(bass + 12 + interval + openVoicing, feel);
+    });
+    const root = this.stylePitch(bass, feel);
+    const spacious = 1 + 0.7 * feel.spaciousness;
+    const warmBass = 0.28 + 0.12 * feel.warmth;
+    if (Math.random() >= feel.sparse * 0.78) {
+      this.playTone(frequency(root), start, barLength * 0.93 * spacious, warmBass, 'sine', 0.18);
+    }
     for (const note of notes.slice(0, 3)) {
-      this.playTone(frequency(note), start, BAR * 0.97, 0.095, 'triangle', 0.65);
+      if (Math.random() < feel.sparse * 0.78) continue;
+      this.playTone(frequency(note), start, barLength * 0.97 * spacious, 0.095, 'triangle', 0.65);
     }
     // Thermal-riding lifts the arpeggio an octave higher; ridge-soaring a fifth higher.
     const lift = behavior === 'thermal-riding' ? 24 : behavior === 'ridge-soaring' ? 19 : 12;
     const order = ARPEGGIOS[Math.floor(Math.random() * ARPEGGIOS.length)]!;
     order.forEach((noteIndex, position) => {
-      this.playTone(frequency(notes[noteIndex]! + lift), start + position * BEAT, BEAT * 1.65, 0.13, 'sine', 0.045);
+      if (Math.random() < feel.sparse * 0.78) return;
+      this.playTone(frequency(notes[noteIndex]! + lift), start + position * feel.beat,
+        feel.beat * 1.65 * spacious, 0.13 * (1 - 0.25 * feel.sparse), 'sine', 0.045);
     });
-    if (this.bar % 2 === 1) {
+    if (this.bar % 2 === 1 && Math.random() >= feel.sparse * 0.8) {
       const answer = notes[1 + Math.floor(Math.random() * 3)]!;
-      this.playTone(frequency(answer + 12), start + BEAT * 3, BEAT * 2.3, 0.11, 'triangle', 0.12);
+      this.playTone(frequency(answer + 12), start + feel.beat * 3, feel.beat * 2.3 * spacious, 0.11, 'triangle', 0.12);
     }
+  }
+
+  private stylePitch(midi: number, feel: MusicFeel): number {
+    // Flatten the leading tone into a Mixolydian colour as Highlands gains weight.
+    const modalShift = ((Math.round(midi) % 12 + 12) % 12 === 1) ? feel.modal : 0;
+    return midi + feel.register - modalShift;
   }
 
   private playTone(frequencyHz: number, start: number, length: number, level: number, type: OscillatorType, attack: number): void {
@@ -157,13 +231,6 @@ export class Soundscape {
       ambience.connect(master);
       music.connect(master);
 
-      const windGain = context.createGain();
-      const windFilter = context.createBiquadFilter();
-      windFilter.type = 'lowpass';
-      windFilter.frequency.value = 680;
-      windGain.gain.value = 0.075;
-      windGain.connect(ambience);
-
       const length = context.sampleRate * 4;
       const buffer = context.createBuffer(1, length, context.sampleRate);
       const samples = buffer.getChannelData(0);
@@ -172,17 +239,62 @@ export class Soundscape {
         previous = previous * 0.985 + (Math.random() * 2 - 1) * 0.015;
         samples[index] = previous * 1.8;
       }
-      const wind = context.createBufferSource();
-      wind.buffer = buffer;
-      wind.loop = true;
-      wind.connect(windFilter).connect(windGain);
-      wind.start();
+
+      const makeLayer = (type: BiquadFilterType, cutoff: number, reverb = false) => {
+        const source = context.createBufferSource();
+        const filter = context.createBiquadFilter();
+        const gain = context.createGain();
+        source.buffer = buffer;
+        source.loop = true;
+        filter.type = type;
+        filter.frequency.value = cutoff;
+        gain.gain.value = 0;
+        if (reverb) {
+          const convolver = context.createConvolver();
+          const impulseLength = Math.floor(context.sampleRate * 2.8);
+          const impulse = context.createBuffer(1, impulseLength, context.sampleRate);
+          const impulseSamples = impulse.getChannelData(0);
+          for (let index = 0; index < impulseLength; index += 1) {
+            const decay = (1 - index / impulseLength) ** 3;
+            impulseSamples[index] = (Math.random() * 2 - 1) * decay * 0.07;
+          }
+          convolver.buffer = impulse;
+          convolver.normalize = false;
+          filter.connect(convolver).connect(gain);
+        } else {
+          filter.connect(gain);
+        }
+        gain.connect(ambience);
+        source.connect(filter);
+        source.start();
+        return { source, gain };
+      };
+
+      const hills = makeLayer('lowpass', 680);
+      const woodland = makeLayer('bandpass', 1700);
+      const lakeland = makeLayer('lowpass', 380);
+      const highlands = makeLayer('highpass', 1250, true);
+      const moor = makeLayer('lowpass', 1500);
+      const drone = context.createOscillator();
+      const droneLevel = context.createGain();
+      drone.type = 'sine';
+      drone.frequency.value = 73.42;
+      droneLevel.gain.value = 0.28;
+      drone.connect(droneLevel).connect(moor.gain);
+      drone.start();
 
       this.context = context;
       this.master = master;
       this.ambience = ambience;
       this.music = music;
-      this.wind = wind;
+      this.wind = hills.source;
+      this.ambienceLayers = {
+        hills: hills.gain,
+        woodland: woodland.gain,
+        lakeland: lakeland.gain,
+        highlands: highlands.gain,
+        moor: moor.gain,
+      };
       this.nextBar = context.currentTime + 0.12;
       this.applyVolume();
     } catch (error) {
