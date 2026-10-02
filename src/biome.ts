@@ -28,7 +28,7 @@ export type BiomeProfile = {
 
 // Highlands and Lakeland keep the existing landscape until their own issues supply profiles.
 export const BIOME_PROFILES = {
-  hills: { heightAmplitude: 200, heightOffset: 400, forestDensity: 0.025, treeDensity: 1, crownScale: 1,
+  hills: { heightAmplitude: 75, heightOffset: 150, forestDensity: 0.025, treeDensity: 1, crownScale: 1,
     rockBias: 0, palette: [0x6fa03c, 0x86b83f, 0xb3b04a], species: [0, 1, 0], thermalOdds: 1, scenicBonus: 0.1 },
   woodland: { heightAmplitude: 60, heightOffset: 100, forestDensity: 0.92, treeDensity: 2.5, crownScale: 1.5,
     rockBias: 0.02, palette: [0x1f5a34, 0x2e7a3e, 0x5c9443, 0x7fae45, 0x2f6b3a], species: [0.3, 0.6, 0.1], thermalOdds: 1.6, scenicBonus: 0.2 },

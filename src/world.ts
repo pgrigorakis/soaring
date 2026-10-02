@@ -217,12 +217,11 @@ export class WorldModel {
     const bare = mix(this.baseHeight(x, z), elevation, highland);
     const detail = fbm(x / 125, z / 125, this.seed + 31, 3) * 4.2 + fbm(x / 46, z / 46, this.seed + 37, 2) * 1.05;
 
-    // Blend levels across broad valley floors, including overlapping river mouths.
-    // Selecting one river abruptly leaves steps when their levels differ.
+    // The nearest channel owns the valley. A second channel blends in only near a divide,
+    // so a higher neighbor cannot lift this river onto a ridge or leave a cliff at the shore.
     type Shore = { shoreDist: number; surface: number; lake: boolean; distance: number; half: number };
     let nearest: Shore | null = null;
-    let lakeShore: Shore | null = null;
-    const shores: Shore[] = [];
+    let second: Shore | null = null;
     let wet: Shore | null = null;
     const coneOf = (shore: Shore) => {
       const distance = Math.max(0, shore.shoreDist);
@@ -237,9 +236,10 @@ export class WorldModel {
       const surface = mix(reach.aLevel, reach.bLevel, t);
       const shore: Shore = { shoreDist: distance - half, surface, lake: reach.lake, distance, half };
       if (shore.shoreDist > 1600) continue;
-      shores.push(shore);
-      if (!nearest || shore.shoreDist < nearest.shoreDist) nearest = shore;
-      if (shore.lake && (!lakeShore || shore.shoreDist < lakeShore.shoreDist)) lakeShore = shore;
+      if (!nearest || shore.shoreDist < nearest.shoreDist) {
+        second = nearest;
+        nearest = shore;
+      } else if (!second || shore.shoreDist < second.shoreDist) second = shore;
       if (shore.shoreDist <= 0 && (!wet || (shore.lake && !wet.lake) || (shore.lake === wet.lake && shore.shoreDist < wet.shoreDist))) {
         wet = shore;
       }
@@ -249,23 +249,9 @@ export class WorldModel {
     let bank = nearest?.shoreDist ?? Infinity;
     let surface = nearest?.surface ?? bare;
     if (nearest) {
-      let weightSum = 0;
-      let levelSum = 0;
-      let floorSum = 0;
-      for (const shore of shores) {
-        const weight = Math.exp(-(shore.shoreDist - nearest.shoreDist) / 96);
-        weightSum += weight;
-        levelSum += shore.surface * weight;
-        floorSum += coneOf(shore) * weight;
-      }
-      surface = levelSum / weightSum;
-      height = floorSum / weightSum;
-      // Lakes stay flat; incoming river levels approach that plane before the shore.
-      if (lakeShore) {
-        const lakeShare = 1 - smootherstep(0, 96, lakeShore.shoreDist);
-        surface = mix(surface, lakeShore.surface, lakeShare);
-        height = mix(height, coneOf(lakeShore), lakeShare);
-      }
+      const primary = coneOf(nearest);
+      const share = second ? 0.5 * (1 - smootherstep(0, 48, second.shoreDist - nearest.shoreDist)) : 0;
+      height = mix(primary, second ? coneOf(second) : primary, share);
       const land = smootherstep(mix(280, 380, highland), mix(900, 1050, highland), Math.max(0, nearest.shoreDist));
       height = mix(height, bare, land);
     }
@@ -274,17 +260,17 @@ export class WorldModel {
     if (wet) {
       river = !wet.lake;
       lake = wet.lake;
-      if (wet.lake) surface = wet.surface;
+      surface = wet.surface;
       bank = wet.shoreDist;
       const bowl = wet.lake ? 0.7 + 0.3 * (1 - wet.distance / Math.max(wet.half, 1)) : 1;
       height = surface - (wet.lake ? 3.6 : 2.7) * bowl;
     } else if (bank < SHELF && bank > 0) {
-      height = Math.max(height, surface + 2);
+      height = Math.max(height, surface + 0.85);
     }
     const detailScale = clamp01((bank - 18) / 80);
     height += detail * detailScale;
     if (wet) height = Math.min(height, surface - 1.5);
-    else if (bank < SHELF && bank > 0) height = Math.max(height, surface + 2);
+    else if (bank < SHELF && bank > 0) height = Math.max(height, surface + 0.85);
 
     let peat = 0;
     const pool = this.peatPool(x, z, biome, bank);
@@ -338,8 +324,7 @@ export class WorldModel {
     const ridges = biome.highlands > 0 ? 1 - Math.abs(fbm(x / 1550, z / 1550, this.seed + 47, 4)) : 0;
     const ridge = clamp01((ridges - 0.34) / 0.66);
     const mountains = mountainRegion * ridge * ridge * 380;
-    const hillsRelief = biome.hills > 0 ? fbm(x / 12000, z / 12000, this.seed + 7, 4) : 0;
-    const elevation = biome.hills * (BIOME_PROFILES.hills.heightOffset + hillsRelief * BIOME_PROFILES.hills.heightAmplitude)
+    const elevation = biome.hills * (BIOME_PROFILES.hills.heightOffset + broad * BIOME_PROFILES.hills.heightAmplitude)
       + biome.woodland * (BIOME_PROFILES.woodland.heightOffset + broad * BIOME_PROFILES.woodland.heightAmplitude)
       + biome.moor * (BIOME_PROFILES.moor.heightOffset + broad * BIOME_PROFILES.moor.heightAmplitude)
       + (biome.highlands + biome.lakeland) * (28 + broad * 52 + mountains);
