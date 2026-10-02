@@ -262,27 +262,35 @@ export class WorldModel {
     let nearest: Shore | null = null;
     let second: Shore | null = null;
     let wet: Shore | null = null;
-    let lakeShoreFloor = -Infinity;
     const coneOf = (shore: Shore) => {
       const distance = Math.max(0, shore.shoreDist);
       const gentle = distance * (shore.lake ? 0.05 : 0.075);
       const valley = 0.008 * distance + 0.00032 * Math.max(0, distance - 180) ** 2;
       return shore.surface + mix(gentle, valley, highland);
     };
-    for (const reach of this.reachesNear(x, z)) {
+    const shores = this.reachesNear(x, z).map((reach) => {
       const { distance, t } = reachDistance(reach, x, z);
       const wobble = reach.lake ? 1 : 1 + 0.18 * Math.sin(Math.PI * t);
       const half = mix(reach.aWidth, reach.bWidth, t) / 2 * wobble;
       const surface = mix(reach.aLevel, reach.bLevel, t);
-      const shore: Shore = { shoreDist: distance - half, surface, lake: reach.lake, distance, half,
+      return { shoreDist: distance - half, surface, lake: reach.lake, distance, half,
+        largeLake: reach.lake && half > MAX_LAKE_RADIUS,
         islandDistance: reach.islandRadius ? Math.hypot(x - reach.ax, z - reach.az) : undefined,
-        islandRadius: reach.islandRadius }; 
-      if (shore.shoreDist > 1600) continue;
-      // A large lake can own the nearest valley beside a higher tributary. Support
-      // dry ground at that tributary's lip, not at the lower lake's surface.
-      if (biome.lakeland > 0 && shore.shoreDist > 0 && shore.shoreDist < SHELF) {
-        lakeShoreFloor = Math.max(lakeShoreFloor, surface + 0.85 - Math.max(0, shore.shoreDist - 18) * 0.075);
+        islandRadius: reach.islandRadius };
+    });
+    for (const original of shores) {
+      const shore: Shore = { ...original };
+      if (original.largeLake) {
+        // Reshape lake shores around higher tributaries and neighboring lakes. The
+        // clearance grows with the level difference, leaving room for a gentle bank.
+        // Only the lake mask changes; river beds, levels and routing stay unchanged.
+        for (const other of shores) {
+          const drop = other.surface - shore.surface;
+          if (other === original || drop <= 0.3) continue;
+          shore.shoreDist = Math.max(shore.shoreDist, 150 + drop * 3 - other.shoreDist);
+        }
       }
+      if (shore.shoreDist > 1600) continue;
       if (!nearest || shore.shoreDist < nearest.shoreDist) {
         second = nearest;
         nearest = shore;
@@ -314,12 +322,12 @@ export class WorldModel {
       const bowl = wet.lake ? mix(0.08, 1, smootherstep(0, Math.max(80, wet.half * 0.35), inward)) : 1;
       height = surface - depth * bowl;
     } else if (bank < SHELF && bank > 0) {
-      height = Math.max(height, surface + 0.85, lakeShoreFloor);
+      height = Math.max(height, surface + 0.85);
     }
     const detailScale = clamp01((bank - 18) / 80);
     height += detail * detailScale;
     if (wet) height = Math.min(height, surface - 1.5);
-    else if (bank < SHELF && bank > 0) height = Math.max(height, surface + 0.85, lakeShoreFloor);
+    else if (bank < SHELF && bank > 0) height = Math.max(height, surface + 0.85);
 
     let island = false;
     if (wet?.islandRadius && wet.islandDistance! < wet.islandRadius) {
@@ -577,7 +585,9 @@ export class WorldModel {
     let bz = down.z;
     const downFlow = this.flow(down);
     if (!this.downstream(down) && downFlow >= RIVER_MIN_FLOW) {
-      const radius = this.lakeRadius(down, downFlow);
+      // Keep the accepted inlet geometry. The enlarged lake mask reshapes itself
+      // around tributaries instead of shortening their channels to zero length.
+      const radius = this.inletRadius(down, downFlow);
       const dx = down.x - node.x;
       const dz = down.z - node.z;
       const length = Math.hypot(dx, dz);
@@ -628,8 +638,11 @@ export class WorldModel {
   }
 
   private lakeRadius(node: RiverNode, flow: number): number {
-    const ordinary = mix(lakeRadius(flow), 140 + Math.min(60, Math.sqrt(flow) * 5), node.highland);
-    return mix(ordinary, 750 + 650 * clamp01(Math.sqrt(flow / 80)), node.lakeland);
+    return mix(this.inletRadius(node, flow), 750 + 650 * clamp01(Math.sqrt(flow / 80)), node.lakeland);
+  }
+
+  private inletRadius(node: RiverNode, flow: number): number {
+    return mix(lakeRadius(flow), 140 + Math.min(60, Math.sqrt(flow) * 5), node.highland);
   }
 
   private node(i: number, j: number): RiverNode {
@@ -685,7 +698,7 @@ export class WorldModel {
   private mouth(from: RiverNode, to: RiverNode): { x: number; z: number } {
     const flow = this.flow(to);
     if (!this.downstream(to) && flow >= RIVER_MIN_FLOW) {
-      const radius = this.lakeRadius(to, flow);
+      const radius = this.inletRadius(to, flow);
       const dx = to.x - from.x;
       const dz = to.z - from.z;
       const length = Math.hypot(dx, dz) || 1;
