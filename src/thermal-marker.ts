@@ -30,7 +30,7 @@ export class ThermalMarker {
   private readonly groundY: number[] = Array.from({ length: CAPACITY }, () => 0);
   private readonly shown: ThermalPlacement[] = [];
 
-  constructor(private readonly scene: THREE.Scene, private readonly world: WorldModel) {
+  constructor(private readonly scene: THREE.Object3D, private readonly world: WorldModel) {
     const geometry = new THREE.CylinderGeometry(RADIUS, RADIUS, HEIGHT, 40, 1, true);
     const material = new THREE.ShaderMaterial({
       uniforms: {

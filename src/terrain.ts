@@ -32,7 +32,7 @@ type Chunk = { group: THREE.Group; tier: Tier; descriptor: string; dispose: () =
 type Pending = { x: number; z: number; key: string; chunkSize: number; tier: Tier; trees: TreeMode; descriptor: string };
 
 export class TerrainStream {
-  private readonly scene: THREE.Scene;
+  private readonly scene: THREE.Object3D;
   private readonly world: WorldModel;
   private readonly chunks = new Map<string, Chunk>();
   private reach: number;
@@ -74,7 +74,7 @@ export class TerrainStream {
   private readonly farFoliageMaterial = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });
 
   // Reach is the horizontal distance from the camera's tile that must be loaded.
-  constructor(scene: THREE.Scene, world: WorldModel, reach = MIN_VISIBILITY) {
+  constructor(scene: THREE.Object3D, world: WorldModel, reach = MIN_VISIBILITY) {
     this.scene = scene;
     this.world = world;
     this.reach = reach;
@@ -254,6 +254,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     const step = chunkSize / segments;
     const originX = chunkX * chunkSize;
     const originZ = chunkZ * chunkSize;
+    group.position.set(originX, 0, originZ);
     const geometry = new THREE.BufferGeometry();
     const positions: number[] = [];
     const normals: number[] = [];
@@ -280,7 +281,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         const sample = sampleAt(xIndex, zIndex);
         water.push(sample.water);
         surface.push(sample.water ? sample.surface : this.dryWaterLevel(sampleAt, xIndex, zIndex));
-        positions.push(x, sample.height, z);
+        positions.push(x - originX, sample.height, z - originZ);
         normal.set(
           heightAt(xIndex - 1, zIndex) - heightAt(xIndex + 1, zIndex),
           step * 2,
@@ -357,7 +358,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
       : treeMode === 'far' ? this.createFarTrees(originX, originZ)
       : [];
     treeObjects.forEach((object) => group.add(object));
-    const rocks = this.createRocks(chunkX, chunkZ, config.rocks);
+    const rocks = this.createRocks(chunkX, chunkZ, config.rocks, originX, originZ);
     if (rocks) group.add(rocks);
 
     this.scene.add(group);
@@ -399,14 +400,16 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
       for (let ix = 0; ix < segments; ix += 1) {
         const a = iz * (segments + 1) + ix;
         const corners = [a, a + 1, a + segments + 1, a + segments + 2];
-        const x = originX + ix * step;
-        const z = originZ + iz * step;
+        const localX = ix * step;
+        const localZ = iz * step;
+        const worldX = originX + localX;
+        const worldZ = originZ + localZ;
         if (!corners.some((corner) => water[corner])) continue;
         const [y0, y1, y2, y3] = corners.map((corner) => surface[corner]! + 0.15);
         const base = positions.length / 3;
-        positions.push(x, y0!, z, x + step, y1!, z, x, y2!, z + step, x + step, y3!, z + step);
+        positions.push(localX, y0!, localZ, localX + step, y1!, localZ, localX, y2!, localZ + step, localX + step, y3!, localZ + step);
         for (const [dx, dz] of [[0, 0], [step, 0], [0, step], [step, step]]) {
-          const sample = this.world.sample(x + dx!, z + dz!);
+          const sample = this.world.sample(worldX + dx!, worldZ + dz!);
           waterColor.set(0x2a8fa8);
           if (!sample.river) waterColor.lerp(new THREE.Color(0x2a7fa0), highlandWeight(sample.mountainRegion));
           colors.push(waterColor.r, waterColor.g, waterColor.b);
@@ -429,7 +432,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     const dummy = new THREE.Object3D();
     const trunks = new THREE.InstancedMesh(this.trunkGeometry, this.trunkMaterial, trees.length);
     trees.forEach((tree, index) => {
-      dummy.position.set(tree.x, tree.y + 4.5 * tree.scale, tree.z);
+      dummy.position.set(tree.x - originX, tree.y + 4.5 * tree.scale, tree.z - originZ);
       dummy.rotation.set(0, tree.turn, 0);
       dummy.scale.setScalar(tree.scale);
       dummy.updateMatrix();
@@ -446,7 +449,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
         ? new THREE.InstancedMesh(this.crownGeometries[0]!, this.foliageMaterials[0]!, ofKind.length)
         : null;
       ofKind.forEach((tree, index) => {
-        dummy.position.set(tree.x, tree.y + (kind === 0 ? 14 : kind === 1 ? 14 : 18) * tree.scale, tree.z);
+        dummy.position.set(tree.x - originX, tree.y + (kind === 0 ? 14 : kind === 1 ? 14 : 18) * tree.scale, tree.z - originZ);
         dummy.rotation.set(0, tree.turn, 0);
         dummy.scale.set(tree.scale, tree.scale * (kind === 0 ? 1.4 : kind === 1 ? 0.83 : 2.6), tree.scale);
         dummy.updateMatrix();
@@ -482,7 +485,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     const crowns = new THREE.InstancedMesh(this.farCrownGeometry, this.farFoliageMaterial, trees.length);
     const dummy = new THREE.Object3D();
     trees.forEach((tree, index) => {
-      dummy.position.set(tree.x, tree.y + 4.5 * tree.scale, tree.z);
+      dummy.position.set(tree.x - originX, tree.y + 4.5 * tree.scale, tree.z - originZ);
       dummy.rotation.set(0, tree.turn, 0);
       dummy.scale.setScalar(tree.scale);
       dummy.updateMatrix();
@@ -501,7 +504,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     return [trunks, crowns];
   }
 
-  private createRocks(chunkX: number, chunkZ: number, attempts: number): THREE.InstancedMesh | null {
+  private createRocks(chunkX: number, chunkZ: number, attempts: number, originX: number, originZ: number): THREE.InstancedMesh | null {
     const entries: { x: number; y: number; z: number; scale: number; turn: number }[] = [];
     for (let index = 0; index < attempts * 2; index += 1) {
       const x = (chunkX + hash2(index, chunkZ * 17, this.world.seed + 367)) * CHUNK_SIZE;
@@ -515,7 +518,7 @@ float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity,
     const mesh = new THREE.InstancedMesh(this.rockGeometry, this.rockMaterial, entries.length);
     const dummy = new THREE.Object3D();
     entries.forEach((rock, index) => {
-      dummy.position.set(rock.x, rock.y + rock.scale * 1.5, rock.z);
+      dummy.position.set(rock.x - originX, rock.y + rock.scale * 1.5, rock.z - originZ);
       dummy.rotation.set(rock.turn * 0.3, rock.turn, rock.turn * 0.15);
       dummy.scale.set(rock.scale * 1.25, rock.scale * 0.7, rock.scale);
       dummy.updateMatrix();
