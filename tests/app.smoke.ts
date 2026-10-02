@@ -315,10 +315,9 @@ test('low-power mode persists, uses its work budget, and focus always caps at 30
   const previousRender = await page.evaluate(() => window.__SOARING__.snapshot().renderedFrames);
   await page.waitForFunction((frames) => window.__SOARING__.snapshot().renderedFrames > frames, previousRender);
   const enabled = await page.evaluate(() => window.__SOARING__.snapshot());
-  expect(enabled.lastChunkBuilds).toBeLessThanOrEqual(1);
   expect(enabled.lowPower).toBe(true);
   expect(enabled.frameCap).toBe(30);
-  expect(enabled.chunkBuildBudget).toBe(1);
+  expect(enabled.chunkBuildBudget).toBe(2);
   await page.keyboard.press('d');
   await expect(page.locator('#diagnostics')).toContainText('cap          30 fps');
   await expect(page.locator('#diagnostics')).toContainText('quality step');
@@ -331,7 +330,7 @@ test('low-power mode persists, uses its work budget, and focus always caps at 30
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).frameCap).toBe(30);
   await lowPower.uncheck();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1')!).lowPower)).toBe(false);
-  expect((await page.evaluate(() => window.__SOARING__.snapshot())).chunkBuildBudget).toBe(2);
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).chunkBuildBudget).toBe(4);
   expect(errors).toEqual([]);
 });
 
@@ -391,7 +390,7 @@ test('defaults terrain visibility to 5 km and streams bounded work at each LOD t
   });
   await page.evaluate(() => window.__SOARING__.setTimeScale(1));
   // Full far-field draining is covered by the unit tests; on the software-WebGL CI runner even the
-  // real per-frame build budget (2 chunks/frame) can take a while to fully drain hundreds of
+  // real per-frame time budget (4 ms/frame) can take a while to fully drain hundreds of
   // chunks, so this only waits for every tier to start populating - bounded progress, not
   // completion.
   await page.waitForFunction(() => window.__SOARING__.snapshot().tiers.far > 0, undefined, { timeout: 60_000 });

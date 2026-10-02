@@ -892,6 +892,14 @@ export class WorldModel {
 
   /** World-space grid keeps positions and density independent of chunk partitioning. */
   treesInArea(minX: number, minZ: number, size: number, spacing: number): Tree[] {
+    const build = this.buildTreesInArea(minX, minZ, size, spacing);
+    let result = build.next();
+    while (!result.done) result = build.next();
+    return result.value;
+  }
+
+  /** Same placement as treesInArea, with a scheduling boundary between lattice rows. */
+  *buildTreesInArea(minX: number, minZ: number, size: number, spacing: number): Generator<void, Tree[]> {
     const trees: Tree[] = [];
     for (let cz = Math.floor(minZ / spacing); cz <= Math.floor((minZ + size) / spacing); cz += 1) {
       for (let cx = Math.floor(minX / spacing); cx <= Math.floor((minX + size) / spacing); cx += 1) {
@@ -937,6 +945,7 @@ export class WorldModel {
           turn: hash2(cx, cz, this.seed + 361) * Math.PI * 2,
         });
       }
+      yield;
     }
     return trees;
   }

@@ -29,7 +29,7 @@ test('renders blended biome terrain with deterministic shared chunk edges', asyn
     }
     const scene = new THREE.Scene();
     const terrain = new TerrainStream(scene, first);
-    terrain.update(CHUNK_SIZE / 2, CHUNK_SIZE / 2, 25);
+    terrain.update(CHUNK_SIZE / 2, CHUNK_SIZE / 2, Infinity);
     const leftGroup = scene.getObjectByName('land 0,0');
     const rightGroup = scene.getObjectByName('land 1,0');
     const left = leftGroup.children[0].geometry;
@@ -91,7 +91,7 @@ test('renders varied farmland with physical hedgerows', async ({ page }, testInf
     }
     const scene = new THREE.Scene();
     const terrain = new TerrainStream(scene, new WorldModel(80231));
-    terrain.update(-8000, -40000, 9);
+    terrain.update(-8000, -40000, Infinity);
     let hedgeInstances = 0;
     scene.traverse((object: any) => { if (object.name === 'hedgerows') hedgeInstances += object.count; });
     terrain.dispose();

@@ -10,6 +10,7 @@ function expectLoadedWithin(scene: THREE.Scene, terrain: TerrainStream, x: numbe
   for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 90) {
     const px = x + Math.cos(angle) * (covered - 1);
     const pz = z + Math.sin(angle) * (covered - 1);
+    if (covered <= 0) return;
     const fine = scene.getObjectByName(`land ${Math.floor(px / CHUNK_SIZE)},${Math.floor(pz / CHUNK_SIZE)}`);
     const far = scene.getObjectByName(`land far ${Math.floor(px / FAR_CHUNK_SIZE)},${Math.floor(pz / FAR_CHUNK_SIZE)}`);
     expect(fine ?? far).toBeDefined();
@@ -25,18 +26,18 @@ const treeTrunks = (group: THREE.Object3D) => group.children.reduce((sum, child)
   sum + (child instanceof THREE.InstancedMesh && child.geometry.type === 'CylinderGeometry' ? child.count : 0), 0);
 
 describe('terrain streaming', () => {
-  it('builds at most two tiles per frame, nearest first, and covers the reach', () => {
+  it('streams nearest first within a time budget and covers the reach', () => {
     const scene = new THREE.Scene();
     const terrain = new TerrainStream(scene, new WorldModel(80231));
     const x = CHUNK_SIZE * 0.99;
     const z = CHUNK_SIZE * 0.99;
     terrain.update(x, z);
-    expect(terrain.chunkCount).toBe(2);
-    expect(scene.getObjectByName('land 0,0')).toBeDefined();
+    expect(terrain.pendingCount).toBeGreaterThan(0);
     expect(terrain.coveredDistance(x, z)).toBeLessThan(MIN_VISIBILITY);
     expectLoadedWithin(scene, terrain, x, z);
     while (terrain.pendingCount) terrain.update(x, z);
     expect(terrain.chunkCount).toBe(25);
+    expect(scene.children[0]?.name).toBe('land 0,0');
     expect(terrain.coveredDistance(x, z)).toBe(MIN_VISIBILITY);
     expectLoadedWithin(scene, terrain, x, z);
     terrain.dispose();
@@ -52,17 +53,12 @@ describe('terrain streaming', () => {
     terrain.update(x, z, 25);
     terrain.setReach(reach);
     expect(terrain.coveredDistance(x, z)).toBeLessThan(reach);
-    // Test-only: a larger-than-production build budget keeps this test's own
-    // bookkeeping (not real frame work) from scaling with the max reach.
-    // Real per-frame streaming still uses the default budget of 2 (see the
-    // first test above and TerrainStream.update's default parameter).
+    // Test-only: a larger millisecond budget reduces test bookkeeping.
+    // Production frames use 4 ms, or 2 ms in Low power.
     const testBuildBudget = 50;
-    let previous = terrain.chunkCount;
     let iterations = 0;
     while (terrain.pendingCount) {
       terrain.update(x, z, testBuildBudget);
-      expect(terrain.chunkCount - previous).toBeLessThanOrEqual(testBuildBudget);
-      previous = terrain.chunkCount;
       iterations += 1;
       if (iterations % 5 === 0) expectLoadedWithin(scene, terrain, x, z);
     }
@@ -113,7 +109,7 @@ describe('terrain streaming', () => {
       const z = Math.floor(index / 15) - 6;
       return { x, z, trees: world.treesInArea(x * CHUNK_SIZE, z * CHUNK_SIZE, CHUNK_SIZE, 29) };
     }).find((cell) => cell.trees.length > 8 && new Set(cell.trees.map((tree) => tree.kind)).size === 3)!;
-    terrain.update((forest.x + 0.5) * CHUNK_SIZE, (forest.z + 0.5) * CHUNK_SIZE, 1);
+    terrain.update((forest.x + 0.5) * CHUNK_SIZE, (forest.z + 0.5) * CHUNK_SIZE, Infinity);
     const chunk = scene.getObjectByName(`land ${forest.x},${forest.z}`)!;
     const trees = forest.trees;
     const instances = chunk.children.filter((child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh);
@@ -145,7 +141,7 @@ describe('terrain streaming', () => {
     const edge = (chunkX: number, x: number) => {
       const scene = new THREE.Scene();
       const terrain = new TerrainStream(scene, new WorldModel(448122));
-      terrain.update((chunkX + 0.5) * CHUNK_SIZE, (chunkZ + 0.5) * CHUNK_SIZE, 1);
+      terrain.update((chunkX + 0.5) * CHUNK_SIZE, (chunkZ + 0.5) * CHUNK_SIZE, Infinity);
       const chunk = scene.getObjectByName(`land ${chunkX},${chunkZ}`)!;
       expect(chunk.position.x).toBe(chunkX * CHUNK_SIZE);
       expect(chunk.position.z).toBe(chunkZ * CHUNK_SIZE);

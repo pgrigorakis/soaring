@@ -276,7 +276,7 @@ function applyRenderQuality(): void {
   keyLight.castShadow = shadowsEnabled;
   terrain.setReach(terrainReach());
 }
-let lastChunkBuilds = terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, settings.lowPower ? 1 : 49);
+let lastChunkBuilds = terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, settings.lowPower ? 2 : 4);
 
 let orbitYaw = 0;
 let orbitPitch = 0;
@@ -780,7 +780,7 @@ function frame(now: number): void {
   }
   camera.position.copy(cameraPosition).sub(renderOrigin);
   camera.lookAt(renderLookAt.copy(lookAt).sub(renderOrigin));
-  lastChunkBuilds = terrain.update(cameraPosition.x, cameraPosition.z, settings.lowPower ? 1 : 2);
+  lastChunkBuilds = terrain.update(cameraPosition.x, cameraPosition.z, settings.lowPower ? 2 : 4);
   updateFog();
   if (!skyPaused) skySeconds += rawDelta;
   const body = currentDaylight();
@@ -816,6 +816,8 @@ function frame(now: number): void {
       `FPS          ${fpsSmoothed.toFixed(0)}`,
       `chunks       ${terrain.chunkCount} (${terrain.pendingCount} pending)`,
       `build ms     ${terrain.buildTiming.meanMs.toFixed(2)} mean · ${terrain.buildTiming.maxMs.toFixed(2)} max`,
+      `stream ms    ${terrain.buildTiming.maxUpdateMs.toFixed(2)} update max · ${terrain.buildTiming.maxSliceMs.toFixed(2)} slice max`,
+      `buffers      ${terrain.buildTiming.allocated} allocated · ${terrain.buildTiming.reused} reused`,
       `biome        ${Object.entries(world.sample(state.x, state.z).biome).map(([name, weight]) => `${name} ${weight.toFixed(2)}`).join(' · ')}`,
       `LOD          near ${terrain.tierCounts.near} · mid ${terrain.tierCounts.mid} · far ${terrain.tierCounts.far}`,
       `visibility   ${fog.far.toFixed(0)} / ${effectiveTerrainVisibility().toFixed(0)} m`,
@@ -857,7 +859,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean };
       advanceSimulation?: (seconds: number) => void;
       reviewFlight?: (start: { x: number; z: number; heading: number } | null) => void;
       setTimeScale: (scale: number) => void;
@@ -916,7 +918,7 @@ window.__SOARING__ = {
       cameraDistance: settings.cameraDistance,
       frameCap: currentFrameCap(),
       lowPower: settings.lowPower,
-      chunkBuildBudget: settings.lowPower ? 1 : 2,
+      chunkBuildBudget: settings.lowPower ? 2 : 4,
       qualityStep,
       pixelRatio: renderer.getPixelRatio(),
       shadowsEnabled: renderer.shadowMap.enabled,

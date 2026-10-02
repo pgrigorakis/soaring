@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ChunkBuffers } from './chunk-buffers';
 import { fbm, hash2, type LandscapeSample, type Tree, WorldModel } from './world';
 
 /** Snow stays white; lighting supplies the blue shade. Steep faces remain granite. */
@@ -109,9 +110,34 @@ export class TerrainStream {
   private buildTotalMs = 0;
   private buildCount = 0;
   private buildMaxMs = 0;
+  private maxSliceMs = 0;
+  private maxUpdateMs = 0;
+  private allocated = 0;
+  private reused = 0;
+  private active: { job: Generator<void, Chunk>; cpuMs: number } | null = null;
+  private readonly free: Record<Tier, ChunkBuffers[]> = { near: [], mid: [], far: [] };
+  private readonly samples: LandscapeSample[] = [];
+  private readonly waterSamples: LandscapeSample[] = [];
+  private readonly wet = new Uint8Array(41 * 41);
+  private readonly levels = new Float64Array(41 * 41);
+  private readonly waterDepth = new Float64Array(41 * 41);
 
-  get buildTiming(): { chunks: number; meanMs: number; maxMs: number } {
-    return { chunks: this.buildCount, meanMs: this.buildTotalMs / Math.max(1, this.buildCount), maxMs: this.buildMaxMs };
+  get buildTiming() {
+    return { chunks: this.buildCount, meanMs: this.buildTotalMs / Math.max(1, this.buildCount), maxMs: this.buildMaxMs,
+      maxSliceMs: this.maxSliceMs, maxUpdateMs: this.maxUpdateMs, allocated: this.allocated, reused: this.reused };
+  }
+
+  private cancelBuild(): void {
+    this.active?.job.return(undefined as never);
+    this.active = null;
+    this.samples.length = 0;
+    this.waterSamples.length = 0;
+  }
+
+  private release(tier: Tier, buffers: ChunkBuffers): void {
+    // Two fine-grid rings fit in 64 entries. Bound retained memory after teleports/clear.
+    if (this.free[tier].length < 64) this.free[tier].push(buffers);
+    else buffers.dispose();
   }
 
   private readonly terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0 });
@@ -340,25 +366,37 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
 
   get pendingCount(): number { return this.pending.length; }
 
-  update(x: number, z: number, buildBudget = 2): number {
+  update(x: number, z: number, buildBudgetMs = 4): number {
+    const start = performance.now();
     this.rawX = x;
     this.rawZ = z;
     const centerX = Math.floor(x / CHUNK_SIZE);
     const centerZ = Math.floor(z / CHUNK_SIZE);
     if (centerX !== this.centerX || centerZ !== this.centerZ) this.recenter(centerX, centerZ);
     let built = 0;
-    for (; built < buildBudget && this.pending.length > 0; built += 1) {
-      const next = this.pending.shift()!;
-      const old = this.chunks.get(next.key);
-      const start = performance.now();
-      const chunk = this.createChunk(next);
-      const elapsed = performance.now() - start;
-      this.buildTotalMs += elapsed;
+    while (this.pending.length > 0 && performance.now() - start < buildBudgetMs) {
+      const next = this.pending[0]!;
+      this.active ??= { job: this.createChunk(next), cpuMs: 0 };
+      const sliceStart = performance.now();
+      const result = this.active.job.next();
+      const elapsed = performance.now() - sliceStart;
+      this.active.cpuMs += elapsed;
+      this.maxSliceMs = Math.max(this.maxSliceMs, elapsed);
+      if (!result.done) continue;
+      this.buildTotalMs += this.active.cpuMs;
       this.buildCount += 1;
-      this.buildMaxMs = Math.max(this.buildMaxMs, elapsed);
+      this.buildMaxMs = Math.max(this.buildMaxMs, this.active.cpuMs);
+      this.active = null;
+      this.samples.length = 0;
+      this.waterSamples.length = 0;
+      this.pending.shift();
+      const old = this.chunks.get(next.key);
       if (old) { this.scene.remove(old.group); old.dispose(); }
-      this.chunks.set(next.key, chunk);
+      this.scene.add(result.value.group);
+      this.chunks.set(next.key, result.value);
+      built += 1;
     }
+    this.maxUpdateMs = Math.max(this.maxUpdateMs, performance.now() - start);
     return built;
   }
 
@@ -366,6 +404,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     this.centerX = centerX;
     this.centerZ = centerZ;
     const needed = new Set<string>();
+    this.cancelBuild();
     this.pending = [];
 
     // Fine grid (near + mid tiers): full density near the eagle, thinning to mid density,
@@ -432,16 +471,21 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
   }
 
   clear(): void {
+    this.cancelBuild();
     for (const chunk of this.chunks.values()) {
       this.scene.remove(chunk.group);
       chunk.dispose();
     }
     this.chunks.clear();
     this.pending = [];
+    this.centerX = Number.NaN;
+    this.centerZ = Number.NaN;
   }
 
   dispose(): void {
     this.clear();
+    for (const buffers of Object.values(this.free).flat()) buffers.dispose();
+    for (const pool of Object.values(this.free)) pool.length = 0;
     this.terrainMaterial.dispose();
     this.waterMaterial.dispose();
     this.trunkMaterial.dispose();
@@ -457,7 +501,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     this.farFoliageMaterial.dispose();
   }
 
-  private createChunk({ x: chunkX, z: chunkZ, chunkSize, tier, trees: treeMode }: Pending): Chunk {
+  private *createChunk({ x: chunkX, z: chunkZ, chunkSize, tier, trees: treeMode }: Pending): Generator<void, Chunk> {
     const detailed = tier === 'near';
     const group = new THREE.Group();
     group.name = chunkSize === CHUNK_SIZE ? `land ${chunkX},${chunkZ}` : `land far ${chunkX},${chunkZ}`;
@@ -467,158 +511,170 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     const originX = chunkX * chunkSize;
     const originZ = chunkZ * chunkSize;
     group.position.set(originX, 0, originZ);
-    const geometry = new THREE.BufferGeometry();
-    const positions: number[] = [];
-    const normals: number[] = [];
-    const colors: number[] = [];
-    const indices: number[] = [];
-    const color = new THREE.Color();
-    const normal = new THREE.Vector3();
-    const row = segments + 3;
-    const samples: LandscapeSample[] = [];
-    for (let zIndex = -1; zIndex <= segments + 1; zIndex += 1) {
-      for (let xIndex = -1; xIndex <= segments + 1; xIndex += 1) {
-        samples.push(this.world.sample(originX + xIndex * step, originZ + zIndex * step));
-      }
-    }
-    const sampleAt = (xIndex: number, zIndex: number) => samples[(zIndex + 1) * row + xIndex + 1]!;
-    const heightAt = (xIndex: number, zIndex: number) => sampleAt(xIndex, zIndex).height;
-
-    const hedgeBlocks: { x: number; y: number; z: number; turn: number; weight: number }[] = [];
-
-    for (let zIndex = 0; zIndex <= segments; zIndex += 1) {
-      for (let xIndex = 0; xIndex <= segments; xIndex += 1) {
-        const x = originX + xIndex * step;
-        const z = originZ + zIndex * step;
-        const sample = sampleAt(xIndex, zIndex);
-        positions.push(x - originX, sample.height, z - originZ);
-        normal.set(
-          heightAt(xIndex - 1, zIndex) - heightAt(xIndex + 1, zIndex),
-          step * 2,
-          heightAt(xIndex, zIndex - 1) - heightAt(xIndex, zIndex + 1),
-        ).normalize();
-        normals.push(normal.x, normal.y, normal.z);
-        const slope = Math.hypot(normal.x, normal.z) / normal.y;
-        const edge = sample.fieldEdge;
-        if (detailed && edge && sample.biome.hills > 0 && !sample.water && sample.bank > 20 && slope < 0.45
-          && edge.x >= originX && edge.x < originX + chunkSize && edge.z >= originZ && edge.z < originZ + chunkSize) {
-          hedgeBlocks.push({ x: edge.x - originX, y: sample.height + 1.6 * sample.biome.hills,
-            z: edge.z - originZ, turn: edge.turn, weight: sample.biome.hills });
-        }
-        terrainColor(sample, x, z, this.world.seed, color, slope, normal.y);
-        const hueJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 311) - 0.5) * 0.03;
-        const saturationJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 312) - 0.5) * 0.12;
-        const lightnessJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 313) - 0.5) * 0.06;
-        color.offsetHSL(hueJitter, saturationJitter, lightnessJitter);
-        colors.push(color.r, color.g, color.b);
-      }
-    }
-    for (let zIndex = 0; zIndex < segments; zIndex += 1) {
-      for (let xIndex = 0; xIndex < segments; xIndex += 1) {
-        const a = zIndex * (segments + 1) + xIndex;
-        const b = a + 1;
-        const c = a + segments + 1;
-        const d = c + 1;
-        indices.push(a, c, b, b, c, d);
-      }
-    }
-    if (!detailed) {
-      // High-detail neighbors have more edge vertices. A downward skirt hides
-      // interpolation cracks without multiplying the far-field mesh density.
-      const edge = (vertices: number[], outward: boolean) => {
-        for (let i = 0; i < vertices.length; i += 1) {
-          const top = vertices[i]!;
-          const base = top * 3;
-          const bottom = positions.length / 3;
-          positions.push(positions[base]!, positions[base + 1]! - 140, positions[base + 2]!);
-          normals.push(normals[base]!, normals[base + 1]!, normals[base + 2]!);
-          colors.push(colors[base]!, colors[base + 1]!, colors[base + 2]!);
-          if (i > 0) {
-            const prev = vertices[i - 1]!;
-            const prevBottom = bottom - 1;
-            if (outward) indices.push(prev, top, prevBottom, top, bottom, prevBottom);
-            else indices.push(prev, prevBottom, top, top, prevBottom, bottom);
-          }
-        }
-      };
-      edge(Array.from({ length: segments + 1 }, (_, i) => i), true);
-      edge(Array.from({ length: segments + 1 }, (_, i) => segments * (segments + 1) + i), false);
-      edge(Array.from({ length: segments + 1 }, (_, i) => i * (segments + 1)), false);
-      edge(Array.from({ length: segments + 1 }, (_, i) => i * (segments + 1) + segments), true);
-    }
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    geometry.setIndex(indices);
-    geometry.computeBoundingSphere();
-    const terrain = new THREE.Mesh(geometry, this.terrainMaterial);
-    terrain.receiveShadow = true;
-    terrain.castShadow = true;
-    group.add(terrain);
-
-    // One world-aligned water grid across every terrain tier prevents LOD water seams.
-    const waterSegments = chunkSize / 36;
-    const waterSamples: LandscapeSample[] = [];
-    for (let iz = -1; iz <= waterSegments + 1; iz += 1) {
-      for (let ix = -1; ix <= waterSegments + 1; ix += 1) {
-        waterSamples.push(this.world.sample(originX + ix * 36, originZ + iz * 36));
-      }
-    }
-    const waterAt = (ix: number, iz: number) => waterSamples[(iz + 1) * (waterSegments + 3) + ix + 1]!;
-    const wet: boolean[] = [];
-    const levels: number[] = [];
-    const waterDepth: number[] = [];
-    for (let iz = 0; iz <= waterSegments; iz += 1) {
-      for (let ix = 0; ix <= waterSegments; ix += 1) {
-        const sample = waterAt(ix, iz);
-        const waterSurface = sample.water ? sample.surface : this.dryWaterLevel(waterAt, ix, iz);
-        wet.push(sample.water);
-        levels.push(waterSurface);
-        waterDepth.push(Math.max(0, waterSurface - sample.height));
-      }
-    }
-    const waterGeometry = this.createWaterGeometry(originX, originZ, chunkSize, waterSegments, wet, levels, waterDepth);
-    if (waterGeometry) group.add(new THREE.Mesh(waterGeometry, this.waterMaterial));
-
-    const treeObjects = treeMode === 'near' ? this.createTrees(originX, originZ, TREE_SPACING)
-      : treeMode === 'far' ? this.createFarTrees(originX, originZ)
-      : [];
-    treeObjects.forEach((object) => group.add(object));
-    const rocks = this.createRocks(chunkX, chunkZ, config.rocks, originX, originZ);
-    if (rocks) group.add(rocks);
-    const tors = detailed ? this.createTors(chunkX, chunkZ) : null;
-    if (tors) group.add(tors);
-    const hedges = hedgeBlocks.length ? new THREE.InstancedMesh(this.hedgeGeometry, this.hedgeMaterial, hedgeBlocks.length) : null;
-    if (hedges) {
-      hedges.name = 'hedgerows';
-      const dummy = new THREE.Object3D();
-      hedgeBlocks.forEach((block, index) => {
-        dummy.position.set(block.x, block.y, block.z);
-        dummy.rotation.set(0, block.turn, 0);
-        dummy.scale.set(1.3 * block.weight, 1.8 * block.weight, 7);
-        dummy.updateMatrix();
-        hedges.setMatrixAt(index, dummy.matrix);
-      });
-      hedges.instanceMatrix.needsUpdate = true;
-      hedges.castShadow = true;
-      hedges.receiveShadow = true;
-      group.add(hedges);
-    }
-
-    this.scene.add(group);
-    return {
-      group,
-      tier,
-      descriptor: `${tier}:${treeMode}`,
-      dispose: () => {
-        geometry.dispose();
-        waterGeometry?.dispose();
-        treeObjects.forEach((object) => object.dispose());
-        rocks?.dispose();
-        tors?.dispose();
-        hedges?.dispose();
-      },
+    let buffers = this.free[tier].pop();
+    if (buffers) this.reused += 1;
+    else { buffers = new ChunkBuffers(segments, chunkSize / 36, !detailed); this.allocated += 1; }
+    const owned = buffers;
+    let complete = false;
+    const release = () => {
+      group.traverse((object) => { if (object instanceof THREE.InstancedMesh) object.dispose(); });
+      this.release(tier, owned);
     };
+    try {
+      const geometry = buffers.geometry;
+      const { positions, normals, colors, indices } = buffers;
+      let vertex = 0;
+      let indexCount = 0;
+      const color = new THREE.Color();
+      const normal = new THREE.Vector3();
+      const row = segments + 3;
+      const samples = this.samples;
+      for (let zIndex = -1; zIndex <= segments + 1; zIndex += 1) {
+        for (let xIndex = -1; xIndex <= segments + 1; xIndex += 1) {
+          samples.push(this.world.sample(originX + xIndex * step, originZ + zIndex * step));
+          if ((xIndex + 1) % 8 === 0) yield;
+        }
+      }
+      const sampleAt = (xIndex: number, zIndex: number) => samples[(zIndex + 1) * row + xIndex + 1]!;
+      const heightAt = (xIndex: number, zIndex: number) => sampleAt(xIndex, zIndex).height;
+
+      const hedgeBlocks: { x: number; y: number; z: number; turn: number; weight: number }[] = [];
+
+      for (let zIndex = 0; zIndex <= segments; zIndex += 1) {
+        for (let xIndex = 0; xIndex <= segments; xIndex += 1) {
+          const x = originX + xIndex * step;
+          const z = originZ + zIndex * step;
+          const sample = sampleAt(xIndex, zIndex);
+          const base = vertex++ * 3;
+          positions[base] = x - originX; positions[base + 1] = sample.height; positions[base + 2] = z - originZ;
+          normal.set(
+            heightAt(xIndex - 1, zIndex) - heightAt(xIndex + 1, zIndex),
+            step * 2,
+            heightAt(xIndex, zIndex - 1) - heightAt(xIndex, zIndex + 1),
+          ).normalize();
+          normals[base] = normal.x; normals[base + 1] = normal.y; normals[base + 2] = normal.z;
+          const slope = Math.hypot(normal.x, normal.z) / normal.y;
+          const edge = sample.fieldEdge;
+          if (detailed && edge && sample.biome.hills > 0 && !sample.water && sample.bank > 20 && slope < 0.45
+            && edge.x >= originX && edge.x < originX + chunkSize && edge.z >= originZ && edge.z < originZ + chunkSize) {
+            hedgeBlocks.push({
+              x: edge.x - originX, y: sample.height + 1.6 * sample.biome.hills,
+              z: edge.z - originZ, turn: edge.turn, weight: sample.biome.hills
+            });
+          }
+          terrainColor(sample, x, z, this.world.seed, color, slope, normal.y);
+          const hueJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 311) - 0.5) * 0.03;
+          const saturationJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 312) - 0.5) * 0.12;
+          const lightnessJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 313) - 0.5) * 0.06;
+          color.offsetHSL(hueJitter, saturationJitter, lightnessJitter);
+          colors[base] = color.r; colors[base + 1] = color.g; colors[base + 2] = color.b;
+          if (xIndex % 8 === 0) yield;
+        }
+      }
+      for (let zIndex = 0; zIndex < segments; zIndex += 1) {
+        for (let xIndex = 0; xIndex < segments; xIndex += 1) {
+          const a = zIndex * (segments + 1) + xIndex;
+          const b = a + 1;
+          const c = a + segments + 1;
+          const d = c + 1;
+          indices[indexCount++] = a; indices[indexCount++] = c; indices[indexCount++] = b;
+          indices[indexCount++] = b; indices[indexCount++] = c; indices[indexCount++] = d;
+        }
+      }
+      if (!detailed) {
+        // High-detail neighbors have more edge vertices. A downward skirt hides
+        // interpolation cracks without multiplying the far-field mesh density.
+        const edge = (vertices: number[], outward: boolean) => {
+          for (let i = 0; i < vertices.length; i += 1) {
+            const top = vertices[i]!;
+            const base = top * 3;
+            const bottom = vertex++;
+            const dst = bottom * 3;
+            positions[dst] = positions[base]!; positions[dst + 1] = positions[base + 1]! - 140; positions[dst + 2] = positions[base + 2]!;
+            for (let j = 0; j < 3; j += 1) { normals[dst + j] = normals[base + j]!; colors[dst + j] = colors[base + j]!; }
+            if (i > 0) {
+              const prev = vertices[i - 1]!;
+              const prevBottom = bottom - 1;
+              indices[indexCount++] = prev;
+              indices[indexCount++] = outward ? top : prevBottom;
+              indices[indexCount++] = outward ? prevBottom : top;
+              indices[indexCount++] = top;
+              indices[indexCount++] = outward ? bottom : prevBottom;
+              indices[indexCount++] = outward ? prevBottom : bottom;
+            }
+          }
+        };
+        edge(Array.from({ length: segments + 1 }, (_, i) => i), true);
+        edge(Array.from({ length: segments + 1 }, (_, i) => segments * (segments + 1) + i), false);
+        edge(Array.from({ length: segments + 1 }, (_, i) => i * (segments + 1)), false);
+        edge(Array.from({ length: segments + 1 }, (_, i) => i * (segments + 1) + segments), true);
+      }
+      for (const attribute of Object.values(geometry.attributes)) attribute.needsUpdate = true;
+      geometry.index!.needsUpdate = true;
+      geometry.computeBoundingSphere();
+      yield;
+      const terrain = new THREE.Mesh(geometry, this.terrainMaterial);
+      terrain.receiveShadow = true;
+      terrain.castShadow = true;
+      group.add(terrain);
+
+      // One world-aligned water grid across every terrain tier prevents LOD water seams.
+      const waterSegments = chunkSize / 36;
+      const waterSamples = this.waterSamples;
+      for (let iz = -1; iz <= waterSegments + 1; iz += 1) {
+        for (let ix = -1; ix <= waterSegments + 1; ix += 1) {
+          waterSamples.push(this.world.sample(originX + ix * 36, originZ + iz * 36));
+          if ((ix + 1) % 8 === 0) yield;
+        }
+      }
+      const waterAt = (ix: number, iz: number) => waterSamples[(iz + 1) * (waterSegments + 3) + ix + 1]!;
+      const { wet, levels, waterDepth } = this;
+      let waterVertex = 0;
+      for (let iz = 0; iz <= waterSegments; iz += 1) {
+        for (let ix = 0; ix <= waterSegments; ix += 1) {
+          const sample = waterAt(ix, iz);
+          const waterSurface = sample.water ? sample.surface : this.dryWaterLevel(waterAt, ix, iz);
+          wet[waterVertex] = Number(sample.water);
+          levels[waterVertex] = waterSurface;
+          waterDepth[waterVertex++] = Math.max(0, waterSurface - sample.height);
+          if (ix % 8 === 0) yield;
+        }
+      }
+      const waterGeometry = yield* this.createWaterGeometry(originX, originZ, chunkSize, waterSegments, wet, levels, waterDepth, buffers);
+      if (waterGeometry) group.add(new THREE.Mesh(waterGeometry, this.waterMaterial));
+
+      const treeObjects = treeMode === 'near' ? yield* this.createTrees(originX, originZ, TREE_SPACING)
+        : treeMode === 'far' ? yield* this.createFarTrees(originX, originZ)
+          : [];
+      treeObjects.forEach((object) => group.add(object));
+      const rocks = this.createRocks(chunkX, chunkZ, config.rocks, originX, originZ);
+      if (rocks) group.add(rocks);
+      const tors = detailed ? this.createTors(chunkX, chunkZ) : null;
+      if (tors) group.add(tors);
+      const hedges = hedgeBlocks.length ? new THREE.InstancedMesh(this.hedgeGeometry, this.hedgeMaterial, hedgeBlocks.length) : null;
+      if (hedges) {
+        hedges.name = 'hedgerows';
+        const dummy = new THREE.Object3D();
+        hedgeBlocks.forEach((block, index) => {
+          dummy.position.set(block.x, block.y, block.z);
+          dummy.rotation.set(0, block.turn, 0);
+          dummy.scale.set(1.3 * block.weight, 1.8 * block.weight, 7);
+          dummy.updateMatrix();
+          hedges.setMatrixAt(index, dummy.matrix);
+        });
+        hedges.instanceMatrix.needsUpdate = true;
+        hedges.castShadow = true;
+        hedges.receiveShadow = true;
+        group.add(hedges);
+      }
+
+      complete = true;
+      return { group, tier, descriptor: `${tier}:${treeMode}`, dispose: release };
+    } finally {
+      this.samples.length = 0;
+      this.waterSamples.length = 0;
+      if (!complete) release();
+    }
   }
 
   // A dry vertex at a water edge takes its wet neighbors' level, so river and lake edges stay flat.
@@ -639,12 +695,15 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     return Math.min(count > 0 ? sum / count : dry.surface, dry.height - 0.15);
   }
 
-  private createWaterGeometry(originX: number, originZ: number, chunkSize: number, segments: number, water: boolean[], surface: number[], waterDepth: number[]): THREE.BufferGeometry | null {
+  private *createWaterGeometry(originX: number, originZ: number, chunkSize: number, segments: number, water: Uint8Array, surface: Float64Array, waterDepth: Float64Array, buffers: ChunkBuffers): Generator<void, THREE.BufferGeometry | null> {
     const step = chunkSize / segments;
-    const positions: number[] = [];
-    const depths: number[] = [];
-    const colors: number[] = [];
-    const indices: number[] = [];
+    const positions = buffers.waterPositions;
+    const depths = buffers.depths;
+    const colors = buffers.waterColors;
+    const indices = buffers.waterIndices;
+    let vertex = 0;
+    let indexCount = 0;
+    indices.fill(0);
     const waterColor = new THREE.Color();
     for (let iz = 0; iz < segments; iz += 1) {
       for (let ix = 0; ix < segments; ix += 1) {
@@ -656,10 +715,16 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
         const worldZ = originZ + localZ;
         if (!corners.some((corner) => water[corner])) continue;
         const [y0, y1, y2, y3] = corners.map((corner) => surface[corner]! + 0.15);
-        const base = positions.length / 3;
-        positions.push(localX, y0!, localZ, localX + step, y1!, localZ, localX, y2!, localZ + step, localX + step, y3!, localZ + step);
-        depths.push(waterDepth[corners[0]!]!, waterDepth[corners[1]!]!, waterDepth[corners[2]!]!, waterDepth[corners[3]!]!);
-        for (const [dx, dz] of [[0, 0], [step, 0], [0, step], [step, step]]) {
+        const base = vertex;
+        const offset = base * 3;
+        positions[offset] = localX; positions[offset + 1] = y0!; positions[offset + 2] = localZ;
+        positions[offset + 3] = localX + step; positions[offset + 4] = y1!; positions[offset + 5] = localZ;
+        positions[offset + 6] = localX; positions[offset + 7] = y2!; positions[offset + 8] = localZ + step;
+        positions[offset + 9] = localX + step; positions[offset + 10] = y3!; positions[offset + 11] = localZ + step;
+        for (let corner = 0; corner < 4; corner += 1) {
+          const dx = corner % 2 * step;
+          const dz = Math.floor(corner / 2) * step;
+          depths[vertex] = waterDepth[corners[corner]!]!;
           const sample = this.world.sample(worldX + dx!, worldZ + dz!);
           waterColor.set(0x2a8fa8);
           if (!sample.river) {
@@ -668,23 +733,31 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
             waterColor.lerp(scratch, sample.biome.lakeland);
           }
           if (sample.peat > 0) waterColor.set(0x2e4a4a);
-          colors.push(waterColor.r, waterColor.g, waterColor.b);
+          colors[vertex * 3] = waterColor.r; colors[vertex * 3 + 1] = waterColor.g; colors[vertex * 3 + 2] = waterColor.b;
+          vertex += 1;
         }
-        indices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
+        indices[indexCount++] = base; indices[indexCount++] = base + 2; indices[indexCount++] = base + 1;
+        indices[indexCount++] = base + 1; indices[indexCount++] = base + 2; indices[indexCount++] = base + 3;
+        yield;
       }
     }
-    if (positions.length === 0) return null;
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('waterDepth', new THREE.Float32BufferAttribute(depths, 1));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    geometry.setIndex(indices);
+    if (vertex === 0) return null;
+    const geometry = buffers.water;
+    geometry.setDrawRange(0, indexCount);
+    for (const attribute of Object.values(geometry.attributes)) {
+      // Three.js stores count as mutable metadata; the backing GPU capacity stays fixed.
+      Object.defineProperty(attribute, 'count', { value: vertex });
+      attribute.needsUpdate = true;
+    }
+    geometry.index!.needsUpdate = true;
     geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    yield;
     return geometry;
   }
 
-  private createTrees(originX: number, originZ: number, spacing: number): THREE.InstancedMesh[] {
-    const trees = this.world.treesInArea(originX, originZ, CHUNK_SIZE, spacing);
+  private *createTrees(originX: number, originZ: number, spacing: number): Generator<void, THREE.InstancedMesh[]> {
+    const trees = yield* this.world.buildTreesInArea(originX, originZ, CHUNK_SIZE, spacing);
     if (trees.length === 0) return [];
     const dummy = new THREE.Object3D();
     const trunks = new THREE.InstancedMesh(this.trunkGeometry, this.trunkMaterial, trees.length);
@@ -734,8 +807,8 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     return meshes;
   }
 
-  private createFarTrees(originX: number, originZ: number): THREE.InstancedMesh[] {
-    const trees = this.world.treesInArea(originX, originZ, CHUNK_SIZE, TREE_SPACING);
+  private *createFarTrees(originX: number, originZ: number): Generator<void, THREE.InstancedMesh[]> {
+    const trees = yield* this.world.buildTreesInArea(originX, originZ, CHUNK_SIZE, TREE_SPACING);
     if (trees.length === 0) return [];
     const trunks = new THREE.InstancedMesh(this.trunkGeometry, this.trunkMaterial, trees.length);
     const crowns = new THREE.InstancedMesh(this.farCrownGeometry, this.farFoliageMaterial, trees.length);
