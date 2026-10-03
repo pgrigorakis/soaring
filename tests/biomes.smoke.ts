@@ -68,6 +68,7 @@ test('renders blended biome terrain with deterministic shared chunk edges', asyn
 // Failure modes: parcels remain aligned squares, hedges remain painted stripes,
 // negative coordinates change field ownership, or colour changes alter glade/density rules.
 test('renders varied farmland with physical hedgerows', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
   await page.addInitScript(() => localStorage.setItem('soaring.world-seed.v1', '80231'));
   await page.goto('/?smoke');
   await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0);

@@ -1,0 +1,38 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 tests/chunk-budget.smoke.ts:4:1 › retains valid partial terrain work across a center change (419ms)
+
+
+  1) tests/chunk-budget.smoke.ts:4:1 › retains valid partial terrain work across a center change ───
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      23 |   });
+      24 |   await info.attach('retained-work', { body: JSON.stringify(evidence), contentType: 'application/json' });
+    > 25 |   expect(evidence.retained).toBe(true);
+         |                             ^
+      26 |   expect(evidence.pending).toBeGreaterThan(0);
+      27 | });
+      28 |
+        at /Users/pgrigorakis/.treehouse/soaring-b45a19/4/soaring/tests/chunk-budget.smoke.ts:25:29
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chunk-budget.smoke.ts-reta-3893b-work-across-a-center-change/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chunk-budget.smoke.ts-reta-3893b-work-across-a-center-change/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chunk-budget.smoke.ts-reta-3893b-work-across-a-center-change/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chunk-budget.smoke.ts-reta-3893b-work-across-a-center-change/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/chunk-budget.smoke.ts:4:1 › retains valid partial terrain work across a center change ────

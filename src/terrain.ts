@@ -114,7 +114,7 @@ export class TerrainStream {
   private maxUpdateMs = 0;
   private allocated = 0;
   private reused = 0;
-  private active: { job: Generator<void, Chunk>; cpuMs: number } | null = null;
+  private active: { tile: Pending; job: Generator<void, Chunk>; cpuMs: number } | null = null;
   private readonly free: Record<Tier, ChunkBuffers[]> = { near: [], mid: [], far: [] };
   private readonly samples: LandscapeSample[] = [];
   private readonly waterSamples: LandscapeSample[] = [];
@@ -375,8 +375,9 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     if (centerX !== this.centerX || centerZ !== this.centerZ) this.recenter(centerX, centerZ);
     let built = 0;
     while (this.pending.length > 0 && performance.now() - start < buildBudgetMs) {
-      const next = this.pending[0]!;
-      this.active ??= { job: this.createChunk(next), cpuMs: 0 };
+      // Finish already-started work if recenter still needs it. New jobs remain nearest first.
+      const next = this.active?.tile ?? this.pending[0]!;
+      this.active ??= { tile: next, job: this.createChunk(next), cpuMs: 0 };
       const sliceStart = performance.now();
       const result = this.active.job.next();
       const elapsed = performance.now() - sliceStart;
@@ -389,7 +390,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       this.active = null;
       this.samples.length = 0;
       this.waterSamples.length = 0;
-      this.pending.shift();
+      this.pending.splice(this.pending.findIndex((tile) => tile.key === next.key), 1);
       const old = this.chunks.get(next.key);
       if (old) { this.scene.remove(old.group); old.dispose(); }
       this.scene.add(result.value.group);
@@ -404,7 +405,6 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     this.centerX = centerX;
     this.centerZ = centerZ;
     const needed = new Set<string>();
-    this.cancelBuild();
     this.pending = [];
 
     // Fine grid (near + mid tiers): full density near the eagle, thinning to mid density,
@@ -461,6 +461,10 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     this.pending.sort((a, b) =>
       Math.hypot(a.x * a.chunkSize - centerX * CHUNK_SIZE, a.z * a.chunkSize - centerZ * CHUNK_SIZE)
       - Math.hypot(b.x * b.chunkSize - centerX * CHUNK_SIZE, b.z * b.chunkSize - centerZ * CHUNK_SIZE));
+
+    const active = this.active;
+    if (active && !this.pending.some((tile) => tile.key === active.tile.key
+      && tile.descriptor === active.tile.descriptor)) this.cancelBuild();
 
     for (const [key, chunk] of this.chunks) {
       if (needed.has(key)) continue;

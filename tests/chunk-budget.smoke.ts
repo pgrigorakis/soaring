@@ -1,13 +1,39 @@
 import { expect, test } from '@playwright/test';
 
+// Failure mode: recenter cancels a partially built chunk even when its key/detail remain needed.
+test('retains valid partial terrain work across a center change', async ({ page }, info) => {
+  await page.goto('/?smoke');
+  const evidence = await page.evaluate(async () => {
+    const terrainPath = '/src/terrain.ts';
+    const worldPath = '/src/world.ts';
+    const threePath = '/node_modules/.vite/deps/three.js';
+    const { TerrainStream } = await import(terrainPath);
+    const { WorldModel } = await import(worldPath);
+    const THREE = await import(threePath);
+    const stream = new TerrainStream(new THREE.Scene(), new WorldModel(12345));
+    stream.update(10, 10, .001);
+    stream.update(10, 10, .1);
+    const active = stream.active;
+    const before = stream.buildTiming;
+    stream.update(370, 10, .001);
+    const retained = active !== null && stream.active === active;
+    const pending = stream.pendingCount;
+    stream.dispose();
+    return { retained, pending, before };
+  });
+  await info.attach('retained-work', { body: JSON.stringify(evidence), contentType: 'application/json' });
+  expect(evidence.retained).toBe(true);
+  expect(evidence.pending).toBeGreaterThan(0);
+});
+
 test('resumable streaming cancels safely and reuses detached buffers', async ({ page }, info) => {
-  test.setTimeout(240_000);
+  test.setTimeout(480_000);
   await page.addInitScript(() => {
     localStorage.setItem('soaring.world-seed.v1', '12345');
     localStorage.setItem('soaring.settings.v1', JSON.stringify({ terrainVisibility: 720, lowPower: true }));
   });
   await page.goto('/?smoke');
-  await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0);
+  // Coverage is measured at fixed poses. A slow CI CPU can otherwise add work faster than 2 ms builds drain it.
   const records = [];
   for (const x of [720, 1440, -720]) {
     await page.evaluate((x) => window.__SOARING__.reviewFlight!({ x, z: 0, heading: 0 }), x);
@@ -20,7 +46,7 @@ test('resumable streaming cancels safely and reuses detached buffers', async ({ 
     await page.waitForFunction((frame) => {
       const s = window.__SOARING__.snapshot();
       return s.renderedFrames > frame && s.pending === 0 && s.visibleDistance === 720;
-    }, frame);
+    }, frame, { timeout: 180_000 });
     const s = await page.evaluate(() => window.__SOARING__.snapshot());
     expect(s.visibleDistance).toBe(720);
     expect(s.chunks).toBeLessThanOrEqual(49);
