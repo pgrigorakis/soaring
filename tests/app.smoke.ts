@@ -1,10 +1,11 @@
 import { writeFile } from 'node:fs/promises';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type CDPSession, type Page } from '@playwright/test';
 
 type TestWindow = Window & {
   __trackedAudioContext?: AudioContext;
   __setPageVisibility?: (state: 'hidden' | 'visible') => void;
   __visibilityCapture?: { completed: boolean; snapshot: ReturnType<typeof window.__SOARING__.snapshot> | null };
+  __hideResize?: boolean;
 };
 
 // Record frame starvation independently of the simulation's clamped clock.
@@ -122,6 +123,123 @@ test('renders high-detail terrain, streams, and supports camera controls', async
   await page.mouse.up();
   expect(errors).toEqual([]);
 });
+
+test('caps normal rendering at two million pixels through viewport and DPR changes', async ({ page }) => {
+  test.setTimeout(45_000);
+  await preparePixelBudgetPage(page, '/?profile');
+  const cdp = await page.context().newCDPSession(page);
+  await setPixelBudgetLowPower(page, false);
+  await setPixelBudgetMetrics(page, cdp, 1000, 700, 2);
+  let measured = await readPixelBudgetMetrics(page);
+  expect(measured.css).toEqual([1000, 700]);
+  expect(measured.lowPower).toBe(false);
+  expect(measured.ratio).toBeLessThanOrEqual(1.5);
+  expectRenderWithinPixelBudget(measured);
+
+  await setPixelBudgetMetrics(page, cdp, 1512, 982, 2);
+  measured = await readPixelBudgetMetrics(page);
+  expect(measured.css).toEqual([1512, 982]);
+  const ratioLimit = Math.sqrt(2_000_000 / (measured.css[0]! * measured.css[1]!));
+  expect(measured.lowPower).toBe(false);
+  expect(measured.ratio).toBeLessThanOrEqual(Math.min(1.5, ratioLimit));
+  expectRenderWithinPixelBudget(measured);
+
+  const retinaRatio = await page.evaluate(() => window.__SOARING__.snapshot().pixelRatio);
+  await setPixelBudgetMetrics(page, cdp, 1512, 982, 1, false);
+  await page.waitForFunction((previous) => window.__SOARING__.snapshot().pixelRatio < previous, retinaRatio);
+  measured = await readPixelBudgetMetrics(page);
+  expect(measured.css).toEqual([1512, 982]);
+  expect(measured.ratio).toBeLessThanOrEqual(1);
+  expectRenderWithinPixelBudget(measured);
+  await cdp.detach();
+});
+
+test('caps Low power rendering during DPR and large viewport changes', async ({ page }) => {
+  test.setTimeout(45_000);
+  await preparePixelBudgetPage(page);
+  const cdp = await page.context().newCDPSession(page);
+  await setPixelBudgetMetrics(page, cdp, 1512, 982, 2);
+
+  let measured = await readPixelBudgetMetrics(page);
+  expect(measured.css).toEqual([1512, 982]);
+  expect(measured.lowPower).toBe(true);
+  expect(measured.ratio).toBe(1);
+  expectRenderWithinPixelBudget(measured);
+
+  await setPixelBudgetMetrics(page, cdp, 1600, 1400, 2);
+  measured = await readPixelBudgetMetrics(page);
+  expect(measured.css).toEqual([1600, 1400]);
+  expect(measured.lowPower).toBe(true);
+  expect(measured.ratio).toBeLessThanOrEqual(Math.min(1, Math.sqrt(2_000_000 / (measured.css[0]! * measured.css[1]!))));
+  expectRenderWithinPixelBudget(measured);
+  await cdp.detach();
+});
+
+test('keeps smoke rendering at its reduced ratio within the pixel budget', async ({ page }) => {
+  test.setTimeout(45_000);
+  await preparePixelBudgetPage(page, '/?smoke');
+
+  const measured = await readPixelBudgetMetrics(page);
+  expect(measured.ratio).toBe(0.25);
+  expectRenderWithinPixelBudget(measured);
+});
+
+async function preparePixelBudgetPage(page: Page, path = '/'): Promise<void> {
+  await page.setViewportSize({ width: 1000, height: 700 });
+  await page.addInitScript(() => {
+    addEventListener('resize', (event) => {
+      if ((window as TestWindow).__hideResize) event.stopImmediatePropagation();
+    });
+    localStorage.setItem('soaring.world-seed.v1', '123456789');
+    localStorage.setItem('soaring.scenic-visit.v1', '0');
+    localStorage.setItem('soaring.settings.v1', JSON.stringify({
+      ambienceVolume: 0.52, musicVolume: 0.52, muted: true, lowPower: true,
+      cameraDistance: 100, terrainVisibility: 720, showThermal: true, minFlightHeight: 45, maxFlightHeight: 180,
+    }));
+  });
+  await page.goto(path);
+  await expect(page.locator('canvas')).toBeVisible();
+}
+
+async function setPixelBudgetLowPower(page: Page, enabled: boolean): Promise<void> {
+  await page.evaluate((lowPower) => {
+    const input = document.querySelector<HTMLInputElement>('#low-power')!;
+    if (!lowPower && !input.checked) throw new Error('Expected Low power during light-weight startup');
+    input.checked = lowPower;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, enabled);
+  await page.waitForFunction((lowPower) => window.__SOARING__.snapshot().lowPower === lowPower, enabled);
+}
+
+async function setPixelBudgetMetrics(page: Page, cdp: CDPSession, width: number, height: number, deviceScaleFactor: number, dispatchResize = true): Promise<void> {
+  // Chromium may send a native resize with a DPR-only change; hide it so only the matchMedia watcher can react.
+  if (!dispatchResize) await page.evaluate(() => { (window as TestWindow).__hideResize = true; });
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile: false });
+  await page.waitForFunction(({ expectedWidth, expectedHeight, expectedDpr }) =>
+    window.innerWidth === expectedWidth && window.innerHeight === expectedHeight && devicePixelRatio === expectedDpr,
+  { expectedWidth: width, expectedHeight: height, expectedDpr: deviceScaleFactor });
+  // Chromium changes DPR through emulation without sending the native resize event.
+  if (dispatchResize) await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  // Chromium can skip the matchMedia change for an emulated DPR-only change; a media
+  // emulation update makes it re-evaluate media queries without a resize.
+  else await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
+}
+
+async function readPixelBudgetMetrics(page: Page) {
+  return page.evaluate(() => {
+    const canvas = document.querySelector('canvas')!;
+    const snapshot = window.__SOARING__.snapshot();
+    return { css: [innerWidth, innerHeight], render: [canvas.width, canvas.height],
+      pixels: canvas.width * canvas.height, ratio: snapshot.pixelRatio, lowPower: snapshot.lowPower,
+      diagnosticRender: [snapshot.renderWidth, snapshot.renderHeight], diagnosticPixels: snapshot.renderPixels };
+  });
+}
+
+function expectRenderWithinPixelBudget(measured: Awaited<ReturnType<typeof readPixelBudgetMetrics>>): void {
+  expect(measured.pixels).toBeLessThanOrEqual(2_000_000);
+  expect(measured.diagnosticRender).toEqual(measured.render);
+  expect(measured.diagnosticPixels).toBe(measured.pixels);
+}
 
 async function advanceToThermal(page: Page): Promise<void> {
   // Exercise the real navigator in the same bounded steps as the frame loop. The old
