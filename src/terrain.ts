@@ -19,8 +19,8 @@ const lakeMeadow = new THREE.Color(0x6fa03c);
 const lakeBeach = new THREE.Color(0xe3cd8b);
 const lakeReeds = new THREE.Color(0x9fb65a);
 const lakeCliff = new THREE.Color(0x8a8174);
-const shallowWater = new THREE.Color(0x3fb0b8);
-const deepWater = new THREE.Color(0x1d5e8a);
+const shallowWater = new THREE.Color(0x78b4a3);
+const deepWater = new THREE.Color(0x2b6c73);
 const graniteGround = new THREE.Color(0x857e72);
 const peatGround = new THREE.Color(0x2e4a4a);
 const hedgeGround = new THREE.Color(0x2e6b34);
@@ -148,8 +148,8 @@ export class TerrainStream {
   private readonly waterSparkle = { value: 0 };
   private readonly waterTime = { value: 0 };
   private readonly waterPatternOffset = { value: new THREE.Vector2() };
-  private readonly waterDeepColor = { value: new THREE.Color(0x1d5e8a) };
-  private readonly waterShallowColor = { value: new THREE.Color(0x3fb0b8) };
+  private readonly waterDeepColor = { value: new THREE.Color(0x2b6c73) };
+  private readonly waterShallowColor = { value: new THREE.Color(0x78b4a3) };
   private readonly waterMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     vertexColors: true,
