@@ -4,7 +4,7 @@
 
 Normal streaming receives 4 ms per update; Low power receives 2 ms. Startup uses the same budget. A generator yields between eight terrain samples/vertices, eight water samples/levels, individual wet water cells, and tree-placement lattice rows. Geometry completion and instance construction remain short indivisible steps. This is a cooperative CPU budget, not a hard real-time guarantee. A slow world sample, garbage collection, or GPU upload can still exceed it.
 
-Only a completed group enters the scene. Its queue entry remains present until publication, so haze cannot cross unfinished terrain. Recenter and clear cancel the generator before replacing the queue. Its `finally` releases detached buffers and instances. An old displayed chunk stays visible during a tier upgrade. Removed/replaced chunks return buffers only after scene removal.
+Only a completed group enters the scene. Its queue entry remains present until publication, so haze cannot cross unfinished terrain. Recenter keeps a started build when its key and detail remain desired, so slow devices do not lose progress at each tile boundary. It cancels obsolete work; clear cancels all work. The generator's `finally` releases detached buffers and instances. An old displayed chunk stays visible during a tier upgrade. Removed/replaced chunks return buffers only after scene removal.
 
 Each buffer pair owns fixed-capacity typed terrain and water arrays, attributes, indices, and geometry for one detail tier. Water uses draw range and active attribute counts without reallocating its arrays. Free lists retain at most 64 pairs per tier, enough for ordinary ring churn without retaining an entire cleared world. Teleports and large tier changes can still allocate. World samples and vegetation objects still allocate; shared species pools are issue 101 and are not included here. Sampling, water levels, palette, triangle winding, skirts, and world-aligned edges remain unchanged.
 
@@ -47,6 +47,18 @@ See `evidence/chunk-budget-flight.json` and `evidence/chunk-budget-after.png`. R
 - Haze shortened to loaded terrain, ending at **1659 m**, with **328 pending** at 8× flight speed.
 
 This is four simulated minutes, not an hour-long browser soak. It demonstrates reuse and bounded retained free lists, not zero lifetime allocation or full 5 km coverage at accelerated speed. No changes to world-cache limits or navigation were made.
+
+## CI repair and final reconciliation
+
+The first CI run failed five coverage waits under one-worker software WebGL. A SwiftShader browser with 4× CPU throttling reproduced moving queues that added work faster than the fixed CPU budget could drain them. A new browser regression first failed on valid-build cancellation across a center change. The repair retains that active generator if its key and descriptor still match the desired queue. New work remains nearest first; completed work is removed by key rather than by queue position.
+
+Coverage tests now hold their measurement poses, retain every coverage/resource assertion, and allow software-WebGL deadlines appropriate to the unchanged 4/2 ms budgets. The flight/control test still advances the real navigator before checking the new pose. The thermal fixture uses seed 80231 and visit 0 on both loads instead of depending on a random route reaching a thermal within 300 simulated seconds.
+
+The upstream fog test also raced a continuous sampler: a new read can start before a poll observes `readPending === false`. A development-only completion record captures revision, phase, count, target/color and failures at actual successful completion. The test checks current-revision completion and visible color convergence separately. Its rapid-change case holds a real GPU fence until the revision changes, then verifies the obsolete read was discarded. Zero synchronous reads, actual async reads, no failures and color differences remain asserted. Production sampling behavior is unchanged. The reusable fog repair is commit `2b934bd52c51740bbe9ace0adfc4b3961d36918e`.
+
+The final validation reconciled main `4947104`, including async fog, sky order, profiling tools, documentation restructuring and unsigned edge-seed checks. All **27 smoke tests passed** in a one-worker SwiftShader browser using `playwright.chunk-ci.config.ts` on private port 4186. `npm run check` also passed. The earlier five failed coverage tests and the new retained-work regression all passed. The software renderer reported `ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)`.
+
+Final normal-rendering measurements used the same 1440×900 viewport, seed 12345, held 720→1440 m camera move, 5 km setting, pixel ratio 1 and quality step 0. See `evidence/chunk-budget-reconciled-after.json`. They recorded **60.2 FPS**, 16.8 ms maximum/p95 gap, **14.36/66.8 ms** lifetime mean/max chunk CPU, **1.0 ms** maximum step and **4.7 ms** maximum update. At ten seconds, 172 builds had completed and one remained pending; haze was correctly limited to 4853 m. The remaining build then completed and restored 605 loaded chunks and full 5000 m coverage. The final run includes upstream rendering improvements, so it must not be attributed to terrain streaming alone. The earlier controlled comparison remains the terrain-only evidence.
 
 ## Validation
 

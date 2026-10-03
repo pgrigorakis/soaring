@@ -1,0 +1,20 @@
+{
+  "position": [
+    720,
+    273.5237477866384,
+    0
+  ],
+  "chunks": 605,
+  "pending": 0,
+  "visibleDistance": 5000,
+  "requestedDistance": 5000,
+  "buildTiming": {
+    "chunks": 794,
+    "meanMs": 14.38060453489085,
+    "maxMs": 66.79999989271164,
+    "maxSliceMs": 1,
+    "maxUpdateMs": 4.699999988079071,
+    "allocated": 627,
+    "reused": 168
+  }
+}

@@ -21,6 +21,8 @@ The real-browser smoke tests run against the development server in Chromium. CI 
 
 The development-only `?smoke` URL loads the real scene, shaders, terrain budgets, and controls with a 0.25 pixel ratio and no shadows. It draws the scene once every four animation frames. Simulation, camera easing, and streaming continue on every frame. Only this mode exposes `window.__SOARING__.advanceSimulation(seconds)`, which advances up to 300 seconds in bounded navigation steps. Smoke tests use it for flight assertions instead of waiting on wall time. CI checks bounded progress instead of waiting for a full max-visibility load. Sky captures wait for `snapshot().renderedFrames` to advance.
 
+Terrain streaming uses a 4 ms CPU budget per update, or 2 ms in Low power. Partial builds remain invisible. Diagnostics report maximum step/update time and allocated/reused buffer pairs. Coverage checks hold their camera pose so a slow software renderer does not add work faster than this budget can drain it. `playwright.chunk-ci.config.ts` reproduces one-worker SwiftShader rendering on a private port.
+
 Development builds also expose `reviewFlight({ x, z, heading })` to freeze navigation at a repeatable start with the default chase camera. Call `reviewFlight(null)` to resume flight. Use `window.__SOARING__.setTimeScale(n)` in the browser console for accelerated resource and stability checks. The scale is capped at 12×; simulation advances in bounded 0.1-second steps, and slow rendering can reduce effective simulation speed.
 
 Relevant browser checks include:
