@@ -5,6 +5,7 @@ type TestWindow = Window & {
   __trackedAudioContext?: AudioContext;
   __setPageVisibility?: (state: 'hidden' | 'visible') => void;
   __visibilityCapture?: { completed: boolean; snapshot: ReturnType<typeof window.__SOARING__.snapshot> | null };
+  __hideResize?: boolean;
 };
 
 // Record frame starvation independently of the simulation's clamped clock.
@@ -186,6 +187,9 @@ test('keeps smoke rendering at its reduced ratio within the pixel budget', async
 async function preparePixelBudgetPage(page: Page, path = '/'): Promise<void> {
   await page.setViewportSize({ width: 1000, height: 700 });
   await page.addInitScript(() => {
+    addEventListener('resize', (event) => {
+      if ((window as TestWindow).__hideResize) event.stopImmediatePropagation();
+    });
     localStorage.setItem('soaring.world-seed.v1', '123456789');
     localStorage.setItem('soaring.scenic-visit.v1', '0');
     localStorage.setItem('soaring.settings.v1', JSON.stringify({
@@ -208,12 +212,17 @@ async function setPixelBudgetLowPower(page: Page, enabled: boolean): Promise<voi
 }
 
 async function setPixelBudgetMetrics(page: Page, cdp: CDPSession, width: number, height: number, deviceScaleFactor: number, dispatchResize = true): Promise<void> {
+  // Chromium may send a native resize with a DPR-only change; hide it so only the matchMedia watcher can react.
+  if (!dispatchResize) await page.evaluate(() => { (window as TestWindow).__hideResize = true; });
   await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile: false });
   await page.waitForFunction(({ expectedWidth, expectedHeight, expectedDpr }) =>
     window.innerWidth === expectedWidth && window.innerHeight === expectedHeight && devicePixelRatio === expectedDpr,
   { expectedWidth: width, expectedHeight: height, expectedDpr: deviceScaleFactor });
   // Chromium changes DPR through emulation without sending the native resize event.
   if (dispatchResize) await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  // Chromium can skip the matchMedia change for an emulated DPR-only change; a media
+  // emulation update makes it re-evaluate media queries without a resize.
+  else await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
 }
 
 async function readPixelBudgetMetrics(page: Page) {
