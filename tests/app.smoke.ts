@@ -296,12 +296,67 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   });
   // A single render frame must ease toward the new height, not teleport to it.
   expect(Math.abs(firstFrame.cameraHeight - firstFrame.startingHeight)).toBeLessThan(12);
-  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraHeight > 48);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraHeight > 15);
   const farCamera = await page.evaluate(() => window.__SOARING__.snapshot());
   expect(farCamera.cameraDistance).toBe(100);
-  expect(farCamera.cameraHeight).toBeGreaterThan(48);
-  expect(farCamera.cameraHeight).toBeLessThan(62);
+  expect(farCamera.cameraHeight).toBeGreaterThan(15);
+  expect(farCamera.cameraHeight).toBeLessThan(24);
   expect(snapshot.chunks + snapshot.pending).toBeLessThan(700);
+  expect(errors).toEqual([]);
+});
+
+test('mouse wheel zooms the camera and stays in sync with the slider', async ({ page }) => {
+  const errors = captureErrors(page);
+  await page.goto('/?smoke');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('Canvas has no layout box');
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+  await page.mouse.wheel(0, -2000);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 10);
+  await expect(page.locator('#distance')).toHaveValue('10');
+  await expect(page.locator('#distance-value')).toHaveText('10 m');
+  await page.mouse.wheel(0, 300);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance > 12);
+  await page.waitForTimeout(1000);
+  const zoomed = await page.evaluate(() => window.__SOARING__.snapshot().cameraDistance);
+  expect(zoomed).toBeGreaterThan(12);
+  expect(zoomed).toBeLessThan(100);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1') ?? '{}').cameraDistance)).toBe(zoomed);
+  await page.mouse.wheel(0, 20_000);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 100);
+  expect(errors).toEqual([]);
+});
+
+test('a dragged camera angle stays until a double-click resets it, and a drag never resets', async ({ page }) => {
+  const errors = captureErrors(page);
+  await page.goto('/?smoke');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('Canvas has no layout box');
+  const x = box.x + box.width * 0.5;
+  const y = box.y + box.height * 0.5;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 200, y - 60, { steps: 8 });
+  await page.mouse.up();
+  const dragged = await page.evaluate(() => window.__SOARING__.snapshot());
+  expect(Math.abs(dragged.orbitYaw)).toBeGreaterThan(0.5);
+  expect(dragged.orbitPitch).toBeLessThan(0);
+  // Two quick clicks right after a drag count as a drag, not a reset.
+  await page.mouse.dblclick(x, y);
+  await page.waitForTimeout(1500);
+  const held = await page.evaluate(() => window.__SOARING__.snapshot());
+  expect(held.orbitYaw).toBeCloseTo(dragged.orbitYaw, 5);
+  expect(held.orbitPitch).toBeCloseTo(dragged.orbitPitch, 5);
+  // A double-click with no drag in the pair resets smoothly.
+  await page.waitForTimeout(700);
+  await page.mouse.dblclick(x, y);
+  const mid = await page.evaluate(() => window.__SOARING__.snapshot().orbitYaw);
+  expect(Math.abs(mid)).toBeGreaterThan(0);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().orbitYaw === 0 && window.__SOARING__.snapshot().orbitPitch === 0);
   expect(errors).toEqual([]);
 });
 
