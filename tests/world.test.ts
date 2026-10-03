@@ -11,6 +11,17 @@ function channelPoint(reach: Reach, t: number): { x: number; z: number } {
 }
 
 describe('deterministic world generation', () => {
+  it.each([0, 4294967295])('keeps unsigned edge seed %i deterministic across world data', (seed) => {
+    const first = new WorldModel(seed);
+    const second = new WorldModel(seed);
+    expect(first.seed).toBe(seed);
+    const point = first.sample(-12_503.4, 9_921.7);
+    expect(point).toEqual(second.sample(-12_503.4, 9_921.7));
+    expect(Number.isFinite(point.height)).toBe(true);
+    expect(first.thermalAtCell(-2, 7)).toEqual(second.thermalAtCell(-2, 7));
+    expect(first.reachesNear(900, -1400)).toEqual(second.reachesNear(900, -1400));
+  });
+
   it('returns identical terrain and thermals for a seed', () => {
     const first = new WorldModel(seedFromText('highland-river'));
     const second = new WorldModel(seedFromText('highland-river'));
