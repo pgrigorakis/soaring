@@ -17,13 +17,21 @@ function expectLoadedWithin(scene: THREE.Scene, terrain: TerrainStream, x: numbe
   }
 }
 
-function instances(group: THREE.Object3D, geometry: abstract new (...args: never[]) => THREE.BufferGeometry): number {
-  return group.children.reduce((sum, child) =>
-    sum + (child instanceof THREE.InstancedMesh && child.geometry instanceof geometry ? child.count : 0), 0);
+/** World positions of a shared pool's live instances inside one fine tile. */
+function pooled(scene: THREE.Object3D, name: string, tile: THREE.Object3D): THREE.Vector3[] {
+  const pool = scene.getObjectByName(name) as THREE.InstancedMesh;
+  const matrix = new THREE.Matrix4();
+  const positions: THREE.Vector3[] = [];
+  for (let index = 0; index < pool.count; index += 1) {
+    pool.getMatrixAt(index, matrix);
+    if (matrix.determinant() === 0) continue;
+    const position = new THREE.Vector3().setFromMatrixPosition(matrix).add(pool.position);
+    if (position.x >= tile.position.x && position.x < tile.position.x + CHUNK_SIZE
+      && position.z >= tile.position.z && position.z < tile.position.z + CHUNK_SIZE) positions.push(position);
+  }
+  return positions;
 }
-const treeCrowns = (group: THREE.Object3D) => instances(group, THREE.IcosahedronGeometry);
-const treeTrunks = (group: THREE.Object3D) => group.children.reduce((sum, child) =>
-  sum + (child instanceof THREE.InstancedMesh && child.geometry.type === 'CylinderGeometry' ? child.count : 0), 0);
+const treeTrunks = (scene: THREE.Object3D, tile: THREE.Object3D) => pooled(scene, 'tree trunks', tile).length;
 
 describe('terrain streaming', () => {
   it('streams nearest first within a time budget and covers the reach', () => {
@@ -37,7 +45,7 @@ describe('terrain streaming', () => {
     expectLoadedWithin(scene, terrain, x, z);
     while (terrain.pendingCount) terrain.update(x, z);
     expect(terrain.chunkCount).toBe(25);
-    expect(scene.children[0]?.name).toBe('land 0,0');
+    expect(scene.children.find((child) => child.name.startsWith('land'))?.name).toBe('land 0,0');
     expect(terrain.coveredDistance(x, z)).toBe(MIN_VISIBILITY);
     expectLoadedWithin(scene, terrain, x, z);
     terrain.dispose();
@@ -89,14 +97,17 @@ describe('terrain streaming', () => {
     terrain.update((spot.x + 0.5) * CHUNK_SIZE, (spot.z + 0.5) * CHUNK_SIZE, Infinity);
     const far = scene.getObjectByName(`land ${spot.x + 5},${spot.z}`)!;
     expect(far).toBeDefined();
-    const farTrees = treeCrowns(far);
-    expect(treeTrunks(far)).toBe(farTrees);
-    far.traverse((object) => { if (object instanceof THREE.Mesh && !object.material.transparent) expect(object.castShadow).toBe(true); });
+    const farTrees = pooled(scene, 'mid tree crowns', far).length;
+    expect(farTrees).toBeGreaterThan(5);
+    expect(treeTrunks(scene, far)).toBe(farTrees);
+    for (const root of [far, scene.getObjectByName('tree trunks')!, scene.getObjectByName('mid tree crowns')!]) {
+      root.traverse((object) => { if (object instanceof THREE.Mesh && !object.material.transparent) expect(object.castShadow).toBe(true); });
+    }
     const name = far.name;
     terrain.update((spot.x + 1.5) * CHUNK_SIZE, (spot.z + 0.5) * CHUNK_SIZE, Infinity);
     const detailed = scene.getObjectByName(name)!;
     expect(detailed).not.toBe(far);
-    expect(treeTrunks(detailed)).toBe(farTrees);
+    expect(treeTrunks(scene, detailed)).toBe(farTrees);
     terrain.dispose();
   }, 20_000);
 
