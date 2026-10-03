@@ -186,7 +186,7 @@ export class TerrainStream {
   private readonly torGeometry = new THREE.BoxGeometry(6, 3.2, 5);
   private readonly hedgeGeometry = new THREE.DodecahedronGeometry(1, 0);
   private readonly hedgeMaterial = new THREE.MeshStandardMaterial({ color: 0x2e6b34, roughness: 1, flatShading: true });
-  // Distant trees keep the near placement, trunks, and colors with two draw calls per tile.
+  // Distant trees keep the near placement, trunks, and colors with a simpler crown.
   private readonly farCrownGeometry = new THREE.IcosahedronGeometry(5.4, 0);
   private readonly farFoliageMaterial = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });
   // One draw call per tree shape for the whole ring, not one per tile. Mid-tier trees start beyond
