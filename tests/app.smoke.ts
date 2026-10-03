@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type CDPSession, type Page } from '@playwright/test';
 
 type TestWindow = Window & {
   __trackedAudioContext?: AudioContext;
@@ -126,40 +126,50 @@ test('renders high-detail terrain, streams, and supports camera controls', async
 test('caps normal rendering at two million pixels through viewport and DPR changes', async ({ page }) => {
   test.setTimeout(45_000);
   await preparePixelBudgetPage(page);
+  const cdp = await page.context().newCDPSession(page);
   await setPixelBudgetLowPower(page, false);
-  await setPixelBudgetMetrics(page, 1000, 700, 2);
+  await setPixelBudgetMetrics(page, cdp, 1000, 700, 2);
   let measured = await readPixelBudgetMetrics(page);
-  expect(measured.ratio).toBe(1.5);
+  expect(measured.css).toEqual([1000, 700]);
+  expect(measured.lowPower).toBe(false);
+  expect(measured.ratio).toBeLessThanOrEqual(1.5);
   expectRenderWithinPixelBudget(measured);
 
-  await setPixelBudgetMetrics(page, 1512, 982, 2);
+  await setPixelBudgetMetrics(page, cdp, 1512, 982, 2);
   measured = await readPixelBudgetMetrics(page);
+  expect(measured.css).toEqual([1512, 982]);
   const ratioLimit = Math.sqrt(2_000_000 / (measured.css[0]! * measured.css[1]!));
   expect(measured.lowPower).toBe(false);
   expect(measured.ratio).toBeLessThanOrEqual(Math.min(1.5, ratioLimit));
   expectRenderWithinPixelBudget(measured);
 
-  await setPixelBudgetMetrics(page, 1512, 982, 1);
+  await setPixelBudgetMetrics(page, cdp, 1512, 982, 1);
   measured = await readPixelBudgetMetrics(page);
+  expect(measured.css).toEqual([1512, 982]);
   expect(measured.ratio).toBeLessThanOrEqual(1);
   expectRenderWithinPixelBudget(measured);
+  await cdp.detach();
 });
 
 test('caps Low power rendering during DPR and large viewport changes', async ({ page }) => {
   test.setTimeout(45_000);
   await preparePixelBudgetPage(page);
-  await setPixelBudgetMetrics(page, 1512, 982, 2);
+  const cdp = await page.context().newCDPSession(page);
+  await setPixelBudgetMetrics(page, cdp, 1512, 982, 2);
 
   let measured = await readPixelBudgetMetrics(page);
+  expect(measured.css).toEqual([1512, 982]);
   expect(measured.lowPower).toBe(true);
   expect(measured.ratio).toBe(1);
   expectRenderWithinPixelBudget(measured);
 
-  await setPixelBudgetMetrics(page, 1600, 1400, 2);
+  await setPixelBudgetMetrics(page, cdp, 1600, 1400, 2);
   measured = await readPixelBudgetMetrics(page);
+  expect(measured.css).toEqual([1600, 1400]);
   expect(measured.lowPower).toBe(true);
-  expect(measured.ratio).toBeLessThanOrEqual(Math.min(1, Math.sqrt(2_000_000 / (1600 * 1400))));
+  expect(measured.ratio).toBeLessThanOrEqual(Math.min(1, Math.sqrt(2_000_000 / (measured.css[0]! * measured.css[1]!))));
   expectRenderWithinPixelBudget(measured);
+  await cdp.detach();
 });
 
 test('keeps smoke rendering at its reduced ratio within the pixel budget', async ({ page }) => {
@@ -195,15 +205,13 @@ async function setPixelBudgetLowPower(page: Page, enabled: boolean): Promise<voi
   await page.waitForFunction((lowPower) => window.__SOARING__.snapshot().lowPower === lowPower, enabled);
 }
 
-async function setPixelBudgetMetrics(page: Page, width: number, height: number, deviceScaleFactor: number): Promise<void> {
-  const cdp = await page.context().newCDPSession(page);
+async function setPixelBudgetMetrics(page: Page, cdp: CDPSession, width: number, height: number, deviceScaleFactor: number): Promise<void> {
   await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile: false });
   await page.waitForFunction(({ expectedWidth, expectedHeight, expectedDpr }) =>
     window.innerWidth === expectedWidth && window.innerHeight === expectedHeight && devicePixelRatio === expectedDpr,
   { expectedWidth: width, expectedHeight: height, expectedDpr: deviceScaleFactor });
   // Chromium changes DPR through emulation without sending the native resize event.
   await page.evaluate(() => window.dispatchEvent(new Event('resize')));
-  await cdp.detach();
 }
 
 async function readPixelBudgetMetrics(page: Page) {
