@@ -80,7 +80,7 @@ function pixelRatioForStep(step = qualityStep): number {
   if (smokeMode) return 0.25;
   const budgetRatio = Math.sqrt(MAX_RENDER_PIXELS / (innerWidth * innerHeight));
   if (settings.lowPower) return Math.min(1.0, budgetRatio);
-  return Math.min(devicePixelRatio, MAX_PIXEL_RATIO,
+  return Math.min(devicePixelRatio,
     QUALITY_PIXEL_RATIOS[Math.min(step, QUALITY_PIXEL_RATIOS.length - 1)]!, budgetRatio);
 }
 const world = new WorldModel(loadSeed());
