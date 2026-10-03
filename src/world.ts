@@ -244,7 +244,7 @@ export class WorldModel {
   private readonly nearbyReaches = new Map<number, Reach[]>();
 
   constructor(seed: number) {
-    this.seed = seed | 0;
+    this.seed = seed >>> 0;
   }
 
   /** Drop the least-recently-used entries from each cache until it meets the cap. */

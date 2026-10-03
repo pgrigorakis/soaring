@@ -43,8 +43,8 @@ describe('autonomous eagle navigation', () => {
     expect(closeRetargets).toBe(0);
   });
 
-  it('keeps a persistent route and bounded world caches during a one-hour navigation flight', () => {
-    const world = new WorldModel(448122);
+  it.each([448122, 0, 4294967295])('keeps a safe persistent route and bounded world caches for seed %i during a one-hour flight', (seed) => {
+    const world = new WorldModel(seed);
     const navigator = new EagleNavigator(world, world.scenicStart(2));
     const start = { x: navigator.state.x, z: navigator.state.z };
     const routeSamples = [{ time: 0, ...start }];
