@@ -17,7 +17,9 @@ test('renders a long valley lake with a wooded island, beach and seamless water 
     const { TerrainStream } = await import(terrainPath);
     const THREE = await import(threePath);
     const world = new WorldModel(448122);
-    const x = 7647.127558763605, z = -11252.509786414448;
+    // A long Lakeland lake with an island. The previous landmark was a drainage
+    // basin of the old height field; #85 moves those basins.
+    const x = 7267.07754781004, z = -250.06799930008128;
     const lake = world.reachesNear(x, z).find((r: any) => r.ax === x && r.az === z && r.lake);
     const scene = new THREE.Scene();
     const terrain = new TerrainStream(scene, world);
@@ -30,7 +32,7 @@ test('renders a long valley lake with a wooded island, beach and seamless water 
       chunks.push(chunk);
       return chunk.group;
     };
-    const far = make(5, -8, 1440, 'far');
+    const far = make(5, -1, 1440, 'far');
     const edge = (group: any, localX: number) => {
       const result = new Map();
       const mesh = group.children.find((m: any) => m.material?.transparent);
@@ -50,7 +52,7 @@ test('renders a long valley lake with a wooded island, beach and seamless water 
     };
     let seamError = 0, sharedVertices = 0;
     const farEdge = edge(far, 0);
-    for (let row = -32; row < -28; row++) {
+    for (let row = -3; row < 1; row++) {
       const mid = make(19, row, 360, 'mid');
       const near = make(20, row, 360, 'near');
       const left = edge(mid, 360), right = edge(near, 0);
@@ -69,7 +71,11 @@ test('renders a long valley lake with a wooded island, beach and seamless water 
     });
     // Main's accepted shore-following behavior must use the new ellipse outline.
     const shoreTargets = Array.from({ length: 32 }, (_, index) => lakeShorePoint(lake, index * Math.PI / 16, 60));
-    const dryShoreTargets = shoreTargets.every((point: any) => !world.sample(point.x, point.z).water);
+    // A river inlet may cross the outward ring. The lake outline itself must be dry.
+    const dryShoreTargets = shoreTargets.every((point: any) => {
+      const sample = world.sample(point.x, point.z);
+      return !sample.water || sample.river;
+    });
     const minorPoint = lakeShorePoint(lake, lake.heading + Math.PI / 2);
     const minorRadius = Math.hypot(minorPoint.x - x, minorPoint.z - z);
     const thermals = world.nearbyThermals(x, z, 3);
@@ -81,7 +87,7 @@ test('renders a long valley lake with a wooded island, beach and seamless water 
     chunks.forEach((chunk) => chunk.dispose());
     terrain.dispose();
     window.__SOARING__.setTimeOfDay(.5);
-    window.__SOARING__.setViewpoint({ x: x - 1100, y: 630, z: z + 1300, lookX: x, lookY: 85, lookZ: z });
+    window.__SOARING__.setViewpoint({ x: x - 1100, y: lake.aLevel + 540, z: z + 1300, lookX: x, lookY: lake.aLevel, lookZ: z });
     return { seed: world.seed, lake, seamError, sharedVertices, islandTrees: islandTrees.length, waterRing: ring.filter(Boolean).length, dryThermals, landmarkWater, dryShoreTargets, minorRadius };
   });
   expect(evidence.sharedVertices).toBeGreaterThan(10);
