@@ -21,7 +21,9 @@ const OPTIONS = { url: '', smoke: true, frames: 12, warmupFrames: 4, seed: 5 };
 test.describe.configure({ mode: 'serial' });
 
 test('two runs of one build report identical draw calls and triangles at five held vantages', async ({ browser, baseURL }, testInfo) => {
-  test.setTimeout(240_000);
+  // Ten full terrain loads on CI's software renderer. Main took 2.7 to 3.9 minutes on shared runners
+  // (runs 37125342464 and 37125352898), so 4 minutes left no headroom.
+  test.setTimeout(360_000);
   const options = { ...OPTIONS, url: baseURL! };
   const first = await runBenchRound(browser, options);
   const second = await runBenchRound(browser, options);

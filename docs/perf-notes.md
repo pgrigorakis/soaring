@@ -9,7 +9,7 @@ This ledger records how Soaring measures render cost and every result. Add new r
 - **Frame interval**: the gap between `requestAnimationFrame` timestamps. This is cadence and latency. It includes idle time, so it is pinned to the display refresh (16.7 ms at 60 Hz) whenever the frame fits the budget.
 - **Main-thread work**: time inside the frame callback, including render command submission. It excludes GPU execution and idle waiting. "CPU busy" is the sum of work divided by the sum of frame intervals.
 - **GPU time**: `EXT_disjoint_timer_query_webgl2` around `renderer.render`, polled on later frames. Results after a disjoint event or with an invalid value are discarded and counted. If the browser lacks the extension, GPU columns read `n/a`, never zero. "GPU busy" is mean GPU time times rendered frames, divided by the sum of frame intervals.
-- **Draw calls and triangles**: `renderer.info.render` read right after the main render, so shadow passes are included.
+- **Draw calls and triangles**: `renderer.info.render` read right after the main render. three.js resets these counts after the shadow pass, so they cover the main pass only.
 
 Because the frame interval is vsync-bound, read headroom from work and GPU time, not from frame-interval percentiles. A frame interval above the refresh period means a missed frame.
 
@@ -79,3 +79,26 @@ Observations:
 - Frame intervals sit at the 60 Hz refresh at every vantage. GPU time (about 5.5 to 9 ms) is the larger share of the frame budget, ahead of main-thread work (about 2.5 to 3.6 ms).
 - The river run at golden hour is the heaviest view: 533k triangles and the highest GPU time.
 - This is one machine. Treat the numbers as a reference for this machine only.
+
+## Result 1: shared tree and water pools (#101)
+
+Command: `BENCH_BUILDS=base=…,pools=… BENCH_ROUNDS=3 BENCH_FRAMES=300 BENCH_WARMUP=60 BENCH_DPR=2 npm run bench`, interleaved.
+
+- Base `aba0e81` (main) against the pooled branch, on the Baseline 1 machine, browser, viewport, seed and visibility
+- Artifact: `docs/perf/issue-101-pools.json` (all rounds) and `.md`
+
+| vantage | calls before | calls after | triangles before | triangles after | work p50 before | work p50 after |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| lake-noon | 300 | 173 | 188062 | 370710 | 2.00 | 1.20 |
+| confluence-noon | 412 | 182 | 245050 | 521886 | 2.80 | 1.20 |
+| river-run-golden-hour | 475 | 170 | 533342 | 1246626 | 3.30 | 1.20 |
+| network-noon | 438 | 178 | 263446 | 513566 | 3.00 | 1.20 |
+| origin-night | 391 | 179 | 221244 | 384196 | 2.50 | 1.20 |
+
+Observations:
+
+- Each tree shape and all water draw once for the whole ring. Main-thread work fell by 0.8 to 2.1 ms.
+- Triangles rose because a pool cannot be frustum culled: trees outside the view are still submitted.
+- GPU p50 did not change consistently. On this machine it is bimodal (about 3.5 ms or about 6 ms) between rounds of the same build, so it cannot resolve a change of this size.
+- Step measurements, one round each: mid-tier trees alone gave 262 to 371 calls; adding near-tier trees gave 251 to 288; adding water gave the table above.
+- Picture parity against the base build stayed at the same-build noise floor at all five vantages; the changed pixels are water ripples, wing flaps and the thermal marker pulse.

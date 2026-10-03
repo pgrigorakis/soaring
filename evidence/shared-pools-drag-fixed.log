@@ -1,0 +1,41 @@
+
+Running 1 test using 1 worker
+
+[1/1] tests/tmp-throttle.smoke.ts:75:1 › a dragged camera angle stays until a double-click resets it, and a drag never resets
+  1) tests/tmp-throttle.smoke.ts:75:1 › a dragged camera angle stays until a double-click resets it, and a drag never resets 
+
+    Error: expect(received).toBeCloseTo(expected, precision)
+
+    Expected: -1
+    Received: 0
+
+    Expected precision:    5
+    Expected difference: < 0.000005
+    Received difference:   1
+
+      109 |   await page.waitForTimeout(1500);
+      110 |   const held = await page.evaluate(() => window.__SOARING__.snapshot());
+    > 111 |   expect(held.orbitYaw).toBeCloseTo(dragged.orbitYaw, 5);
+          |                         ^
+      112 |   expect(held.orbitPitch).toBeCloseTo(dragged.orbitPitch, 5);
+      113 |   // A double-click with no drag in the pair resets smoothly.
+      114 |   await page.waitForTimeout(700);
+        at /Users/pgrigorakis/.treehouse/soaring-b45a19/2/soaring/tests/tmp-throttle.smoke.ts:111:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/tmp-throttle.smoke.ts-a-dr-f8d6a--it-and-a-drag-never-resets/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/tmp-throttle.smoke.ts-a-dr-f8d6a--it-and-a-drag-never-resets/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/tmp-throttle.smoke.ts-a-dr-f8d6a--it-and-a-drag-never-resets/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/tmp-throttle.smoke.ts-a-dr-f8d6a--it-and-a-drag-never-resets/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  1 failed
+    tests/tmp-throttle.smoke.ts:75:1 › a dragged camera angle stays until a double-click resets it, and a drag never resets 
