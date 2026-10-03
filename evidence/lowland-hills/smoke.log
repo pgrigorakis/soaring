@@ -1,0 +1,40 @@
+
+> soaring-wilderness@0.1.0 test:smoke
+> playwright test
+
+
+Running 31 tests using 6 workers
+
+  ✓   2 tests/chunk-budget.smoke.ts:4:1 › retains valid partial terrain work across a center change (1.6s)
+  ✓   5 tests/biomes.smoke.ts:6:1 › renders blended biome terrain with deterministic shared chunk edges (5.2s)
+  ✓   3 tests/highlands.smoke.ts:12:1 › one hour through Highlands keeps clearance and climb behavior safe (6.9s)
+  ✓   6 tests/app.smoke.ts:75:1 › renders high-detail terrain, streams, and supports camera controls (10.1s)
+  ✓  10 tests/app.smoke.ts:159:1 › rebases render coordinates while navigation stays in world coordinates (849ms)
+  ✓   4 tests/highlands-cover.smoke.ts:5:1 › Highlands snow caps remain visible from the default chase camera (11.5s)
+  ✓  11 tests/app.smoke.ts:179:1 › tracks the active thermal and persists the visibility setting (1.6s)
+  ✓  13 tests/app.smoke.ts:211:1 › persists safe local-terrain height bounds across reloads (937ms)
+  ✓   8 tests/biomes.smoke.ts:70:1 › renders varied farmland with physical hedgerows (9.3s)
+  ✓  15 tests/picture-diff.smoke.ts:11:1 › picture diff reports exact changed-pixel statistics (1ms)
+  ✓  16 tests/picture-diff.smoke.ts:21:1 › picture diff refuses dimensions and environment mismatches (2ms)
+  ✓   9 tests/lakeland.smoke.ts:5:1 › renders a long valley lake with a wooded island, beach and seamless water tiers (7.9s)
+  ✓   1 tests/fog-readback.smoke.ts:11:1 › samples horizon fog asynchronously at fixed sky phases (20.4s)
+  ✓  14 tests/app.smoke.ts:233:1 › visibility and camera distance persist independently (7.6s)
+  ✓  17 tests/app.smoke.ts:308:1 › mouse wheel zooms the camera and stays in sync with the slider (3.4s)
+  ✓   7 tests/chunk-budget.smoke.ts:29:1 › resumable streaming cancels safely and reuses detached buffers (26.6s)
+  ✓  18 tests/app.smoke.ts:332:1 › a dragged camera angle stays until a double-click resets it, and a drag never resets (4.6s)
+  ✓  19 tests/app.smoke.ts:363:1 › low-power mode persists, uses its work budget, and focus always caps at 30 fps (11.5s)
+  ✓  20 tests/app.smoke.ts:410:1 › fullscreen toggle and F keep the idle scene clear while settings and diagnostics still work (5.2s)
+  ✓  21 tests/app.smoke.ts:445:1 › defaults terrain visibility to 5 km and streams bounded work at each LOD tier out to the 5 km max (8.4s)
+  ✓  22 tests/app.smoke.ts:487:1 › settings stay scrollable within short desktop and mobile viewports (707ms)
+  ✓  23 tests/app.smoke.ts:508:1 › migrates prior volume, saves independent controls, and preserves mute on reload (1.2s)
+  ✓  24 tests/app.smoke.ts:538:1 › the first mute gesture and a pending audio start respect the saved mute choice (1.0s)
+  ✓  25 tests/app.smoke.ts:581:1 › suspends hidden audio and bounds the first visible simulation step (1.4s)
+  ✓  26 tests/app.smoke.ts:675:1 › renders daytime, aurora, and midnight sky states (1.4s)
+  ✓  12 tests/perf-bench.smoke.ts:23:1 › two runs of one build report identical draw calls and triangles at five held vantages (55.1s)
+  ✓  27 tests/app.smoke.ts:730:1 › shows drainage water from altitude without page errors (11.2s)
+  ✓  29 tests/app.smoke.ts:761:1 › a blocked browser audio context keeps the mute control usable without page errors (735ms)
+  ✓  28 tests/perf-bench.smoke.ts:83:1 › reports GPU timing as unavailable when the timer extension is missing (5.7s)
+  ✓  30 tests/perf-bench.smoke.ts:96:1 › discards GPU timings that follow a disjoint event and deletes every query (5.9s)
+  ✓  31 tests/perf-bench.smoke.ts:117:1 › keeps profiling dev-only: no timer query without ?profile and none in the production bundle (2.1s)
+
+  31 passed (1.4m)

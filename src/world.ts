@@ -441,8 +441,10 @@ export class WorldModel {
       );
       // The lowland hills carry on into the valley and fade out at the bank, so
       // the cone is not a smooth apron. Hollows bottom out above the water.
-      const valleyHills = hills * smootherstep(30, 350, Math.max(0, nearest.shoreDist));
-      height = Math.max(height + valleyHills, mix(nearest.surface, height, 0.4));
+      if (hills !== 0) {
+        const valleyHills = hills * smootherstep(30, 350, Math.max(0, nearest.shoreDist));
+        height = Math.max(height + valleyHills, mix(nearest.surface, height, 0.4));
+      }
       height = mix(height, bare, land);
     }
     let river = false;

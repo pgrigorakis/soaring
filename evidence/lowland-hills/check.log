@@ -9,54 +9,57 @@
 
  RUN  v3.2.7 /Users/pgrigorakis/.treehouse/soaring-b45a19/4/soaring
 
- ✓ tests/sky-cycle.test.ts (4 tests) 4ms
- ✓ tests/audio.test.ts (6 tests) 19ms
- ✓ tests/eagle.test.ts (4 tests) 219ms
- ✓ tests/thermal-marker.test.ts (3 tests) 2163ms
-   ✓ thermal markers within 3.5 km > keeps the visible thermal field near ten columns  406ms
-   ✓ thermal markers within 3.5 km > reuses one instanced column for every in-range thermal and hides the rest  1357ms
-   ✓ thermal markers within 3.5 km > tracks every in-range thermal through seeking, circling, and replacement  399ms
- ✓ tests/world.test.ts (19 tests) 3983ms
-   ✓ deterministic world generation > keeps tree positions identical across chunk partitions, including negative boundaries  505ms
-   ✓ deterministic world generation > makes large forests, open meadows, small groves and isolated trees  656ms
-   ✓ deterministic world generation > places thermals deterministically and never on water  953ms
-   ✓ deterministic world generation > marks river water at its reach and keeps trees off steep slopes  327ms
-   ✓ deterministic world generation > never leaves dry ground under the water drawn at a river or lake edge  976ms
- ✓ tests/terrain.test.ts (5 tests) 11058ms
-   ✓ terrain streaming > streams nearest first within a time budget and covers the reach  507ms
-   ✓ terrain streaming > keeps haze on loaded tiles while extending the reach, including after recentering  4786ms
-   ✓ terrain streaming > gives distant tiles the same trees and shadows as detailed tiles  4448ms
-   ✓ terrain streaming > renders several distinct instanced tree silhouettes at generated world positions  666ms
-   ✓ terrain streaming > matches terrain and river water across a chunk seam built by separate streams  651ms
- ❯ tests/navigation-route.test.ts (3 tests | 1 failed) 12753ms
-   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 448122  4462ms
-   × one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 0 3971ms
-     → expected 31337.539746940478 to be greater than or equal to 36491.77591404005
-   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 4294967295  4319ms
- ✓ tests/navigation.test.ts (12 tests) 16432ms
-   ✓ autonomous eagle navigation > finishes a thermal approach through the visible navigation path  1469ms
-   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 50–70 m during a one-hour flight  4778ms
-   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 90–145 m during a one-hour flight  4817ms
-   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 65–210 m during a one-hour flight  4620ms
-   ✓ autonomous eagle navigation > leaves thermal-riding at maximum flight height without a fixed timer  528ms
+ ✓ tests/sky-cycle.test.ts (4 tests) 5ms
+ ✓ tests/audio.test.ts (6 tests) 20ms
+ ✓ tests/eagle.test.ts (4 tests) 256ms
+ ✓ tests/thermal-marker.test.ts (3 tests) 2495ms
+   ✓ thermal markers within 3.5 km > keeps the visible thermal field near ten columns  421ms
+   ✓ thermal markers within 3.5 km > reuses one instanced column for every in-range thermal and hides the rest  1588ms
+   ✓ thermal markers within 3.5 km > tracks every in-range thermal through seeking, circling, and replacement  485ms
+ ✓ tests/world.test.ts (19 tests) 5185ms
+   ✓ deterministic world generation > keeps tree positions identical across chunk partitions, including negative boundaries  582ms
+   ✓ deterministic world generation > makes large forests, open meadows, small groves and isolated trees  693ms
+   ✓ deterministic world generation > places thermals deterministically and never on water  1285ms
+   ✓ deterministic world generation > carves river valleys without near-vertical walls  412ms
+   ✓ deterministic world generation > marks river water at its reach and keeps trees off steep slopes  741ms
+   ✓ deterministic world generation > never leaves dry ground under the water drawn at a river or lake edge  1110ms
+ ✓ tests/terrain.test.ts (5 tests) 13076ms
+   ✓ terrain streaming > streams nearest first within a time budget and covers the reach  548ms
+   ✓ terrain streaming > keeps haze on loaded tiles while extending the reach, including after recentering  6332ms
+   ✓ terrain streaming > gives distant tiles the same trees and shadows as detailed tiles  4756ms
+   ✓ terrain streaming > renders several distinct instanced tree silhouettes at generated world positions  728ms
+   ✓ terrain streaming > matches terrain and river water across a chunk seam built by separate streams  710ms
+ ✓ tests/navigation-route.test.ts (3 tests) 15062ms
+   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 448122  6053ms
+   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 0  4378ms
+   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 4294967295  4629ms
+ ✓ tests/navigation.test.ts (12 tests) 17624ms
+   ✓ autonomous eagle navigation > finishes a thermal approach through the visible navigation path  1731ms
+   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 50–70 m during a one-hour flight  5710ms
+   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 90–145 m during a one-hour flight  4748ms
+   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 65–210 m during a one-hour flight  4649ms
+   ✓ autonomous eagle navigation > leaves thermal-riding at maximum flight height without a fixed timer  550ms
 
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
-
- FAIL  tests/navigation-route.test.ts > one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 0
-AssertionError: expected 31337.539746940478 to be greater than or equal to 36491.77591404005
- ❯ tests/navigation-route.test.ts:36:25
-     34|     }
-     35|     const netDistance = Math.hypot(navigator.state.x - start.x, naviga…
-     36|     expect(netDistance).toBeGreaterThanOrEqual(distanceFlown * 0.35);
-       |                         ^
-     37|     expect(revisitPasses).toBeLessThanOrEqual(5);
-     38|     expect(maxThermals).toBeLessThanOrEqual(WORLD_CACHE_LIMIT);
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+ Test Files  8 passed (8)
+      Tests  56 passed (56)
+   Start at  19:11:52
+   Duration  18.16s (transform 308ms, setup 0ms, collect 920ms, tests 53.72s, environment 1ms, prepare 421ms)
 
 
- Test Files  1 failed | 7 passed (8)
-      Tests  1 failed | 55 passed (56)
-   Start at  18:53:08
-   Duration  16.74s (transform 236ms, setup 0ms, collect 604ms, tests 46.63s, environment 1ms, prepare 282ms)
+> soaring-wilderness@0.1.0 build
+> tsc --noEmit && vite build
 
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 18 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.79 kB │ gzip:   0.48 kB
+dist/assets/index-B4_9kUkP.css    3.34 kB │ gzip:   1.38 kB
+dist/assets/index-C9MvbrQC.js   610.38 kB │ gzip: 164.74 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 495ms

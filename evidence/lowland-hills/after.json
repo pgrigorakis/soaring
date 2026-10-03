@@ -46,7 +46,7 @@
         "moorCandidates": 375,
         "windowKm": 48
       },
-      "seconds": 0.624
+      "seconds": 0.556
     },
     "57": {
       "top": {
@@ -94,7 +94,7 @@
         "moorCandidates": 509,
         "windowKm": 48
       },
-      "seconds": 1.18
+      "seconds": 1.225
     },
     "80231": {
       "top": {
@@ -142,9 +142,9 @@
         "moorCandidates": 66,
         "windowKm": 48
       },
-      "seconds": 1.329
+      "seconds": 1.296
     }
   },
   "gradientLatticeSlope": 0.9985079767316611,
-  "seconds": 3.133
+  "seconds": 3.079
 }
