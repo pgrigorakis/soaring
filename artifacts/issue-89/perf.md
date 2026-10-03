@@ -32,6 +32,14 @@ The median of the five per-vantage median deltas is **+0.07 ms**. The median acr
 
 The golden-hour baseline had a large round-to-round swing (5.60 ms versus 9.09–9.11 ms). Treat the small GPU deltas as an estimate, not a precise isolated shader cost.
 
+## CI timeout diagnosis
+
+The earlier PR run, [37136020081](https://github.com/pgrigorakis/soaring/actions/runs/37136020081), failed when the four-minute test-wide deadline interrupted `runBenchRound` while it waited for terrain work to drain. The individual 120-second streaming deadlines and the benchmark assertions did not change.
+
+A paired one-worker SwiftShader run used the same five-vantage smoke benchmark against current `origin/main` (`700c56f`) and the cloud build (`21bedb5`). It passed in 1.2 minutes without clouds and 1.1 minutes with clouds. Both runs kept 16.7 ms frame-interval p50, and every vantage began and ended with zero pending chunks. GPU timer results varied between rounds and do not support a precise comparison.
+
+The same unchanged baseline took 2.7 and 3.9 minutes on shared CI runners (runs 37125342464 and 37125352898, recorded in the shared-pools PR evidence). This points to runner variance and insufficient test-level headroom, not a repeatable cloud or streaming regression. The repair raises only the overall test timeout from four to six minutes. It leaves every per-vantage deadline and assertion unchanged. The updated validation is on [PR #120](https://github.com/pgrigorakis/soaring/pull/120).
+
 ## Artifact note
 
 The Playwright output directory is cleared at the start of a smoke run. This report preserves the benchmark summary. The repeatable screenshot test writes its images and metadata under `test-results/issue-89/`; copies are in `artifacts/issue-89/screenshots/`.
