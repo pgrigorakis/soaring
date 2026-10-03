@@ -1,6 +1,12 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { Soundscape } from '../src/audio';
-import { biomeWeights } from '../src/biome';
+import { BIOME_CLIMATE, CLIMATE, biomeWeights } from '../src/biome';
+
+/** Weights at a fraction of the way from the Hills climate point to the Woodland point. */
+const towardWoodland = (fraction: number) => {
+  const raw = (axis: number) => (BIOME_CLIMATE.hills[axis]! + (BIOME_CLIMATE.woodland[axis]! - BIOME_CLIMATE.hills[axis]!) * fraction - 0.5) / CLIMATE.stretch + 0.5;
+  return biomeWeights(0, raw(0), raw(1), raw(2));
+};
 
 class Parameter {
   value = 1;
@@ -80,7 +86,7 @@ function layerSource(context: BrowserAudio, filterFrequency: number): Source {
 afterEach(() => { vi.unstubAllGlobals(); BrowserAudio.instances = []; });
 
 test('biome weights sum to one across the hills-to-woodland boundary', () => {
-  const samples = Array.from({ length: 9 }, (_, index) => biomeWeights(0, 0.44 + index * 0.015, 60, 0.4));
+  const samples = Array.from({ length: 9 }, (_, index) => towardWoodland(0.3 + index * 0.05));
   expect(samples.some((weights) => weights.hills > 0 && weights.woodland > 0)).toBe(true);
   for (const weights of samples) {
     expect(weights.hills + weights.woodland + weights.moor + weights.highlands + weights.lakeland).toBeCloseTo(1);
@@ -95,11 +101,11 @@ test('biome ambience crossfades with the world weights', async () => {
   context.currentTime = 4;
   const hills = layerSource(context, 680);
   const woodland = layerSource(context, 1700);
-  const start = biomeWeights(0, 0.44, 60, 0.4);
+  const start = towardWoodland(0.3);
   sound.update('gliding', false, start);
   const startHills = outputLevel(hills);
   const startWoodland = outputLevel(woodland);
-  const end = biomeWeights(0, 0.56, 60, 0.4);
+  const end = towardWoodland(0.7);
   sound.update('gliding', false, end);
   expect(outputLevel(hills)).toBeLessThan(startHills);
   expect(outputLevel(woodland)).toBeGreaterThan(startWoodland);

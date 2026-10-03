@@ -32,7 +32,7 @@ Relevant browser checks include:
 - `tests/highlands.smoke.ts` records a one-hour Highlands flight with terrain clearance, climb limits, and behavior-duration checks. Total flap time is recorded, not limited.
 - `tests/highlands-cover.smoke.ts` captures noon and golden-hour snow cover from the default chase camera.
 - `tests/lakeland.smoke.ts` checks a wooded lake island, dry banks, and water edges across mesh tiers. Run `node scripts/calibrate-lakeland.mjs` to measure territory across three large seed grids, or `node scripts/audit-lakeland.mjs` to record a repeatable one-hour lake-heavy navigation trace. See [Lakeland measurements](diagnostics/issue-59-lakeland.md).
-- `tests/biomes.smoke.ts` checks deterministic biome samples and shared mesh edges, and writes a repeatable JSON artifact. See [biome measurements](diagnostics/issue-58-biome-spans.md).
+- `tests/biomes.smoke.ts` checks deterministic biome samples and shared mesh edges, and writes a repeatable JSON artifact. `tests/climate.smoke.ts` checks climate selection, altitude cooling, snow and the tree line. See [current biome measurements and captures](diagnostics/issue-93-biomes/README.md) and the [earlier span decision](diagnostics/issue-58-biome-spans.md).
 
 The product reliability target is one uninterrupted hour without intervention or obvious repetition. Automated navigation tests simulate one hour at 10 Hz across several flight-height ranges. Browser validation is shorter and accelerated; it is not a literal one-hour browser soak.
 

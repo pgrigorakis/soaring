@@ -1,13 +1,40 @@
-/** Decision B: Hills has a broad moisture territory, not a narrow remainder strip. */
+/** Highlands follows the mountain landform and Lakeland the lake field (#93 decisions). */
 export const BIOME_SELECTION = {
-  climateWavelength: 16000,
   reliefWavelength: 18000,
-  hillsWavelength: 16000,
-  hillsThreshold: 0.62,
   lakeWavelength: 7000,
   lakeThreshold: 0.75,
-  woodlandThreshold: 0.5,
-  moorThreshold: 0.5,
+} as const;
+
+/**
+ * Climate fields, after fly-with-me: moisture at 0.8× and region at 0.9× the
+ * temperature scale, all warped about 900 m. Temperature falls by 1 every 2,600 m.
+ * Each axis is stretched by 2.2 about its middle before selection. fly-with-me uses
+ * 12 km; Gradient noise at that scale gave 3–5 km median spans, so the scale is
+ * 28 km to keep #58's 6–10 km targets.
+ */
+export const CLIMATE = { scale: 28000, warp: 900, lapse: 2600, stretch: 2.2, radius: 0.12, sharpness: 2.2 } as const;
+
+/**
+ * [temperature, moisture, region] on the stretched axes. Each point keeps the sense
+ * of its nearest fly-with-me biome: Hills is the warm, drier meadow (wildsong), Woodland
+ * the moist forest (elderwood), Moor the cool heath (moor). The three points form a
+ * triangle around the cooled lowland climate, so no biome is a thin band between two others.
+ */
+export const BIOME_CLIMATE = {
+  hills: [0.56, 0.36, 0.45],
+  woodland: [0.42, 0.7, 0.55],
+  moor: [0.24, 0.4, 0.4],
+} as const satisfies Record<'hills' | 'woodland' | 'moor', readonly [number, number, number]>;
+
+/**
+ * Snow and the tree line follow temperature, not a fixed height. Each pair is the
+ * temperature at the line's start and end; at a mean climate (0.5) they sit at the
+ * former heights: trees thin from 280 m to 320 m, scree at 320–340 m, snow at 380–420 m.
+ */
+export const CLIMATE_LINES = {
+  treeLine: [0.5 - 280 / CLIMATE.lapse, 0.5 - 320 / CLIMATE.lapse],
+  scree: [0.5 - 320 / CLIMATE.lapse, 0.5 - 340 / CLIMATE.lapse],
+  snow: [0.5 - 380 / CLIMATE.lapse, 0.5 - 420 / CLIMATE.lapse],
 } as const;
 
 /** Glade size stays fixed; only the threshold controls how often holes occur. */
@@ -54,14 +81,28 @@ export const transition = (threshold: number, value: number) => {
   return t * t * t * (t * (t * 6 - 15) + 10);
 };
 
-/** Ordered allocation, never independent masks: each rule consumes only the remainder. */
-export function biomeWeights(relief: number, climate: number, elevation: number, hillsField: number, lakeField = 0): BiomeWeights {
+const climateAxis = (value: number) => Math.max(0, Math.min(1, (value - 0.5) * CLIMATE.stretch + 0.5));
+
+/**
+ * Highlands, then Lakeland, claim their landform and lake territory first. Hills,
+ * Woodland and Moor share the remainder by a soft nearest point in climate space.
+ */
+export function biomeWeights(relief: number, temperature: number, moisture: number, region: number, lakeField = 0): BiomeWeights {
   const highlands = transition(0.55, relief);
   const lakeland = (1 - highlands) * (1 - transition(0.4, relief)) * transition(BIOME_SELECTION.lakeThreshold, lakeField);
-  const hillsClaim = (1 - highlands - lakeland) * transition(BIOME_SELECTION.hillsThreshold, hillsField);
-  const woodland = (1 - highlands - lakeland - hillsClaim) * transition(BIOME_SELECTION.woodlandThreshold, climate);
-  const moor = (1 - highlands - lakeland - hillsClaim - woodland) * transition(0.6, elevation / 150);
-  return { hills: 1 - highlands - lakeland - woodland - moor, woodland, moor, highlands, lakeland };
+  const point = [climateAxis(temperature), climateAxis(moisture), climateAxis(region)];
+  const distance = (centre: readonly number[]) =>
+    centre.reduce((sum, value, axis) => sum + (point[axis]! - value) ** 2, 0) / CLIMATE.radius ** 2;
+  const hills = distance(BIOME_CLIMATE.hills);
+  const woodland = distance(BIOME_CLIMATE.woodland);
+  const moor = distance(BIOME_CLIMATE.moor);
+  // Measured from the nearest point, so the largest term is one and never underflows.
+  const nearest = Math.min(hills, woodland, moor);
+  const claim = (value: number) => Math.exp(-CLIMATE.sharpness * (value - nearest));
+  const remainder = (1 - highlands - lakeland) / (claim(hills) + claim(woodland) + claim(moor));
+  const woodlandWeight = claim(woodland) * remainder;
+  const moorWeight = claim(moor) * remainder;
+  return { hills: Math.max(0, 1 - highlands - lakeland - woodlandWeight - moorWeight), woodland: woodlandWeight, moor: moorWeight, highlands, lakeland };
 }
 
 /** Highlands keeps its existing parameters until it receives a full profile. */

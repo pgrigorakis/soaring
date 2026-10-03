@@ -1,0 +1,111 @@
+{
+  "ref": "17ed32f",
+  "metric": "dominant-biome contiguous flight-line chord, excluding boundary-truncated runs",
+  "spanBiomes": "hills, woodland, moor, highlands of the landform allocation (Lakeland excluded, as in #58)",
+  "coverageMetric": "mean pre-drainage biome weights (not dry-land-only vertex coverage)",
+  "stepMeters": 100,
+  "extentMeters": 240000,
+  "options": [
+    {
+      "climateScaleMeters": "default",
+      "seeds": [
+        {
+          "seed": 80231,
+          "weights": {
+            "hills": 0.1945655085102059,
+            "woodland": 0.25791744713877446,
+            "moor": 0.21646082996784052,
+            "highlands": 0.1704180139679324,
+            "lakeland": 0.16063820041524568
+          },
+          "spans": {
+            "hills": {
+              "runs": 893,
+              "medianMeters": 7600,
+              "meanMeters": 9758.678611422172
+            },
+            "woodland": {
+              "runs": 1118,
+              "medianMeters": 7000,
+              "meanMeters": 10108.318425760286
+            },
+            "moor": {
+              "runs": 948,
+              "medianMeters": 6800,
+              "meanMeters": 9693.565400843881
+            },
+            "highlands": {
+              "runs": 586,
+              "medianMeters": 9100,
+              "meanMeters": 10660.921501706485
+            }
+          }
+        },
+        {
+          "seed": 42,
+          "weights": {
+            "hills": 0.2576027065902685,
+            "woodland": 0.2276622359962676,
+            "moor": 0.20952380310320623,
+            "highlands": 0.16174321163086844,
+            "lakeland": 0.14346804267938845
+          },
+          "spans": {
+            "hills": {
+              "runs": 1026,
+              "medianMeters": 8900,
+              "meanMeters": 10476.413255360623
+            },
+            "woodland": {
+              "runs": 1001,
+              "medianMeters": 7700,
+              "meanMeters": 9580.21978021978
+            },
+            "moor": {
+              "runs": 1053,
+              "medianMeters": 6200,
+              "meanMeters": 8856.79012345679
+            },
+            "highlands": {
+              "runs": 577,
+              "medianMeters": 8500,
+              "meanMeters": 10630.50259965338
+            }
+          }
+        },
+        {
+          "seed": 123456,
+          "weights": {
+            "hills": 0.24972754103645275,
+            "woodland": 0.1946032870910807,
+            "moor": 0.24355133309513116,
+            "highlands": 0.17637933042394577,
+            "lakeland": 0.13573850835338677
+          },
+          "spans": {
+            "hills": {
+              "runs": 912,
+              "medianMeters": 8500,
+              "meanMeters": 11410.197368421053
+            },
+            "woodland": {
+              "runs": 1025,
+              "medianMeters": 6100,
+              "meanMeters": 8094.1463414634145
+            },
+            "moor": {
+              "runs": 1192,
+              "medianMeters": 6700,
+              "meanMeters": 9148.909395973154
+            },
+            "highlands": {
+              "runs": 565,
+              "medianMeters": 9200,
+              "meanMeters": 10846.725663716814
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
