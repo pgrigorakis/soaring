@@ -64,6 +64,17 @@ const MASSIF_LIFT = 1040;
 /** Continental warp, matching fly-with-me: about 700 m at a 2.2 km scale. */
 const LANDFORM_WARP = 700;
 const LANDFORM_WARP_WAVELENGTH = 2200;
+/**
+ * Captain decision on #86: one fly-with-me hill shape (520 m, warped coordinates)
+ * with a height per lowland biome. Fly-with-me land is ±48 m; Woodland and Moor
+ * keep their old 60/75 share of the Hills relief. Lakeland keeps the landform beneath it.
+ */
+const LOWLAND_HILL_WAVELENGTH = 520;
+const LOWLAND_HILL_HEIGHT = { hills: 48, woodland: 38, moor: 38 } as const;
+/** Peat pool sites: one hashed candidate per 500 m cell, centred in its middle half. */
+const PEAT_CELL = 500;
+/** Hills fade into a level shelf this far from a peat site, inside its own cell. */
+const PEAT_SHELF_REACH = 120;
 const NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]] as const;
 
 type RiverNode = {
@@ -346,7 +357,7 @@ export class WorldModel {
   }
 
   sample(x: number, z: number): LandscapeSample {
-    const { mountainRegion, elevation, biome } = this.relief(x, z);
+    const { mountainRegion, elevation, biome, hills } = this.relief(x, z);
     const highland = biome.highlands;
     // The rendered ground and the drainage lattice read the same continuous landform.
     // None of the landform terms is blended through the 500 m lattice.
@@ -428,6 +439,10 @@ export class WorldModel {
         mix(900, 1050, highland) * reliefScale,
         Math.max(0, nearest.shoreDist),
       );
+      // The lowland hills carry on into the valley and fade out at the bank, so
+      // the cone is not a smooth apron. Hollows bottom out above the water.
+      const valleyHills = hills * smootherstep(30, 350, Math.max(0, nearest.shoreDist));
+      height = Math.max(height + valleyHills, mix(nearest.surface, height, 0.4));
       height = mix(height, bare, land);
     }
     let river = false;
@@ -520,28 +535,53 @@ export class WorldModel {
     const landform = biomeWeights(mountainRegion, climate, candidate, hillsField);
     const biome = biomeWeights(mountainRegion, climate, candidate, hillsField, lakeField);
     const warped = warpLandform(x, z, this.seed);
-    const elevation = this.lowlandTerm(warped.x, warped.z, landform)
+    const hills = this.peatShelf(x, z, landform, this.lowlandHills(warped.x, warped.z, landform));
+    const elevation = this.lowlandTerm(warped.x, warped.z, landform) + hills
       + this.massifTerm(warped.x, warped.z, landform, mountainRegion)
       + this.summitTerm(x, z, landform);
-    return { elevation, mountainRegion, biome };
+    return { elevation, mountainRegion, biome, hills };
   }
 
-  /**
-   * Lowland and highland base, on warped gradient noise. #86 adds the 520 m hill
-   * term in `lowlandHills`, blended by these same biome weights.
-   */
+  /** Lowland and highland base, on warped gradient noise. The 520 m hills are added in `relief`. */
   private lowlandTerm(x: number, z: number, landform: BiomeWeights): number {
     const broad = gradientFbm(x / 3200, z / 3200, this.seed + 7, 4);
     return landform.hills * (BIOME_PROFILES.hills.heightOffset + broad * BIOME_PROFILES.hills.heightAmplitude)
       + landform.woodland * (BIOME_PROFILES.woodland.heightOffset + broad * BIOME_PROFILES.woodland.heightAmplitude)
       + landform.moor * (BIOME_PROFILES.moor.heightOffset + broad * BIOME_PROFILES.moor.heightAmplitude)
-      + landform.highlands * (28 + broad * 52)
-      + this.lowlandHills(x, z, landform);
+      + landform.highlands * (28 + broad * 52);
   }
 
-  /** #86 seam. The hill term is not part of this ticket. */
-  private lowlandHills(_x: number, _z: number, _landform: BiomeWeights): number {
-    return 0;
+  /** Fly-with-me lowland hills on warped coordinates, blended by the landform biome weights. */
+  private lowlandHills(x: number, z: number, landform: BiomeWeights): number {
+    const height = landform.hills * LOWLAND_HILL_HEIGHT.hills + landform.woodland * LOWLAND_HILL_HEIGHT.woodland
+      + landform.moor * LOWLAND_HILL_HEIGHT.moor;
+    if (height === 0) return 0;
+    return height * gradientFbm(x / LOWLAND_HILL_WAVELENGTH, z / LOWLAND_HILL_WAVELENGTH, this.seed + 11, 4);
+  }
+
+  /**
+   * Captain decision on #86: Moor keeps about its old peat pool count. Around each
+   * peat site the hills hold their centre height, so the pool's level test reads
+   * the broad landform, as before the hills.
+   */
+  private peatShelf(x: number, z: number, landform: BiomeWeights, hills: number): number {
+    if (landform.moor === 0) return hills;
+    const site = this.peatSite(x, z);
+    if (!site || site.distance > PEAT_SHELF_REACH - site.radius) return hills;
+    const centre = warpLandform(site.x, site.z, this.seed);
+    const level = landform.moor * (1 - smootherstep(26, PEAT_SHELF_REACH - site.radius, site.distance));
+    return mix(hills, this.lowlandHills(centre.x, centre.z, landform), level);
+  }
+
+  /** The candidate peat site in this point's cell, and the distance from its shore. */
+  private peatSite(x: number, z: number): { x: number; z: number; radius: number; distance: number } | null {
+    const cx = Math.floor(x / PEAT_CELL);
+    const cz = Math.floor(z / PEAT_CELL);
+    if (hash2(cx, cz, this.seed + 193) > 0.22) return null;
+    const centerX = (cx + 0.25 + hash2(cx, cz, this.seed + 194) * 0.5) * PEAT_CELL;
+    const centerZ = (cz + 0.25 + hash2(cx, cz, this.seed + 195) * 0.5) * PEAT_CELL;
+    const radius = 32 + hash2(cx, cz, this.seed + 196) * 22;
+    return { x: centerX, z: centerZ, radius, distance: Math.hypot(x - centerX, z - centerZ) - radius };
   }
 
   /**
@@ -569,18 +609,12 @@ export class WorldModel {
   /** Small dark pools on genuinely flat, high Moor tops, separate from drainage lakes. */
   private peatPool(x: number, z: number, biome: BiomeWeights, bank: number): { distance: number; surface: number } | null {
     if (biome.moor < 0.98 || bank < 1000) return null;
-    const cx = Math.floor(x / 500);
-    const cz = Math.floor(z / 500);
-    if (hash2(cx, cz, this.seed + 193) > 0.22) return null;
-    const centerX = (cx + 0.25 + hash2(cx, cz, this.seed + 194) * 0.5) * 500;
-    const centerZ = (cz + 0.25 + hash2(cx, cz, this.seed + 195) * 0.5) * 500;
-    const radius = 32 + hash2(cx, cz, this.seed + 196) * 22;
-    const distance = Math.hypot(x - centerX, z - centerZ) - radius;
-    if (distance > 26) return null;
-    const surface = this.relief(centerX, centerZ).elevation - 0.5;
-    if (surface < 110 || Math.abs(this.relief(centerX + 36, centerZ).elevation - surface - 0.5) > 2.2
-      || Math.abs(this.relief(centerX, centerZ + 36).elevation - surface - 0.5) > 2.2) return null;
-    return { distance, surface };
+    const site = this.peatSite(x, z);
+    if (!site || site.distance > 26) return null;
+    const surface = this.relief(site.x, site.z).elevation - 0.5;
+    if (surface < 110 || Math.abs(this.relief(site.x + 36, site.z).elevation - surface - 0.5) > 2.2
+      || Math.abs(this.relief(site.x, site.z + 36).elevation - surface - 0.5) > 2.2) return null;
+    return { distance: site.distance, surface };
   }
 
   /** River reaches and lake discs that can shape the ground near a point. */
