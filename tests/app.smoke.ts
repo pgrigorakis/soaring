@@ -125,7 +125,7 @@ test('renders high-detail terrain, streams, and supports camera controls', async
 
 test('caps normal rendering at two million pixels through viewport and DPR changes', async ({ page }) => {
   test.setTimeout(45_000);
-  await preparePixelBudgetPage(page);
+  await preparePixelBudgetPage(page, '/?profile');
   const cdp = await page.context().newCDPSession(page);
   await setPixelBudgetLowPower(page, false);
   await setPixelBudgetMetrics(page, cdp, 1000, 700, 2);
@@ -143,7 +143,9 @@ test('caps normal rendering at two million pixels through viewport and DPR chang
   expect(measured.ratio).toBeLessThanOrEqual(Math.min(1.5, ratioLimit));
   expectRenderWithinPixelBudget(measured);
 
-  await setPixelBudgetMetrics(page, cdp, 1512, 982, 1);
+  const retinaRatio = await page.evaluate(() => window.__SOARING__.snapshot().pixelRatio);
+  await setPixelBudgetMetrics(page, cdp, 1512, 982, 1, false);
+  await page.waitForFunction((previous) => window.__SOARING__.snapshot().pixelRatio < previous, retinaRatio);
   measured = await readPixelBudgetMetrics(page);
   expect(measured.css).toEqual([1512, 982]);
   expect(measured.ratio).toBeLessThanOrEqual(1);
@@ -205,13 +207,13 @@ async function setPixelBudgetLowPower(page: Page, enabled: boolean): Promise<voi
   await page.waitForFunction((lowPower) => window.__SOARING__.snapshot().lowPower === lowPower, enabled);
 }
 
-async function setPixelBudgetMetrics(page: Page, cdp: CDPSession, width: number, height: number, deviceScaleFactor: number): Promise<void> {
+async function setPixelBudgetMetrics(page: Page, cdp: CDPSession, width: number, height: number, deviceScaleFactor: number, dispatchResize = true): Promise<void> {
   await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile: false });
   await page.waitForFunction(({ expectedWidth, expectedHeight, expectedDpr }) =>
     window.innerWidth === expectedWidth && window.innerHeight === expectedHeight && devicePixelRatio === expectedDpr,
   { expectedWidth: width, expectedHeight: height, expectedDpr: deviceScaleFactor });
   // Chromium changes DPR through emulation without sending the native resize event.
-  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  if (dispatchResize) await page.evaluate(() => window.dispatchEvent(new Event('resize')));
 }
 
 async function readPixelBudgetMetrics(page: Page) {
