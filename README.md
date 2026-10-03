@@ -24,7 +24,7 @@ Open `http://127.0.0.1:4173`.
 
 Sound is procedural and starts muted on every page load. The two volume settings persist independently. Settings and the world seed live in `localStorage`. A reload keeps the seed but starts the eagle elsewhere in the same world.
 
-Normal rendering caps its pixel ratio at the lower of the device ratio, 1.5, and the value needed to stay within a 2-million-pixel budget. Low power uses the lower of 1.0 and that budget ratio. Adaptive quality keeps its existing steps, and the ratio updates when the viewport or device-pixel ratio changes.
+Normal rendering caps its pixel ratio at the lower of the device ratio, 1.5, and the value needed to stay within a 2-million-pixel budget. Low power uses the lower of 1.0 and that budget ratio. Adaptive quality can lower the normal ratio through steps of 1.5, 1.25, and 1.0, and the ratio updates when the viewport or device-pixel ratio changes.
 
 ## Terrain visibility
 
