@@ -1,0 +1,12 @@
+{
+  "seed": 57,
+  "seconds": 3600,
+  "stepSeconds": 0.1,
+  "runtime": "Chrome 154, real browser imports of src/world.ts and src/eagle.ts",
+  "counterfactual": "Disable only WorldModel.lowlandHills before sampling",
+  "runs": [
+    { "start": { "x": -84000, "z": 121500, "heading": 0 }, "disableHills": false, "ridgeTicks": 0, "highlandSeconds": 2071.2999999992116, "minClearance": 12.359802659419415 },
+    { "start": { "x": -84000, "z": 121500, "heading": 0 }, "disableHills": true, "ridgeTicks": 4455, "highlandSeconds": 2050.99999999923, "minClearance": 12.27824672169686 },
+    { "start": { "x": -84500, "z": 122000, "heading": 0 }, "disableHills": false, "ridgeTicks": 2101, "highlandSeconds": 2613.099999998719, "minClearance": 12.346893680369362 }
+  ]
+}

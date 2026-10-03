@@ -1,5 +1,5 @@
 {
-  "ref": "origin/main",
+  "ref": "17ed32f",
   "metric": "dominant-biome contiguous flight-line chord, excluding boundary-truncated runs",
   "spanBiomes": "hills, woodland, moor, highlands of the landform allocation (Lakeland excluded, as in #58)",
   "coverageMetric": "mean pre-drainage biome weights (not dry-land-only vertex coverage)",

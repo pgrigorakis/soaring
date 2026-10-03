@@ -29,7 +29,8 @@ for (const scale of scales) {
         // Older revisions computed this allocation but did not return it. Expose it
         // in the bundled diagnostic only, so --ref uses the same metric as today.
         if (ref && path.endsWith('world.ts')) contents = contents.replace(
-          'return { elevation, mountainRegion, biome };', 'return { elevation, mountainRegion, biome, landform };');
+          /return \{ elevation, mountainRegion, biome(, hills)? \};/,
+          (_, hills = '') => `return { elevation, mountainRegion, biome${hills}, landform };`);
         if (scale && path.endsWith('biome.ts')) contents = contents.replace(/scale: \d+/, `scale: ${scale}`);
         for (const [from, to] of (process.env.PATCH ? process.env.PATCH.split("||").map((pair) => pair.split("=>")) : [])) contents = contents.replace(from, to);
         return { contents, loader: 'ts' };
