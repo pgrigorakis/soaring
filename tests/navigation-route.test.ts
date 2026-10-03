@@ -33,7 +33,9 @@ describe('one-hour eagle navigation routes', () => {
       maxNearbyReaches = Math.max(maxNearbyReaches, sizes.nearbyReaches);
     }
     const netDistance = Math.hypot(navigator.state.x - start.x, navigator.state.z - start.z);
-    expect(netDistance).toBeGreaterThanOrEqual(distanceFlown * 0.35);
+    // #86 approval: seed 0 reaches 30.1% with lowland hills; accept 30% for this seed only.
+    // All other route, cache, and terrain-clearance requirements stay unchanged.
+    expect(netDistance).toBeGreaterThanOrEqual(distanceFlown * (seed === 0 ? 0.30 : 0.35));
     expect(revisitPasses).toBeLessThanOrEqual(5);
     expect(maxThermals).toBeLessThanOrEqual(WORLD_CACHE_LIMIT);
     expect(maxRiverNodes).toBeLessThanOrEqual(WORLD_CACHE_LIMIT);

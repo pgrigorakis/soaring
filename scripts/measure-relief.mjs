@@ -1,17 +1,17 @@
-// Measures the #85 landform: world top, lowland slope, and lattice-node slope.
-// Repeatable artifact: node scripts/measure-relief.mjs
+// Measures the landform: world top, lowland slope, lattice-node slope, and Moor peat pools.
+// Repeatable artifact: node scripts/measure-relief.mjs [world-source] [report-path]
 import { build } from 'esbuild';
 import { mkdir, writeFile } from 'node:fs/promises';
 
 await mkdir('test-results', { recursive: true });
 await build({
-  entryPoints: ['src/world.ts'],
+  entryPoints: [process.argv[2] ?? 'src/world.ts'],
   outfile: 'test-results/relief-world.mjs',
   bundle: true,
   platform: 'node',
   format: 'esm',
 });
-const { WorldModel, DRAINAGE_SPACING, gradientNoise } = await import('../test-results/relief-world.mjs');
+const { WorldModel, DRAINAGE_SPACING, gradientNoise, hash2 } = await import('../test-results/relief-world.mjs');
 
 const degree = (rise) => Math.atan(rise) * 180 / Math.PI;
 const median = (values) => {
@@ -46,6 +46,7 @@ function latticeSlopes(world) {
 
 function lowlandStats(world) {
   const slopes = [];
+  const bySlope = { hills: [], woodland: [], moor: [] };
   const heights = [];
   const span = 8000;
   const step = 160;
@@ -57,6 +58,7 @@ function lowlandStats(world) {
       if (lowland < 0.5) continue;
       const measured = slopeAt(world, x, z);
       slopes.push(measured.slope);
+      for (const biome of Object.keys(bySlope)) if (sample.biome[biome] >= 0.9) bySlope[biome].push(measured.slope);
       heights.push({ x, z, height: measured.height });
     }
     world.trim(20000);
@@ -78,6 +80,7 @@ function lowlandStats(world) {
     shareUnder3: under3,
     medianSummitDrop: median(summits),
     summits: summits.length,
+    biomeMedianSlope: Object.fromEntries(Object.entries(bySlope).map(([biome, values]) => [biome, { samples: values.length, median: median(values) }])),
   };
 }
 
@@ -99,6 +102,26 @@ function worldTop(world) {
   return { node: { x: nodes[0].x, z: nodes[0].z, elevation: nodes[0].elevation }, peak };
 }
 
+/** Peat pools sit on hashed 500 m cell centres, so each candidate centre is sampled once. */
+function peatPools(world) {
+  const cells = 48;
+  let pools = 0;
+  let candidates = 0;
+  for (let cz = -cells; cz < cells; cz += 1) {
+    for (let cx = -cells; cx < cells; cx += 1) {
+      if (hash2(cx, cz, world.seed + 193) > 0.22) continue;
+      const x = (cx + 0.25 + hash2(cx, cz, world.seed + 194) * 0.5) * 500;
+      const z = (cz + 0.25 + hash2(cx, cz, world.seed + 195) * 0.5) * 500;
+      const sample = world.sample(x, z);
+      if (sample.biome.moor < 0.98) continue;
+      candidates += 1;
+      if (sample.peat > 0.5) pools += 1;
+    }
+    world.trim(20000);
+  }
+  return { pools, moorCandidates: candidates, windowKm: cells };
+}
+
 const started = Date.now();
 const seeds = [42, 80231, 57];
 const report = { seeds: {}, gradientLatticeSlope: null };
@@ -117,9 +140,11 @@ for (const seed of seeds) {
   const top = worldTop(world);
   const lattice = latticeSlopes(world);
   const lowland = lowlandStats(world);
-  report.seeds[seed] = { top, lattice, lowland, seconds: (Date.now() - t0) / 1000 };
+  const peat = peatPools(world);
+  report.seeds[seed] = { top, lattice, lowland, peat, seconds: (Date.now() - t0) / 1000 };
   console.log(seed, JSON.stringify(report.seeds[seed]));
 }
 report.seconds = (Date.now() - started) / 1000;
-await writeFile('test-results/relief-measures.json', JSON.stringify(report, null, 2));
-console.log('wrote test-results/relief-measures.json', report.seconds);
+const output = process.argv[3] ?? 'test-results/relief-measures.json';
+await writeFile(output, JSON.stringify(report, null, 2));
+console.log('wrote', output, report.seconds);

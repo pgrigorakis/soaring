@@ -1,0 +1,64 @@
+
+> soaring-wilderness@0.1.0 check
+> npm run test && npm run build
+
+
+> soaring-wilderness@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.7 /Users/pgrigorakis/.treehouse/soaring-b45a19/4/soaring
+
+ ✓ tests/sky-cycle.test.ts (4 tests) 9ms
+ ✓ tests/audio.test.ts (6 tests) 42ms
+ ✓ tests/eagle.test.ts (4 tests) 286ms
+ ✓ tests/thermal-marker.test.ts (3 tests) 2659ms
+   ✓ thermal markers within 3.5 km > keeps the visible thermal field near ten columns  445ms
+   ✓ thermal markers within 3.5 km > reuses one instanced column for every in-range thermal and hides the rest  1662ms
+   ✓ thermal markers within 3.5 km > tracks every in-range thermal through seeking, circling, and replacement  551ms
+ ✓ tests/world.test.ts (19 tests) 4871ms
+   ✓ deterministic world generation > keeps tree positions identical across chunk partitions, including negative boundaries  646ms
+   ✓ deterministic world generation > makes large forests, open meadows, small groves and isolated trees  841ms
+   ✓ deterministic world generation > places thermals deterministically and never on water  1169ms
+   ✓ deterministic world generation > marks river water at its reach and keeps trees off steep slopes  416ms
+   ✓ deterministic world generation > never leaves dry ground under the water drawn at a river or lake edge  1114ms
+ ✓ tests/terrain.test.ts (5 tests) 13745ms
+   ✓ terrain streaming > streams nearest first within a time budget and covers the reach  642ms
+   ✓ terrain streaming > keeps haze on loaded tiles while extending the reach, including after recentering  6172ms
+   ✓ terrain streaming > gives distant tiles the same trees and shadows as detailed tiles  5397ms
+   ✓ terrain streaming > renders several distinct instanced tree silhouettes at generated world positions  736ms
+   ✓ terrain streaming > matches terrain and river water across a chunk seam built by separate streams  796ms
+ ✓ tests/navigation-route.test.ts (3 tests) 16236ms
+   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 448122  5958ms
+   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 0  5204ms
+   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 4294967295  5073ms
+ ✓ tests/navigation.test.ts (12 tests) 19245ms
+   ✓ autonomous eagle navigation > finishes a thermal approach through the visible navigation path  1982ms
+   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 50–70 m during a one-hour flight  5770ms
+   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 90–145 m during a one-hour flight  5565ms
+   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 65–210 m during a one-hour flight  5120ms
+   ✓ autonomous eagle navigation > leaves thermal-riding at maximum flight height without a fixed timer  567ms
+
+ Test Files  8 passed (8)
+      Tests  56 passed (56)
+   Start at  19:18:30
+   Duration  19.71s (transform 280ms, setup 0ms, collect 782ms, tests 57.09s, environment 1ms, prepare 439ms)
+
+
+> soaring-wilderness@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 18 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.79 kB │ gzip:   0.48 kB
+dist/assets/index-B4_9kUkP.css    3.34 kB │ gzip:   1.38 kB
+dist/assets/index-DDvqAvuF.js   610.76 kB │ gzip: 164.89 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 554ms
