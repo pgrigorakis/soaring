@@ -36,9 +36,9 @@ The golden-hour baseline had a large round-to-round swing (5.60 ms versus 9.09â€
 
 The earlier PR run, [37136020081](https://github.com/pgrigorakis/soaring/actions/runs/37136020081), failed when the four-minute test-wide deadline interrupted `runBenchRound` while it waited for terrain work to drain. The individual 120-second streaming deadlines and the benchmark assertions did not change.
 
-A paired one-worker SwiftShader run used the same five-vantage smoke benchmark against current `origin/main` (`700c56f`) and the cloud build (`21bedb5`). It passed in 1.2 minutes without clouds and 1.1 minutes with clouds. Both runs kept 16.7 ms frame-interval p50, and every vantage began and ended with zero pending chunks. GPU timer results varied between rounds and do not support a precise comparison.
+A paired one-worker SwiftShader run compared the five-vantage smoke benchmark on then-current main (`700c56f`) and the cloud build (`21bedb5`). It passed in 1.2 minutes without clouds and 1.1 minutes with clouds. Both runs kept 16.7 ms frame-interval p50, and every vantage began and ended with zero pending chunks. GPU timer results varied between rounds and do not support a precise comparison.
 
-The same unchanged baseline took 2.7 and 3.9 minutes on shared CI runners (runs 37125342464 and 37125352898, recorded in the shared-pools PR evidence). This points to runner variance and insufficient test-level headroom, not a repeatable cloud or streaming regression. The repair raises only the overall test timeout from four to six minutes. It leaves every per-vantage deadline and assertion unchanged. The updated validation is on [PR #120](https://github.com/pgrigorakis/soaring/pull/120).
+The same unchanged baseline took 2.7 and 3.9 minutes on shared CI runners (runs 37125342464 and 37125352898, recorded in the shared-pools PR evidence). This points to runner variance and insufficient test-level headroom, not a repeatable cloud or streaming regression. The six-minute overall test timeout is now part of current main and remains unchanged after rebase. Every per-vantage deadline and assertion is unchanged. The old-head build passed in [run 37140712353](https://github.com/pgrigorakis/soaring/actions/runs/37140712353); it does not validate the rebased head.
 
 ## Artifact note
 
