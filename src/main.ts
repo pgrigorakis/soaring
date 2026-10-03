@@ -1173,7 +1173,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
     return { cover: mistCover(sample), water: sample.water, moisture: sample.moisture, bank: sample.bank, height: sample.height, surface: sample.surface };
   },
   fillMist: (budgetMs: number) => {
-    if (!Number.isFinite(budgetMs) || budgetMs < 0 || budgetMs > 80) throw new RangeError('Expected 0–80 ms');
+    if (!Number.isFinite(budgetMs) || budgetMs < 0 || budgetMs > 30_000) throw new RangeError('Expected 0–30000 ms');
     cloudSea.fillNow(world, budgetMs);
   },
   reviewSpots: () => world.reviewSpots(),
