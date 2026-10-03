@@ -9,6 +9,7 @@ import { THERMAL_MARKER_RANGE, ThermalMarker } from './thermal-marker';
 import { AuroraSchedule, auroraAmount, DAY_SECONDS, daylight, nightCycle, type Daylight } from './sky-cycle';
 import { FrameProfiler, type ProfileReport } from './profile';
 import { WORLD_CACHE_LIMIT, WorldModel } from './world';
+import { PuffClouds, type PuffCloudSnapshot } from './puff-clouds';
 
 type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; lowPower: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
 const CAMERA_DISTANCE = { min: 10, max: 100, default: 100 } as const;
@@ -100,6 +101,7 @@ const worldRoot = new THREE.Group();
 const renderOrigin = new THREE.Vector3(navigator.state.x, navigator.state.y, navigator.state.z);
 worldRoot.position.copy(renderOrigin).negate();
 scene.add(worldRoot);
+const puffClouds = new PuffClouds(worldRoot, world.seed, navigator.state);
 
 const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.5, MAX_VISIBILITY + 500);
 const renderer = new THREE.WebGLRenderer({ antialias: !smokeMode, powerPreference: 'high-performance' });
@@ -894,6 +896,7 @@ function frame(now: number): void {
   if (!skyPaused) skySeconds += rawDelta;
   const body = currentDaylight();
   applyDaylight(body, rawDelta);
+  puffClouds.update(state, navigator.wind, delta, cameraPosition, fogGoal);
 
   keyLight.target.position.set(cameraPosition.x, world.sample(cameraPosition.x, cameraPosition.z).height, cameraPosition.z);
   updateShadowBasis(keyDir);
@@ -936,6 +939,7 @@ function frame(now: number): void {
       `quality step ${qualityStep}/3 · pixel ${renderer.getPixelRatio().toFixed(2)}`,
       `render       ${renderer.domElement.width} × ${renderer.domElement.height} · ${renderer.domElement.width * renderer.domElement.height} px`,
       `draw calls   ${renderer.info.render.calls}`,
+      `puff clouds  ${puffClouds.count} instances · 1 draw call`,
       `geometries   ${renderer.info.memory.geometries}`,
       `behavior     ${state.behavior}${state.flapping ? ' (flapping)' : ''}`,
       `wind         ${navigator.wind.x.toFixed(1)}, ${navigator.wind.z.toFixed(1)} m/s (${navigator.wind.speed.toFixed(1)} m/s)`,
@@ -968,17 +972,21 @@ window.addEventListener('beforeunload', () => {
   profiler?.dispose();
   fogTarget.dispose();
   thermalMarker.dispose();
+  puffClouds.dispose();
   terrain.dispose();
 });
 
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
+      puffCloudSnapshot: () => PuffCloudSnapshot;
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
       profile?: { begin: () => void; end: () => void; report: () => ProfileReport };
       reviewFlight?: (start: { x: number; z: number; heading: number } | null) => void;
+      pauseFlight: () => void;
+      setCapturePixelRatio: (ratio: number) => void;
       setTimeScale: (scale: number) => void;
       setTimeOfDay: (phase: number) => void;
       lookAtBody: (body: 'sun' | 'moon' | 'horizon' | 'chase') => void;
@@ -986,6 +994,7 @@ declare global {
       sample: (x: number, z: number) => { water: boolean; river: boolean; height: number; surface: number };
       setViewpoint: (pose: { x: number; y: number; z: number; lookX: number; lookY: number; lookZ: number }) => void;
       clearViewpoint: () => void;
+      setPuffCloudsVisible: (visible: boolean) => void;
       setCaptureClear: (on: boolean) => void;
       setVisibility: (meters: number) => void;
       reviewSpots: () => { confluence: { x: number; z: number; surface: number }; lake: { x: number; z: number; surface: number }; run: { x: number; z: number; surface: number; heading: number }; network: { x: number; z: number; surface: number } };
@@ -1029,6 +1038,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
     return {
       renderedFrames,
       buildTiming: terrain.buildTiming,
+      drawCalls: renderer.info.render.calls,
       seed: world.seed,
       chunks: terrain.chunkCount,
       pending: terrain.pendingCount,
@@ -1076,6 +1086,12 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       },
     };
   },
+  puffCloudSnapshot: () => puffClouds.snapshot(),
+  pauseFlight: () => { reviewFlightPaused = true; },
+  setCapturePixelRatio: (ratio: number) => {
+    if (!Number.isFinite(ratio)) throw new RangeError('Expected a finite capture pixel ratio');
+    renderer.setPixelRatio(THREE.MathUtils.clamp(ratio, 0.25, 2));
+  },
   setTimeScale: (scale: number) => { timeScale = Math.max(1, Math.min(12, scale)); },
   setTimeOfDay: (phase: number) => {
     skySeconds = phase * DAY_SECONDS;
@@ -1090,6 +1106,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
   sample: (x: number, z: number) => world.sample(x, z),
   setViewpoint: (pose) => { heldViewpoint = pose; },
   clearViewpoint: () => { heldViewpoint = null; },
+  setPuffCloudsVisible: (visible: boolean) => puffClouds.setVisible(visible),
   setCaptureClear: (on: boolean) => { captureClear = on; },
   setVisibility: (meters: number) => {
     settings.terrainVisibility = meters;
