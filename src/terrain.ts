@@ -97,7 +97,7 @@ const TREE_SPACING = 29;
 // including a one-chunk move before rebuilds finish, with headroom. A full pool grows rather than drop trees.
 const POOL_CAPACITY = { midTrees: 40_000, nearTrunks: 12_000, cones: 7_500, broadleaf: 7_500, birch: 1_500 };
 // Water blocks of 16 quads. The capacity grows if a lake-heavy ring needs more.
-const WATER_CAPACITY = 2048;
+const WATER_CAPACITY = 4096;
 // Instance data stays relative to an anchor near the stream, so long flights keep float32 precision.
 const POOL_ANCHOR_DISTANCE = 8000;
 
