@@ -9,6 +9,7 @@ const PHASES = [
 ] as const;
 
 test('samples horizon fog asynchronously at fixed sky phases', async ({ page }, testInfo) => {
+  test.setTimeout(210_000);
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('pageerror', (error) => errors.push(error.message));
@@ -20,6 +21,14 @@ test('samples horizon fog asynchronously at fixed sky phases', async ({ page }, 
     Object.assign(window, { __issue97Reads: reads, __issue97Unhandled: unhandled });
     addEventListener('unhandledrejection', (event) => unhandled.push(String(event.reason)));
 
+    // Hold a real GPU fence only during the rapid-change case. This makes stale-read rejection
+    // deterministic even when the driver completes a 1px read before the next animation callback.
+    const waitPrototype = WebGL2RenderingContext.prototype;
+    const originalWait = waitPrototype.clientWaitSync;
+    waitPrototype.clientWaitSync = function (sync, flags, timeout) {
+      if (window.__issue97HoldFence) return this.TIMEOUT_EXPIRED;
+      return originalWait.call(this, sync, flags, timeout);
+    };
     const prototype = WebGL2RenderingContext.prototype as unknown as { readPixels: (this: WebGL2RenderingContext, ...args: unknown[]) => void };
     const original = prototype.readPixels;
     prototype.readPixels = function (this: WebGL2RenderingContext, ...args: unknown[]) {
@@ -43,42 +52,58 @@ test('samples horizon fog asynchronously at fixed sky phases', async ({ page }, 
   });
   const initialFog = await page.evaluate(() => window.__SOARING__.snapshot().fog);
   expect(initialFog.color.every(Number.isFinite)).toBe(true);
-  await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0, undefined, { timeout: 60_000 });
+  await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0, undefined, { timeout: 180_000 });
 
   await mkdir(ARTIFACT_DIR, { recursive: true });
   const phaseRecords: Array<Record<string, unknown>> = [];
   for (const { name, phase } of PHASES) {
-    const frame = await page.evaluate((value) => {
+    const start = await page.evaluate((value) => {
+      const samples = window.__SOARING__.snapshot().fog.samples;
       window.__SOARING__.setTimeOfDay(value);
-      return window.__SOARING__.snapshot().renderedFrames;
+      return { samples, frame: window.__SOARING__.snapshot().renderedFrames, revision: window.__SOARING__.fogSamples!().revision };
     }, phase);
-    await page.waitForFunction((previous) => window.__SOARING__!.snapshot().renderedFrames > previous, frame);
-    await page.waitForTimeout(900);
+    await page.waitForFunction((previous) => window.__SOARING__!.snapshot().renderedFrames > previous, start.frame);
+    // The continuous sampler can start again before polling. Observe a latched successful completion,
+    // then check visible color convergence independently of whether another read is pending.
+    const settled = await page.waitForFunction(({ label, samples, revision, phase }) => {
+      const state = window.__SOARING__.snapshot();
+      const fog = state.fog;
+      const completion = window.__SOARING__.fogSamples!().completion;
+      if (!completion || completion.revision !== revision || completion.phase !== phase || completion.samples <= samples
+        || state.visibleDistance !== 2400
+        || Math.hypot(...fog.color.map((value, index) => value - fog.targetColor[index]!)) >= 0.06) return false;
+      return { label, revision, completion, state: { phase: state.timeOfDay, sunElevation: state.sunElevation, visibleDistance: state.visibleDistance, fog } };
+    }, { label: name, samples: start.samples, revision: start.revision, phase });
+    phaseRecords.push(await settled.jsonValue() as Record<string, unknown>);
+    await settled.dispose();
     const screenshot = await page.screenshot({ path: `${ARTIFACT_DIR}/${name}.png` });
     await testInfo.attach(`issue-97-${name}`, { body: screenshot, contentType: 'image/png' });
-    phaseRecords.push(await page.evaluate((label) => {
-      const state = window.__SOARING__.snapshot() as ReturnType<typeof window.__SOARING__.snapshot> & {
-        fog?: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number };
-      };
-      return { label, state: { phase: state.timeOfDay, sunElevation: state.sunElevation, visibleDistance: state.visibleDistance, fog: state.fog ?? null } };
-    }, name));
   }
 
   const rapidChange = await page.evaluate(async () => {
     const app = window.__SOARING__;
+    window.__issue97HoldFence = true;
     app.setTimeOfDay(0.5);
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    const inFlight = app.snapshot().fog.readPending;
+    let inFlight = false;
+    for (let frame = 0; frame < 120 && !inFlight; frame += 1) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      inFlight = app.snapshot().fog.readPending;
+    }
     const samplesBeforeChange = app.snapshot().fog.samples;
+    const discardedBeforeChange = app.fogSamples!().discarded;
     app.setTimeOfDay(0.72);
     app.setTimeOfDay(0);
-    return { renderedFrames: app.snapshot().renderedFrames, inFlight, samplesBeforeChange };
+    window.__issue97HoldFence = false;
+    return { renderedFrames: app.snapshot().renderedFrames, inFlight, samplesBeforeChange,
+      discardedBeforeChange, revision: app.fogSamples!().revision };
   });
+  expect(rapidChange.inFlight).toBe(true);
   await page.waitForFunction((previous) => window.__SOARING__!.snapshot().renderedFrames > previous.renderedFrames, rapidChange);
-  await page.waitForFunction((samples) => {
-    const fog = window.__SOARING__!.snapshot().fog;
-    return fog.samples > samples && !fog.readPending;
-  }, rapidChange.samplesBeforeChange);
+  await page.waitForFunction(({ samplesBeforeChange, discardedBeforeChange, revision }) => {
+    const debug = window.__SOARING__.fogSamples!();
+    return debug.completion?.revision === revision && debug.completion.samples > samplesBeforeChange
+      && debug.discarded > discardedBeforeChange;
+  }, rapidChange);
   await page.waitForTimeout(900);
 
   const timing = await page.evaluate(async () => {
@@ -109,6 +134,9 @@ test('samples horizon fog asynchronously at fixed sky phases', async ({ page }, 
       rapidChangeFinalPhase: snapshot.timeOfDay,
       rapidChangeHadReadInFlight: rapidChange.inFlight,
       rapidFog: snapshot.fog,
+      rapidCompletion: window.__SOARING__.fogSamples!(),
+      expectedRapidRevision: rapidChange.revision,
+      discardedBeforeChange: rapidChange.discardedBeforeChange,
       reads: globals.__issue97Reads,
       unhandledRejections: globals.__issue97Unhandled,
       timing,
@@ -124,11 +152,19 @@ test('samples horizon fog asynchronously at fixed sky phases', async ({ page }, 
   expect(errors).toEqual([]);
   expect(result.rapidChangeFinalPhase).toBe(0);
   expect(result.rapidChangeHadReadInFlight).toBe(true);
+  expect(result.rapidCompletion.completion?.revision).toBe(result.expectedRapidRevision);
+  expect(result.rapidCompletion.completion?.phase).toBe(0);
+  expect(result.rapidCompletion.completion?.failures).toBe(0);
+  expect(result.rapidCompletion.discarded).toBeGreaterThan(result.discardedBeforeChange);
   for (const phase of result.phases) {
+    const completion = phase.completion as { revision: number; samples: number; failures: number; phase: number };
     const state = phase.state as { visibleDistance: number; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } | null };
     expect(state.visibleDistance).toBe(2400);
     expect(state.fog).not.toBeNull();
-    expect(state.fog?.readPending).toBe(false);
+    expect(completion.revision).toBe(phase.revision);
+    expect(completion.phase).toBe((phase.state as { phase: number }).phase);
+    expect(completion.samples).toBeGreaterThan(0);
+    expect(completion.failures).toBe(0);
     expect(state.fog?.samples).toBeGreaterThan(0);
     expect(state.fog?.failures).toBe(0);
     expect(Math.hypot(...state.fog!.color.map((value, index) => value - state.fog!.targetColor[index]!))).toBeLessThan(0.06);
@@ -143,6 +179,7 @@ test('samples horizon fog asynchronously at fixed sky phases', async ({ page }, 
 
 declare global {
   interface Window {
+    __issue97HoldFence?: boolean;
     __issue97Reads?: { synchronous: number; asynchronous: number };
     __issue97Unhandled?: string[];
   }

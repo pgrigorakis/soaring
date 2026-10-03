@@ -223,6 +223,9 @@ let fogSampleDisposed = false;
 let fogSamplingFailed = false;
 let fogSampleCount = 0;
 let fogReadbackFailures = 0;
+type FogReadCompletion = { revision: number; phase: number; samples: number; targetColor: number[]; color: number[]; failures: number };
+let fogReadCompletion: FogReadCompletion | null = null;
+let fogDiscardedReads = 0;
 function sampleHorizonColor(): void {
   if (fogSamplePending || fogSampleDisposed || fogSamplingFailed) return;
   fogSamplePending = true;
@@ -255,10 +258,19 @@ function sampleHorizonColor(): void {
   }
 
   void renderer.readRenderTargetPixelsAsync(fogTarget, 0, 0, 1, 1, fogPixel).then((pixel) => {
-    if (fogSampleDisposed || revision !== fogInputRevision) return;
+    if (fogSampleDisposed) return;
+    if (revision !== fogInputRevision) {
+      if (import.meta.env.DEV) fogDiscardedReads += 1;
+      return;
+    }
     fogSample.setRGB(pixel[0]! / 255, pixel[1]! / 255, pixel[2]! / 255);
     fogGoal.copy(neutralToneMap(fogSample, exposure));
     fogSampleCount += 1;
+    if (import.meta.env.DEV) {
+      // Latch one coherent successful completion; a continuous sampler need not become idle.
+      fogReadCompletion = { revision, phase: skySeconds / DAY_SECONDS, samples: fogSampleCount,
+        targetColor: [fogGoal.r, fogGoal.g, fogGoal.b], color: [fog.color.r, fog.color.g, fog.color.b], failures: fogReadbackFailures };
+    }
   }).catch(() => {
     if (fogSampleDisposed) return;
     fogReadbackFailures += 1;
@@ -901,6 +913,7 @@ declare global {
   interface Window {
     __SOARING__: {
       snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
+      fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
       reviewFlight?: (start: { x: number; z: number; heading: number } | null) => void;
       setTimeScale: (scale: number) => void;
@@ -918,6 +931,7 @@ declare global {
 }
 window.__SOARING__ = {
   ...(import.meta.env.DEV ? {
+    fogSamples: () => ({ revision: fogInputRevision, discarded: fogDiscardedReads, completion: fogReadCompletion }),
     // Freeze only navigation for repeatable lighting comparisons. The normal
     // chase camera, renderer, streaming and light loop remain unchanged.
     reviewFlight: (pose: { x: number; z: number; heading: number } | null) => {
