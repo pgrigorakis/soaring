@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
-  EagleNavigator, EagleView, inwardThermalBankSign, THERMAL_CLIMB_RANGE, type EagleState,
+  EagleNavigator, EagleView, inwardThermalBankSign, RIDGE, ridgeClimb, THERMAL_CLIMB_RANGE, type EagleState,
 } from '../src/eagle';
 import { WorldModel } from '../src/world';
 
@@ -106,6 +106,18 @@ describe('procedural eagle', () => {
     }
     expect(riding).toBe(true);
     expect(checkedBank && checkedClimb).toBe(true);
+  });
+
+  it('keeps windward lift on a peaked crest and rejects a lee face, a flat face, and a short spur', () => {
+    const wind = { x: 8, z: 0, speed: 8, angle: 0 };
+    const peaked = 20 * Math.PI / 180;
+    expect(ridgeClimb(peaked, 0, wind)).toBeGreaterThanOrEqual(RIDGE.enterClimb);
+    expect(ridgeClimb(peaked, Math.PI, wind)).toBe(0);
+    expect(ridgeClimb(5 * Math.PI / 180, 0, wind)).toBeLessThan(RIDGE.enterClimb);
+    expect(RIDGE.minSlope).toBe(18 * Math.PI / 180);
+    expect(RIDGE.crestDrop).toBe(40);
+    expect(RIDGE.minSegment).toBe(320);
+    expect(RIDGE.minSegment).toBeGreaterThan(RIDGE.segmentStep * 2);
   });
 });
 

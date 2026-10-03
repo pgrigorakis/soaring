@@ -51,7 +51,8 @@ const MAX_TREE_SLOPE = 0.6;
 const TREE_BANK_CLEARANCE = 18;
 /**
  * Captain decision on #85: the world top is about 1,050 m, fly-with-me scale.
- * #87 and #88 share this scale. Snow and the tree line follow temperature (#93).
+ * #87 keeps this top. #88 shares it when pyramid summits arrive.
+ * Snow and the tree line follow temperature (#93).
  */
 export const WORLD_TOP = 1050;
 /** Valley influence before the height scale. Highland valleys multiply this by the relief scale. */
@@ -59,10 +60,15 @@ const VALLEY_REACH = 1600;
 /** Maximum warped lake plus node jitter, from the previous reach search. */
 const MAX_LAKE_REACH = 1470;
 /**
- * Massif lift on the current ridge shape. Tuned so sampled crests reach WORLD_TOP.
- * #87 replaces the ridge with a ridged multifractal and keeps this scale.
+ * Massif amplitude. Fly-with-me's massif is 640 m and its pyramids make up the rest.
+ * #88 owns those summits, so this amplitude is tuned until rendered crests reach about WORLD_TOP.
  */
-const MASSIF_LIFT = 1040;
+const MASSIF_LIFT = 1600;
+/** Four-octave ridged multifractal wavelength, fly-with-me's 1.6 km massif scale. */
+const MASSIF_WAVELENGTH = 1600;
+/** Second warp, on the already continentally warped coordinates: 260 m at 900 m. */
+const MASSIF_WARP = 260;
+const MASSIF_WARP_WAVELENGTH = 900;
 /** Continental warp, matching fly-with-me: about 700 m at a 2.2 km scale. */
 const LANDFORM_WARP = 700;
 const LANDFORM_WARP_WAVELENGTH = 2200;
@@ -224,6 +230,30 @@ export function gradientNoise(x: number, z: number, seed: number): number {
   const nx0 = n00 + (n10 - n00) * u;
   const nx1 = n01 + (n11 - n01) * u;
   return (nx0 + (nx1 - nx0) * v) * 1.6;
+}
+
+/**
+ * Ridged multifractal in about [0, 1]. Finer octaves sharpen only where the coarser
+ * ridge already stands, and each finer octave has a rounder crest. fly-with-me
+ * `ridgedMulti` is the reference.
+ */
+export function ridgedMulti(x: number, z: number, seed: number, octaves = 4): number {
+  let amplitude = 1;
+  let frequency = 1;
+  let sum = 0;
+  let norm = 0;
+  let weight = 1;
+  for (let octave = 0; octave < octaves; octave += 1) {
+    const noise = gradientNoise(x * frequency, z * frequency, seed + octave * 977);
+    let n = 1 - Math.sqrt(noise * noise + 0.012 + 0.03 * octave);
+    n = n * n * weight;
+    weight = Math.min(1, Math.max(0, n * 1.7));
+    sum += n * amplitude;
+    norm += amplitude;
+    amplitude *= 0.5;
+    frequency *= 2.05;
+  }
+  return sum / norm;
 }
 
 /** Fractal gradient noise in about [-1, 1]. Landform terms use this, not `fbm`. */
@@ -625,17 +655,16 @@ export class WorldModel {
   }
 
   /**
-   * Highland massif. #87 replaces this ridge with a warped ridged multifractal
-   * and keeps MASSIF_LIFT, the scale that reaches WORLD_TOP.
+   * Highland massif: a four-octave ridged multifractal at 1.6 km, warped again by
+   * 260 m at 900 m. The 700 m continental warp is already in the coordinates.
+   * The existing mountain-region mask keeps it on Highlands. Drainage reads this term.
    */
   private massifTerm(x: number, z: number, landform: BiomeWeights, mountainRegion: number): number {
     if (landform.highlands === 0) return 0;
-    // Wavelength grows with the lift, so this ridge is not a cliff at the new height.
-    // #87 replaces the shape and can sharpen it.
-    const wavelength = 1550 * (MASSIF_LIFT / 380);
-    const ridges = 1 - Math.abs(gradientFbm(x / wavelength, z / wavelength, this.seed + 47, 4));
-    const ridge = clamp01((ridges - 0.34) / 0.66);
-    return landform.highlands * mountainRegion * ridge * ridge * MASSIF_LIFT;
+    const rx = x + MASSIF_WARP * gradientFbm(x / MASSIF_WARP_WAVELENGTH + 3.3, z / MASSIF_WARP_WAVELENGTH - 1.1, this.seed + 29, 2);
+    const rz = z + MASSIF_WARP * gradientFbm(x / MASSIF_WARP_WAVELENGTH - 2.2, z / MASSIF_WARP_WAVELENGTH + 4.4, this.seed + 31, 2);
+    const ridge = ridgedMulti(rx / MASSIF_WAVELENGTH, rz / MASSIF_WAVELENGTH, this.seed + 23, 4);
+    return landform.highlands * mountainRegion * ridge * MASSIF_LIFT;
   }
 
   /**

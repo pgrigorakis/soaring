@@ -22,4 +22,4 @@ To reproduce:
 4. Hide the intro and controls for capture. Wait until `snapshot().pending === 0` and `snapshot().visibleDistance === 5000`.
 5. Call `setTimeOfDay(0.5)` for noon and `setTimeOfDay(0.72)` for golden hour. Wait for a new rendered frame before each screenshot. Snow is white `#F2F4F7`; no face receives the board's blue shadow colour.
 
-`tests/highlands-cover.smoke.ts` also verifies full snow above 420 m, bare faces above 40°, no snow below 380 m, and a small headwater cirque lake feeding a downhill river.
+`tests/highlands-cover.smoke.ts` also verifies a snow cap on a cold crest, bare faces above 40°, no snow on warm ground, and a small headwater cirque lake feeding a downhill river. Snow follows temperature.
