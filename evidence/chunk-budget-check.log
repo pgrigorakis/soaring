@@ -9,43 +9,42 @@
 
  RUN  v3.2.7 /Users/pgrigorakis/.treehouse/soaring-b45a19/4/soaring
 
- ✓ tests/sky-cycle.test.ts (4 tests) 5ms
- ✓ tests/audio.test.ts (6 tests) 20ms
- ✓ tests/eagle.test.ts (4 tests) 419ms
-   ✓ procedural eagle > circles with the rendered bank toward the thermal and climbs at 3–4 m/s  393ms
- ✓ tests/thermal-marker.test.ts (3 tests) 2055ms
-   ✓ thermal markers within 3.5 km > reuses one instanced column for every in-range thermal and hides the rest  995ms
-   ✓ thermal markers within 3.5 km > tracks every in-range thermal through seeking, circling, and replacement  790ms
- ✓ tests/world.test.ts (19 tests) 3842ms
-   ✓ deterministic world generation > keeps tree positions identical across chunk partitions, including negative boundaries  461ms
-   ✓ deterministic world generation > makes large forests, open meadows, small groves and isolated trees  711ms
+ ✓ tests/sky-cycle.test.ts (4 tests) 4ms
+ ✓ tests/audio.test.ts (6 tests) 19ms
+ ✓ tests/eagle.test.ts (4 tests) 424ms
+   ✓ procedural eagle > circles with the rendered bank toward the thermal and climbs at 3–4 m/s  412ms
+ ✓ tests/thermal-marker.test.ts (3 tests) 2069ms
+   ✓ thermal markers within 3.5 km > reuses one instanced column for every in-range thermal and hides the rest  984ms
+   ✓ thermal markers within 3.5 km > tracks every in-range thermal through seeking, circling, and replacement  788ms
+ ✓ tests/world.test.ts (19 tests) 3906ms
+   ✓ deterministic world generation > keeps tree positions identical across chunk partitions, including negative boundaries  471ms
+   ✓ deterministic world generation > makes large forests, open meadows, small groves and isolated trees  712ms
    ✓ deterministic world generation > places thermals deterministically and never on water  756ms
-   ✓ deterministic world generation > carves river valleys without near-vertical walls  304ms
-   ✓ deterministic world generation > marks river water at its reach and keeps trees off steep slopes  362ms
-   ✓ deterministic world generation > never leaves dry ground under the water drawn at a river or lake edge  985ms
- ✓ tests/terrain.test.ts (5 tests) 14984ms
-   ✓ terrain streaming > streams nearest first within a time budget and covers the reach  530ms
-   ✓ terrain streaming > keeps haze on loaded tiles while extending the reach, including after recentering  6294ms
-   ✓ terrain streaming > gives distant tiles the same trees and shadows as detailed tiles  6334ms
-   ✓ terrain streaming > renders several distinct instanced tree silhouettes at generated world positions  924ms
-   ✓ terrain streaming > matches terrain and river water across a chunk seam built by separate streams  901ms
- ✓ tests/navigation-route.test.ts (3 tests) 22745ms
-   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 448122  7597ms
-   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 0  7804ms
-   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 4294967295  7342ms
- ✓ tests/navigation.test.ts (12 tests) 30896ms
-   ✓ autonomous eagle navigation > finishes a thermal approach through the visible navigation path  2038ms
-   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 50–70 m during a one-hour flight  10167ms
-   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 90–145 m during a one-hour flight  9190ms
-   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 65–210 m during a one-hour flight  8105ms
+   ✓ deterministic world generation > marks river water at its reach and keeps trees off steep slopes  375ms
+   ✓ deterministic world generation > never leaves dry ground under the water drawn at a river or lake edge  1008ms
+ ✓ tests/terrain.test.ts (5 tests) 15150ms
+   ✓ terrain streaming > streams nearest first within a time budget and covers the reach  526ms
+   ✓ terrain streaming > keeps haze on loaded tiles while extending the reach, including after recentering  6424ms
+   ✓ terrain streaming > gives distant tiles the same trees and shadows as detailed tiles  6448ms
+   ✓ terrain streaming > renders several distinct instanced tree silhouettes at generated world positions  885ms
+   ✓ terrain streaming > matches terrain and river water across a chunk seam built by separate streams  865ms
+ ✓ tests/navigation-route.test.ts (3 tests) 22852ms
+   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 448122  7749ms
+   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 0  7863ms
+   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 4294967295  7240ms
+ ✓ tests/navigation.test.ts (12 tests) 30974ms
+   ✓ autonomous eagle navigation > finishes a thermal approach through the visible navigation path  2072ms
+   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 50–70 m during a one-hour flight  10370ms
+   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 90–145 m during a one-hour flight  9011ms
+   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 65–210 m during a one-hour flight  8148ms
    ✓ autonomous eagle navigation > circles a thermal with varying radius and bank, climbing without flapping  301ms
-   ✓ autonomous eagle navigation > keeps thermal-riding past 19 s when below maximum flight height  321ms
-   ✓ autonomous eagle navigation > leaves thermal-riding at maximum flight height without a fixed timer  738ms
+   ✓ autonomous eagle navigation > keeps thermal-riding past 19 s when below maximum flight height  307ms
+   ✓ autonomous eagle navigation > leaves thermal-riding at maximum flight height without a fixed timer  731ms
 
  Test Files  8 passed (8)
       Tests  56 passed (56)
-   Start at  09:48:36
-   Duration  31.22s (transform 328ms, setup 0ms, collect 745ms, tests 74.97s, environment 1ms, prepare 338ms)
+   Start at  12:39:20
+   Duration  31.32s (transform 237ms, setup 0ms, collect 668ms, tests 75.40s, environment 1ms, prepare 367ms)
 
 
 > soaring-wilderness@0.1.0 build
@@ -64,4 +63,4 @@ dist/assets/index-7wviiv1t.js   607.81 kB │ gzip: 163.62 kB
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 483ms
+✓ built in 450ms

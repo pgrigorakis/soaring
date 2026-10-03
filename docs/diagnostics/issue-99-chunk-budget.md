@@ -60,6 +60,12 @@ The final validation reconciled main `4947104`, including async fog, sky order, 
 
 Final normal-rendering measurements used the same 1440×900 viewport, seed 12345, held 720→1440 m camera move, 5 km setting, pixel ratio 1 and quality step 0. See `evidence/chunk-budget-reconciled-after.json`. They recorded **60.2 FPS**, 16.8 ms maximum/p95 gap, **14.36/66.8 ms** lifetime mean/max chunk CPU, **1.0 ms** maximum step and **4.7 ms** maximum update. At ten seconds, 172 builds had completed and one remained pending; haze was correctly limited to 4853 m. The remaining build then completed and restored 605 loaded chunks and full 5000 m coverage. The final run includes upstream rendering improvements, so it must not be attributed to terrain streaming alone. The earlier controlled comparison remains the terrain-only evidence.
 
+### Production render check
+
+GitHub run `37108196457` on head `e340ab9` passed all development smoke checks: 26 passed and one GPU-capability check skipped. Its only failure was the production bundle's 30-second pixel wait. The retained screenshot showed a rendered eagle and fog-limited terrain, while the test polled a uniform bottom-left region outside the actual draw callback. A throttled SwiftShader browser reproduced one-color default-framebuffer reads despite a rendered screenshot.
+
+The production check now latches a foreground pixel sample immediately after a real default-framebuffer draw, before browser composition can discard the buffer. It ignores offscreen targets and uses actual drawing-buffer coordinates. It retains the >8-color threshold, zero seed, base path, absence of development APIs, hidden diagnostics and no-error assertions. The production bundle and graphics settings are unchanged. Both native and one-worker SwiftShader production tests passed locally. See `evidence/chunk-budget-production-diagnosis.md` and `evidence/chunk-budget-production-visible-pixels.json`.
+
 ## Validation
 
 Before implementation, failure modes were recorded in `evidence/chunk-budget-failure-modes.md` and the recenter/cancellation E2E test was written in `tests/chunk-budget.smoke.ts`. That test runs real streaming in Low power, cancels partial builds, changes center again, then checks normal mode, complete coverage, reuse, and GPU geometry bounds. It attaches JSON records and a screenshot. Existing unit tests were adapted to millisecond budgets, not expanded after implementation.

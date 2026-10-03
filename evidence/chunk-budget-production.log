@@ -5,6 +5,6 @@
 
 Running 1 test using 1 worker
 
-  ✓  1 tests/bundle.production.ts:3:1 › production bundle serves from its base path and renders without dev hooks or page errors (1.1s)
+  ✓  1 tests/bundle.production.ts:3:1 › production bundle serves from its base path and renders without dev hooks or page errors (486ms)
 
-  1 passed (2.2s)
+  1 passed (1.6s)
