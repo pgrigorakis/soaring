@@ -1,11 +1,11 @@
 // Measures the landform: world top, lowland slope, lattice-node slope, and Moor peat pools.
-// Repeatable artifact: node scripts/measure-relief.mjs
+// Repeatable artifact: node scripts/measure-relief.mjs [world-source] [report-path]
 import { build } from 'esbuild';
 import { mkdir, writeFile } from 'node:fs/promises';
 
 await mkdir('test-results', { recursive: true });
 await build({
-  entryPoints: ['src/world.ts'],
+  entryPoints: [process.argv[2] ?? 'src/world.ts'],
   outfile: 'test-results/relief-world.mjs',
   bundle: true,
   platform: 'node',
@@ -145,5 +145,6 @@ for (const seed of seeds) {
   console.log(seed, JSON.stringify(report.seeds[seed]));
 }
 report.seconds = (Date.now() - started) / 1000;
-await writeFile('test-results/relief-measures.json', JSON.stringify(report, null, 2));
-console.log('wrote test-results/relief-measures.json', report.seconds);
+const output = process.argv[3] ?? 'test-results/relief-measures.json';
+await writeFile(output, JSON.stringify(report, null, 2));
+console.log('wrote', output, report.seconds);
