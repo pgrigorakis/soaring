@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test';
 
-const port = Number(process.env.PRODUCTION_SMOKE_PORT ?? 4198);
+const port = Number(process.env.PRODUCTION_SMOKE_PORT ?? 41983);
 const origin = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
