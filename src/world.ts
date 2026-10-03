@@ -1,4 +1,4 @@
-import { BIOME_PROFILES, BIOME_SELECTION, WOODLAND_GLADES, biomeWeights, blendParameter, transition, type BiomeWeights } from './biome';
+import { BIOME_PROFILES, BIOME_SELECTION, CLIMATE, CLIMATE_LINES, WOODLAND_GLADES, biomeWeights, blendParameter, transition, type BiomeWeights } from './biome';
 
 export type LandscapeSample = {
   biome: BiomeWeights;
@@ -15,6 +15,8 @@ export type LandscapeSample = {
   /** Distance from the nearest river or lake shore; negative inside the water. */
   bank: number;
   moisture: number;
+  /** Climate temperature at this height: lower on high ground. Snow and the tree line follow it. */
+  temperature: number;
   forest: number;
   rock: number;
   water: boolean;
@@ -49,7 +51,7 @@ const MAX_TREE_SLOPE = 0.6;
 const TREE_BANK_CLEARANCE = 18;
 /**
  * Captain decision on #85: the world top is about 1,050 m, fly-with-me scale.
- * #87 and #88 share this scale. Snow stays on its current line until #87.
+ * #87 and #88 share this scale. Snow and the tree line follow temperature (#93).
  */
 export const WORLD_TOP = 1050;
 /** Valley influence before the height scale. Highland valleys multiply this by the relief scale. */
@@ -336,9 +338,14 @@ export class WorldModel {
   private readonly thermals = new Map<string, Thermal | null>();
   private readonly riverNodes = new Map<number, RiverNode>();
   private readonly nearbyReaches = new Map<number, Reach[]>();
+  /** Hashed from the world seed, as fly-with-me does, so nearby seeds do not share a climate. */
+  private readonly temperatureSeed: number;
+  private readonly regionSeed: number;
 
   constructor(seed: number) {
     this.seed = seed >>> 0;
+    this.temperatureSeed = Math.floor(hash2(this.seed, 2, 0x3c4d) * 0x10000);
+    this.regionSeed = Math.floor(hash2(this.seed, 3, 0x5e6f) * 0x10000);
   }
 
   /** Drop the least-recently-used entries from each cache until it meets the cap. */
@@ -357,7 +364,7 @@ export class WorldModel {
   }
 
   sample(x: number, z: number): LandscapeSample {
-    const { mountainRegion, elevation, biome, hills } = this.relief(x, z);
+    const { mountainRegion, elevation, biome, hills, seaTemperature } = this.relief(x, z);
     const highland = biome.highlands;
     // The drainage lattice reads the landform without the 520 m hills; the rendered ground adds them.
     // None of the landform terms is blended through the 500 m lattice.
@@ -372,6 +379,10 @@ export class WorldModel {
     let nearest: Shore | null = null;
     let second: Shore | null = null;
     let wet: Shore | null = null;
+    // Overlapping river channels share one water level, weighted by depth inside each,
+    // so a narrow confluence of steep tributaries has no step in its water.
+    let riverLevel = 0;
+    let riverDepth = 0;
     const accepted: Shore[] = [];
     const coneOf = (shore: Shore) => {
       const distance = Math.max(0, shore.shoreDist) / reliefScale;
@@ -409,6 +420,10 @@ export class WorldModel {
         second = nearest;
         nearest = shore;
       } else if (!second || shore.shoreDist < second.shoreDist) second = shore;
+      if (shore.shoreDist <= 0 && !shore.lake) {
+        riverLevel -= shore.surface * shore.shoreDist;
+        riverDepth -= shore.shoreDist;
+      }
       if (shore.shoreDist <= 0 && (!wet || (shore.lake && !wet.lake) || (shore.lake === wet.lake && shore.shoreDist < wet.shoreDist))) {
         wet = shore;
       }
@@ -452,7 +467,7 @@ export class WorldModel {
     if (wet) {
       river = !wet.lake;
       lake = wet.lake;
-      surface = wet.surface;
+      surface = !wet.lake && riverDepth > 0 ? riverLevel / riverDepth : wet.surface;
       bank = wet.shoreDist;
       const depth = wet.lake ? 3.6 + Math.max(0, wet.half - MAX_LAKE_RADIUS) * 0.025 : 2.7;
       const inward = Math.min(-wet.shoreDist, wet.islandRadius ? Math.max(0, wet.islandDistance! - wet.islandRadius) : Infinity);
@@ -512,7 +527,9 @@ export class WorldModel {
     const rock = clamp01(biome.highlands * (mountainRegion * 0.74 + smootherstep(96, 170, height))
       + blendParameter(biome, 'rockBias', 0) + biome.moor * localHigh * 0.7);
 
-    return { height, mountainRegion, surface, bank, moisture, forest, rock, water: lake || river, river, biome, glade, field, hedge, fieldEdge, moorPatch, peat, island };
+    const temperature = seaTemperature - Math.max(0, height) / CLIMATE.lapse;
+
+    return { height, mountainRegion, surface, bank, moisture, temperature, forest, rock, water: lake || river, river, biome, glade, field, hedge, fieldEdge, moorPatch, peat, island };
   }
 
   /**
@@ -523,25 +540,42 @@ export class WorldModel {
    * lowland, massif (#87 replaces the ridge), summits (#88).
    */
   private relief(x: number, z: number) {
-    // Biome eligibility stays on the unwarped value-noise field. #93 owns selection.
-    const broad = fbm(x / 3200, z / 3200, this.seed + 7, 4);
+    // Highlands and Lakeland stay on their unwarped value-noise fields (#93 decisions).
     const mountainRegion = smootherstep(0.04, 0.48, fbm(x / BIOME_SELECTION.reliefWavelength, z / BIOME_SELECTION.reliefWavelength, this.seed + 61, 3));
-    const climate = clamp01(0.5 + fbm(x / BIOME_SELECTION.climateWavelength, z / BIOME_SELECTION.climateWavelength, this.seed + 127, 3));
-    const dry = 1 - transition(BIOME_SELECTION.moorThreshold, climate);
-    const candidate = 65 + broad * 45 + dry * (85 + broad * 15);
-    const hillsField = clamp01(0.5 + fbm(x / BIOME_SELECTION.hillsWavelength, z / BIOME_SELECTION.hillsWavelength, this.seed + 129, 3));
     const lakeField = clamp01(0.5 + fbm(x / BIOME_SELECTION.lakeWavelength, z / BIOME_SELECTION.lakeWavelength, this.seed + 131, 4));
-    // Lakeland replaces appearance and basin water, not the accepted drainage
-    // landform. Both allocations use the same ordered biome rules; the landform
-    // allocation reserves no lake territory, exactly as before issue 59.
-    const landform = biomeWeights(mountainRegion, climate, candidate, hillsField);
-    const biome = biomeWeights(mountainRegion, climate, candidate, hillsField, lakeField);
+    const { seaTemperature, moisture, region } = this.climate(x, z);
+    // Temperature reads the height, and the lowland height reads the biome. One pass at
+    // sea-level temperature estimates the height; massif and summits read only the
+    // Highlands weight, which climate does not change, so they are computed once.
     const warped = warpLandform(x, z, this.seed);
+    // Exclude the ground-only 520 m hills from selection too: otherwise their
+    // cooling would change the broad profile height and feed hills back into drainage.
+    const estimate = biomeWeights(mountainRegion, seaTemperature, moisture, region);
+    const mountains = this.massifTerm(warped.x, warped.z, estimate, mountainRegion) + this.summitTerm(x, z, estimate);
+    const temperature = seaTemperature - Math.max(0, this.lowlandTerm(warped.x, warped.z, estimate) + mountains) / CLIMATE.lapse;
+    // Lakeland replaces appearance and basin water, not the accepted drainage
+    // landform. Both allocations use the same biome rules; the landform
+    // allocation reserves no lake territory, exactly as before issue 59.
+    const landform = biomeWeights(mountainRegion, temperature, moisture, region);
+    const biome = biomeWeights(mountainRegion, temperature, moisture, region, lakeField);
+    const elevation = this.lowlandTerm(warped.x, warped.z, landform) + mountains;
     const hills = this.peatShelf(x, z, landform, this.lowlandHills(warped.x, warped.z, landform));
-    const elevation = this.lowlandTerm(warped.x, warped.z, landform)
-      + this.massifTerm(warped.x, warped.z, landform, mountainRegion)
-      + this.summitTerm(x, z, landform);
-    return { elevation, mountainRegion, biome, hills };
+    return { elevation, mountainRegion, biome, landform, hills, seaTemperature };
+  }
+
+  /**
+   * Temperature at sea level, moisture and region, as fly-with-me samples them: two octaves
+   * of gradient noise in coordinates warped about 900 m, so biome borders wander.
+   */
+  private climate(x: number, z: number) {
+    const wavelength = CLIMATE.scale;
+    const kx = x + CLIMATE.warp * gradientFbm(x / 3000 + 4.1, z / 3000 - 2.2, this.regionSeed + 41, 2);
+    const kz = z + CLIMATE.warp * gradientFbm(x / 3000 - 7.7, z / 3000 + 5.5, this.regionSeed + 43, 2);
+    return {
+      seaTemperature: gradientFbm(kx / wavelength + 9.1, kz / wavelength + 3.3, this.temperatureSeed, 2) * 0.5 + 0.5,
+      moisture: gradientFbm(kx / (wavelength * 0.8) - 8.4, kz / (wavelength * 0.8) + 15.2, this.temperatureSeed + 3, 2) * 0.5 + 0.5,
+      region: gradientFbm(kx / (wavelength * 0.9) + 21.3, kz / (wavelength * 0.9) - 8.8, this.regionSeed + 19, 2) * 0.5 + 0.5,
+    };
   }
 
   /** Lowland and highland base, on warped gradient noise. The 520 m hills are separate, in `lowlandHills`. */
@@ -1112,9 +1146,10 @@ export class WorldModel {
           + sample.biome.moor * (0.004 + moorGrove * 0.3)
           + sample.biome.highlands * (0.018 + sample.forest * clumping)
           + sample.biome.lakeland * (sample.island ? 0.5 : 0.2);
-        if (sample.water || (sample.height >= 320 && sample.biome.highlands > 0.5)
+        const [treeStart, treeEnd] = CLIMATE_LINES.treeLine;
+        if (sample.water || (sample.temperature <= treeEnd && sample.biome.highlands > 0.5)
           || sample.rock > mix(0.72, 1, sample.biome.highlands)
-          || hash2(cx, cz, this.seed + 349) > chance * (1 - sample.biome.highlands * smootherstep(280, 320, sample.height))) continue;
+          || hash2(cx, cz, this.seed + 349) > chance * (1 - sample.biome.highlands * smootherstep(treeStart, treeEnd, sample.temperature))) continue;
         if (sample.bank < TREE_BANK_CLEARANCE) continue;
         const slope = Math.hypot(this.sample(x + 3, z).height - sample.height, this.sample(x, z + 3).height - sample.height) / 3;
         if (slope > MAX_TREE_SLOPE) continue;

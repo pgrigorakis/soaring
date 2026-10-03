@@ -83,9 +83,11 @@ describe('deterministic world generation', () => {
 
   it('makes large forests, open meadows, small groves and isolated trees', () => {
     const world = new WorldModel(80231);
+    // #93's climate selection made the origin window core Woodland; this mixed window is 9 km south.
+    const southZ = -25;
     const counts: Array<{ x: number; z: number; n: number }> = [];
     for (let z = -12; z <= 12; z += 1) {
-      for (let x = -12; x <= 12; x += 1) counts.push({ x, z, n: world.treesInArea(x * 360, z * 360, 360, 36).length });
+      for (let x = -12; x <= 12; x += 1) counts.push({ x, z, n: world.treesInArea(x * 360, (z + southZ) * 360, 360, 36).length });
     }
     const at = (x: number, z: number) => counts.find((cell) => cell.x === x && cell.z === z)?.n ?? 0;
     const interior = counts.filter((cell) => Math.abs(cell.x) < 12 && Math.abs(cell.z) < 12);

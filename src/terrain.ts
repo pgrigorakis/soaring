@@ -4,16 +4,17 @@ import { InstancePool } from './instance-pool';
 import { WaterPool } from './water-pool';
 import { fbm, hash2, type LandscapeSample, type Tree, WorldModel } from './world';
 
-/** Snow stays white; lighting supplies the blue shade. Steep faces remain granite. */
+/** Snow stays white; lighting supplies the blue shade. Steep faces remain granite. Snow follows temperature. */
 export function snowCover(sample: LandscapeSample, slope: number, x: number, z: number, seed: number): number {
-  if (sample.water || slope >= Math.tan(40 * Math.PI / 180) || sample.height < 380) return 0;
-  if (sample.height >= 420) return sample.biome.highlands;
-  const altitude = (sample.height - 380) / 40;
+  const [start, full] = CLIMATE_LINES.snow;
+  if (sample.water || slope >= Math.tan(40 * Math.PI / 180) || sample.temperature > start) return 0;
+  if (sample.temperature <= full) return sample.biome.highlands;
+  const altitude = (start - sample.temperature) / (start - full);
   const patch = fbm(x / 85, z / 85, seed + 389, 2) * 0.5 + 0.5;
   return sample.biome.highlands * THREE.MathUtils.smoothstep(altitude, patch * 0.65, patch * 0.65 + 0.35);
 }
 
-import { BIOME_PROFILES } from './biome';
+import { BIOME_PROFILES, CLIMATE_LINES } from './biome';
 
 const palettes = Object.fromEntries(Object.entries(BIOME_PROFILES).map(([key, profile]) =>
   [key, profile.palette.map((hex) => new THREE.Color(hex))])) as Record<keyof typeof BIOME_PROFILES, THREE.Color[]>;
@@ -46,8 +47,8 @@ export function terrainColor(sample: LandscapeSample, x: number, z: number, seed
   target.add(scratch);
   scratch.copy(highlandPalette[0]!);
   if (sample.forest > 0.55) scratch.copy(highlandPalette[1]!);
-  else if (sample.height > 340 || slope > 0.5) scratch.copy(highlandPalette[2]!).lerp(highlandPalette[3]!, THREE.MathUtils.clamp(normalY - 0.3, 0, 1));
-  else if (sample.height > 320) scratch.lerp(highlandPalette[4]!, THREE.MathUtils.smoothstep(sample.height, 320, 340));
+  else if (sample.temperature < CLIMATE_LINES.scree[1] || slope > 0.5) scratch.copy(highlandPalette[2]!).lerp(highlandPalette[3]!, THREE.MathUtils.clamp(normalY - 0.3, 0, 1));
+  else if (sample.temperature < CLIMATE_LINES.scree[0]) scratch.lerp(highlandPalette[4]!, 1 - THREE.MathUtils.smoothstep(sample.temperature, CLIMATE_LINES.scree[1], CLIMATE_LINES.scree[0]));
   const snow = biome.highlands > 0 ? snowCover(sample, slope, x, z, seed) / biome.highlands : 0;
   scratch.lerp(highlandPalette[5]!, snow).multiplyScalar(biome.highlands);
   target.add(scratch);
