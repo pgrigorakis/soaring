@@ -94,7 +94,7 @@ const FAR = { segments: 16, rocks: 0 };
 const TREE_SPACING = 29;
 // Shared pool capacities fit the densest Woodland ring measured by scripts/audit-tree-pools.mjs,
 // including a one-chunk move before rebuilds finish, with headroom. A full pool grows rather than drop trees.
-const POOL_CAPACITY = { midTrees: 40_000 };
+const POOL_CAPACITY = { midTrees: 40_000, nearTrunks: 12_000, cones: 7_500, broadleaf: 7_500, birch: 1_500 };
 // Instance data stays relative to an anchor near the stream, so long flights keep float32 precision.
 const POOL_ANCHOR_DISTANCE = 8000;
 
@@ -190,6 +190,9 @@ export class TerrainStream {
   // the near tiles, outside the shadow camera's 600 m range, so they skip the shadow pass.
   private readonly midTrunkPool: InstancePool;
   private readonly midCrownPool: InstancePool;
+  private readonly nearTrunkPool: InstancePool;
+  // Conifers draw a lower and an upper cone from the same pool.
+  private readonly crownPools: InstancePool[];
 
   // Reach is the horizontal distance from the camera's tile that must be loaded.
   constructor(scene: THREE.Object3D, world: WorldModel, reach = MIN_VISIBILITY) {
@@ -198,6 +201,9 @@ export class TerrainStream {
     this.reach = reach;
     this.midTrunkPool = new InstancePool(scene, 'mid tree trunks', POOL_CAPACITY.midTrees, this.trunkGeometry, this.trunkMaterial, false, false);
     this.midCrownPool = new InstancePool(scene, 'mid tree crowns', POOL_CAPACITY.midTrees, this.farCrownGeometry, this.farFoliageMaterial, true, false);
+    this.nearTrunkPool = new InstancePool(scene, 'near tree trunks', POOL_CAPACITY.nearTrunks, this.trunkGeometry, this.trunkMaterial, false, true);
+    this.crownPools = (['cones', 'broadleaf', 'birch'] as const).map((kind, index) =>
+      new InstancePool(scene, `near ${kind}`, POOL_CAPACITY[kind], this.crownGeometries[index]!, this.foliageMaterials[index]!, true, true));
     this.terrainMaterial.onBeforeCompile = (shader) => {
       shader.uniforms.shadowFadeRange = this.shadowFadeRange;
       shader.fragmentShader = shader.fragmentShader.replace(
@@ -490,7 +496,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     }
   }
 
-  private get pools(): InstancePool[] { return [this.midTrunkPool, this.midCrownPool]; }
+  private get pools(): InstancePool[] { return [this.midTrunkPool, this.midCrownPool, this.nearTrunkPool, ...this.crownPools]; }
 
   /** Live and total slots per shared pool, for diagnostics and tests. */
   get poolUsage(): Record<string, { used: number; capacity: number; grown: number }> {
@@ -675,9 +681,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       const waterGeometry = yield* this.createWaterGeometry(originX, originZ, chunkSize, waterSegments, wet, levels, waterDepth, buffers);
       if (waterGeometry) group.add(new THREE.Mesh(waterGeometry, this.waterMaterial));
 
-      const treeObjects = treeMode === 'near' ? yield* this.createTrees(originX, originZ, TREE_SPACING) : [];
-      treeObjects.forEach((object) => group.add(object));
-      const farTrees = treeMode === 'far' ? yield* this.world.buildTreesInArea(originX, originZ, CHUNK_SIZE, TREE_SPACING) : [];
+      const trees = treeMode === 'none' ? [] : yield* this.world.buildTreesInArea(originX, originZ, CHUNK_SIZE, TREE_SPACING);
       const rocks = this.createRocks(chunkX, chunkZ, config.rocks, originX, originZ);
       if (rocks) group.add(rocks);
       const tors = detailed ? this.createTors(chunkX, chunkZ) : null;
@@ -700,7 +704,8 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       }
 
       // Pool slots are claimed in the build's last slice, so trees appear together with their tile.
-      this.placeFarTrees(farTrees, pooled, slots);
+      if (treeMode === 'near') this.placeNearTrees(trees, pooled, slots);
+      else this.placeFarTrees(trees, pooled, slots);
       complete = true;
       return { group, tier, descriptor: `${tier}:${treeMode}`, dispose: release };
     } finally {
@@ -789,55 +794,30 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     return geometry;
   }
 
-  private *createTrees(originX: number, originZ: number, spacing: number): Generator<void, THREE.InstancedMesh[]> {
-    const trees = yield* this.world.buildTreesInArea(originX, originZ, CHUNK_SIZE, spacing);
-    if (trees.length === 0) return [];
+  private placeNearTrees(trees: Tree[], pooled: InstancePool[], slots: number[]): void {
     const dummy = new THREE.Object3D();
-    const trunks = new THREE.InstancedMesh(this.trunkGeometry, this.trunkMaterial, trees.length);
-    trees.forEach((tree, index) => {
-      dummy.position.set(tree.x - originX, tree.y + 4.5 * tree.scale, tree.z - originZ);
+    const tint = new THREE.Color();
+    const place = (pool: InstancePool, color?: THREE.Color) => {
+      dummy.updateMatrix();
+      slots.push(pool.add(dummy.matrix, color));
+      pooled.push(pool);
+    };
+    for (const tree of trees) {
+      const kind = tree.kind;
+      dummy.position.set(tree.x, tree.y + 4.5 * tree.scale, tree.z);
       dummy.rotation.set(0, tree.turn, 0);
       dummy.scale.setScalar(tree.scale);
-      dummy.updateMatrix();
-      trunks.setMatrixAt(index, dummy.matrix);
-    });
-    trunks.instanceMatrix.needsUpdate = true;
-    trunks.castShadow = true;
-    const meshes: THREE.InstancedMesh[] = [trunks];
-    const tint = new THREE.Color();
-    for (let kind = 0; kind < this.crownGeometries.length; kind += 1) {
-      const ofKind = trees.filter((tree) => tree.kind === kind);
-      if (ofKind.length === 0) continue;
-      const crowns = new THREE.InstancedMesh(this.crownGeometries[kind]!, this.foliageMaterials[kind]!, ofKind.length);
-      const upper = kind === 0
-        ? new THREE.InstancedMesh(this.crownGeometries[0]!, this.foliageMaterials[0]!, ofKind.length)
-        : null;
-      ofKind.forEach((tree, index) => {
-        dummy.position.set(tree.x - originX, tree.y + (kind === 0 ? 14 : kind === 1 ? 14 : 18) * tree.scale, tree.z - originZ);
-        dummy.rotation.set(0, tree.turn, 0);
-        dummy.scale.set(tree.scale, tree.scale * (kind === 0 ? 1.4 : kind === 1 ? 0.83 : 2.6), tree.scale);
-        dummy.updateMatrix();
-        crowns.setMatrixAt(index, dummy.matrix);
-        treeColor(tree, tint);
-        crowns.setColorAt(index, tint);
-        if (upper) {
-          upper.setColorAt(index, tint);
-          dummy.position.y = tree.y + 22 * tree.scale;
-          dummy.scale.setScalar(tree.scale * 0.85);
-          dummy.updateMatrix();
-          upper.setMatrixAt(index, dummy.matrix);
-        }
-      });
-      crowns.instanceMatrix.needsUpdate = true;
-      crowns.castShadow = true;
-      meshes.push(crowns);
-      if (upper) {
-        upper.instanceMatrix.needsUpdate = true;
-        upper.castShadow = true;
-        meshes.push(upper);
+      place(this.nearTrunkPool);
+      treeColor(tree, tint);
+      dummy.position.y = tree.y + (kind === 2 ? 18 : 14) * tree.scale;
+      dummy.scale.set(tree.scale, tree.scale * (kind === 0 ? 1.4 : kind === 1 ? 0.83 : 2.6), tree.scale);
+      place(this.crownPools[kind]!, tint);
+      if (kind === 0) {
+        dummy.position.y = tree.y + 22 * tree.scale;
+        dummy.scale.setScalar(tree.scale * 0.85);
+        place(this.crownPools[0]!, tint);
       }
     }
-    return meshes;
   }
 
   private placeFarTrees(trees: Tree[], pooled: InstancePool[], slots: number[]): void {

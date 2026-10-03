@@ -31,7 +31,6 @@ function pooled(scene: THREE.Object3D, name: string, tile: THREE.Object3D): THRE
   }
   return positions;
 }
-const treeTrunks = (scene: THREE.Object3D, tile: THREE.Object3D) => pooled(scene, 'tree trunks', tile).length;
 
 describe('terrain streaming', () => {
   it('streams nearest first within a time budget and covers the reach', () => {
@@ -81,7 +80,7 @@ describe('terrain streaming', () => {
     terrain.dispose();
   }, 20_000); // Full visibility builds are CPU-bound on the shared CI runner.
 
-  it('gives distant tiles the same trees and shadows as detailed tiles', () => {
+  it('gives distant tiles the same trees as detailed tiles', () => {
     const scene = new THREE.Scene();
     const world = new WorldModel(80231);
     const terrain = new TerrainStream(scene, world, MAX_VISIBILITY);
@@ -99,15 +98,18 @@ describe('terrain streaming', () => {
     expect(far).toBeDefined();
     const farTrees = pooled(scene, 'mid tree crowns', far).length;
     expect(farTrees).toBeGreaterThan(5);
-    expect(treeTrunks(scene, far)).toBe(farTrees);
-    for (const root of [far, scene.getObjectByName('tree trunks')!, scene.getObjectByName('mid tree crowns')!]) {
-      root.traverse((object) => { if (object instanceof THREE.Mesh && !object.material.transparent) expect(object.castShadow).toBe(true); });
+    expect(pooled(scene, 'mid tree trunks', far).length).toBe(farTrees);
+    far.traverse((object) => { if (object instanceof THREE.Mesh && !object.material.transparent) expect(object.castShadow).toBe(true); });
+    // Mid-tier tiles begin beyond the 600 m shadow camera, so only near trees enter the shadow pass.
+    for (const name of ['near tree trunks', 'near cones', 'near broadleaf', 'near birch']) {
+      expect((scene.getObjectByName(name) as THREE.Mesh).castShadow).toBe(true);
     }
     const name = far.name;
     terrain.update((spot.x + 1.5) * CHUNK_SIZE, (spot.z + 0.5) * CHUNK_SIZE, Infinity);
     const detailed = scene.getObjectByName(name)!;
     expect(detailed).not.toBe(far);
-    expect(treeTrunks(scene, detailed)).toBe(farTrees);
+    expect(pooled(scene, 'near tree trunks', detailed).length).toBe(farTrees);
+    expect(pooled(scene, 'mid tree trunks', detailed)).toEqual([]);
     terrain.dispose();
   }, 20_000);
 
@@ -123,22 +125,45 @@ describe('terrain streaming', () => {
     terrain.update((forest.x + 0.5) * CHUNK_SIZE, (forest.z + 0.5) * CHUNK_SIZE, Infinity);
     const chunk = scene.getObjectByName(`land ${forest.x},${forest.z}`)!;
     const trees = forest.trees;
-    const instances = chunk.children.filter((child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh);
-    const trunks = instances.find((mesh) => mesh.geometry.type === 'CylinderGeometry')!;
-    expect(trunks.count).toBe(trees.length);
-    expect(instances.some((mesh) => mesh.geometry.type === 'ConeGeometry')).toBe(true);
-    expect(instances.filter((mesh) => mesh.geometry.type === 'IcosahedronGeometry').length).toBe(2);
-    const matrix = new THREE.Matrix4();
-    const position = new THREE.Vector3();
-    const renderedPositions = Array.from({ length: trunks.count }, (_, index) => {
-      trunks.getMatrixAt(index, matrix);
-      position.setFromMatrixPosition(matrix);
-      return [position.x, position.z];
-    });
-    expect(renderedPositions).toEqual(trees.map((tree) => [
-      Math.fround(tree.x - chunk.position.x),
-      Math.fround(tree.z - chunk.position.z),
+    const trunks = pooled(scene, 'near tree trunks', chunk);
+    expect(trunks.length).toBe(trees.length);
+    // Conifers draw two cones; the other kinds draw one crown each.
+    const kinds = [0, 1, 2].map((kind) => trees.filter((tree) => tree.kind === kind).length);
+    expect(pooled(scene, 'near cones', chunk).length).toBe(kinds[0]! * 2);
+    expect(pooled(scene, 'near broadleaf', chunk).length).toBe(kinds[1]);
+    expect(pooled(scene, 'near birch', chunk).length).toBe(kinds[2]);
+    const anchor = scene.getObjectByName('near tree trunks')!.position;
+    expect(trunks.map((position) => [position.x, position.z])).toEqual(trees.map((tree) => [
+      Math.fround(tree.x - anchor.x) + anchor.x,
+      Math.fround(tree.z - anchor.z) + anchor.z,
     ]));
+    terrain.dispose();
+  });
+
+  // Failure modes: a re-anchored pool shifts trees, a cleared stream leaks slots, or a full pool drops trees.
+  it('keeps pooled trees in place across re-anchoring and frees their slots', () => {
+    const scene = new THREE.Scene();
+    const world = new WorldModel(80231);
+    const terrain = new TerrainStream(scene, world);
+    const cell = Array.from({ length: 400 }, (_, index) => ({ x: 40 + (index % 20), z: Math.floor(index / 20) - 10 }))
+      .find(({ x, z }) => world.treesInArea(x * CHUNK_SIZE, z * CHUNK_SIZE, CHUNK_SIZE, 29).length > 8)!;
+    terrain.update(0, 0, Infinity);
+    terrain.update((cell.x + 0.5) * CHUNK_SIZE, (cell.z + 0.5) * CHUNK_SIZE, Infinity);
+    const pool = scene.getObjectByName('near tree trunks')!;
+    expect(Math.hypot(pool.position.x, pool.position.z)).toBeGreaterThan(8000);
+    const chunk = scene.getObjectByName(`land ${cell.x},${cell.z}`)!;
+    const expected = world.treesInArea(cell.x * CHUNK_SIZE, cell.z * CHUNK_SIZE, CHUNK_SIZE, 29);
+    const placed = pooled(scene, 'near tree trunks', chunk).map((position) => [position.x, position.z]).sort((a, b) => a[0]! - b[0]!);
+    expected.sort((a, b) => a.x - b.x).forEach((tree, index) => {
+      expect(placed[index]![0]).toBeCloseTo(tree.x, 2);
+      expect(placed[index]![1]).toBeCloseTo(tree.z, 2);
+    });
+    const usage = terrain.poolUsage;
+    expect(usage['near tree trunks']!.used).toBeGreaterThan(0);
+    for (const entry of Object.values(usage)) expect(entry.grown).toBe(0);
+    terrain.clear();
+    for (const entry of Object.values(terrain.poolUsage)) expect(entry.used).toBe(0);
+    expect((pool as THREE.InstancedMesh).count).toBe(0);
     terrain.dispose();
   });
 
