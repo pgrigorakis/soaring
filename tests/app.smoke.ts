@@ -460,15 +460,15 @@ test('a dragged camera angle stays until a double-click resets it, and a drag ne
   await page.mouse.down();
   await page.mouse.move(x + 200, y - 60, { steps: 8 });
   await page.mouse.up();
-  const dragged = await page.evaluate(() => window.__SOARING__.snapshot());
-  expect(Math.abs(dragged.orbitYaw)).toBeGreaterThan(0.5);
-  expect(dragged.orbitPitch).toBeLessThan(0);
-  // Two quick clicks right after a drag count as a drag, not a reset.
+  // Keep this click pair adjacent to pointerup. A browser snapshot can exceed
+  // the app's 600 ms drag guard on SwiftShader.
+  const draggedYaw = -200 * 0.005;
+  const draggedPitch = -60 * 0.0035;
   await page.mouse.dblclick(x, y);
   await page.waitForTimeout(1500);
   const held = await page.evaluate(() => window.__SOARING__.snapshot());
-  expect(held.orbitYaw).toBeCloseTo(dragged.orbitYaw, 5);
-  expect(held.orbitPitch).toBeCloseTo(dragged.orbitPitch, 5);
+  expect(held.orbitYaw).toBeCloseTo(draggedYaw, 5);
+  expect(held.orbitPitch).toBeCloseTo(draggedPitch, 5);
   // A double-click with no drag in the pair resets smoothly.
   await page.waitForTimeout(700);
   await page.mouse.dblclick(x, y);
