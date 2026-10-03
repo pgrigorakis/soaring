@@ -1,6 +1,6 @@
 # Soaring
 
-Soaring is an autonomous ambient flight experience: an eagle explores a landscape and seeks thermals while the display provides a calm backdrop.
+See [README.md](README.md) for the user-facing overview.
 
 ## Language
 
@@ -47,9 +47,8 @@ Water filling a lattice basin: a node with no lower neighbor and enough upstream
 _Avoid_: Noise puddle, sea
 
 **Terrain visibility**:
-How far the landscape is visible around the eagle, independent of camera distance.
+The setting described in [README.md](README.md#terrain-visibility).
 _Avoid_: Camera distance, draw distance (when it could be confused with camera distance)
-Near the eagle, the landscape shows individual trees and shadows; far away, it shows simplified terrain only.
 
 **Ambience**:
 Environmental sounds such as wind and wing flaps, separate from music.

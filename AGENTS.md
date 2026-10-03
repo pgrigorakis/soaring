@@ -1,6 +1,6 @@
 # Project agent memory
 
-This file is the project's committed home for project-intrinsic agent knowledge: build, test, release, architecture, and sharp-edge notes that should travel with the code.
+This file holds the engine invariants established by #95 and points agents to related project guidance.
 
 - See `README.md` for user controls and terrain visibility; see `docs/testing.md` for validation commands, test modes, capture guidance, and CI browser behavior.
 
