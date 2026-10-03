@@ -12,7 +12,8 @@
     "test:smoke": "playwright test",
     "test:production-smoke": "playwright test -c playwright.production.config.ts",
     "check": "npm run test && npm run build",
-    "bench": "playwright test -c playwright.bench.config.ts"
+    "bench": "playwright test -c playwright.bench.config.ts",
+    "parity": "playwright test -c playwright.parity.config.ts"
   },
   "dependencies": {
     "three": "^0.180.0"

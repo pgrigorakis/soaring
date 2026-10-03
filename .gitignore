@@ -1,6 +1,7 @@
 node_modules/
 dist/
 test-results/
+artifacts/look-parity/
 playwright-report/
 .vite/
 .DS_Store
