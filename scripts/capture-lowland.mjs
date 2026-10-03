@@ -27,13 +27,21 @@ for (const vantage of vantages) {
     window.__SOARING__.reviewFlight({ x, z, heading });
     window.__SOARING__.setTimeOfDay(0.5);
   }, vantage);
-  await page.waitForFunction(() => window.__SOARING__.snapshot().pending === 0, undefined, { timeout: 180_000 });
-  const settled = await page.evaluate(() => window.__SOARING__.snapshot().renderedFrames);
-  await page.waitForFunction((frame) => window.__SOARING__.snapshot().renderedFrames >= frame + 60, settled, { timeout: 120_000 });
+  // Clearing the terrain leaves pending at zero for a frame, so also wait for the fog to
+  // reach the requested visibility, and require it to hold for 60 rendered frames.
+  const loaded = () => { const state = window.__SOARING__.snapshot();
+    return state.pending === 0 && state.visibleDistance >= state.requestedDistance * 0.95; };
+  for (let attempt = 0; ; attempt += 1) {
+    await page.waitForFunction(loaded, undefined, { timeout: 300_000 });
+    const settled = await page.evaluate(() => window.__SOARING__.snapshot().renderedFrames);
+    await page.waitForFunction((frame) => window.__SOARING__.snapshot().renderedFrames >= frame + 60, settled, { timeout: 120_000 });
+    if (await page.evaluate(loaded)) break;
+    if (attempt === 10) throw new Error(`${vantage.name} did not hold full visibility`);
+  }
   await page.locator('canvas').screenshot({ path: `${output}/${vantage.name}.png` });
   const state = await page.evaluate(() => window.__SOARING__.snapshot());
   record.vantages[vantage.name] = { ...vantage, position: state.position, chunks: state.chunks };
-  console.log(vantage.name, state.position);
+  console.log(vantage.name, JSON.stringify({ position: state.position, visible: state.visibleDistance, requested: state.requestedDistance, quality: state.qualityStep, pixelRatio: state.pixelRatio, lowPower: state.lowPower }));
 }
 await writeFile(`${output}/vantages.json`, JSON.stringify(record, null, 2));
 await browser.close();

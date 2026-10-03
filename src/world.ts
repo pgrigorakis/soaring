@@ -608,7 +608,7 @@ export class WorldModel {
 
   /** Small dark pools on genuinely flat, high Moor tops, separate from drainage lakes. */
   private peatPool(x: number, z: number, biome: BiomeWeights, bank: number): { distance: number; surface: number } | null {
-    if (biome.moor < 0.98 || bank < 1000) return null;
+    if (biome.moor < 0.98 || bank < 850) return null;
     const site = this.peatSite(x, z);
     if (!site || site.distance > 26) return null;
     const surface = this.relief(site.x, site.z).elevation - 0.5;
@@ -881,7 +881,8 @@ export class WorldModel {
     if (node !== undefined) return node;
     const x = (i + 0.5 + (hash2(i, j, this.seed + 163) - 0.5) * 0.42) * DRAINAGE_SPACING;
     const z = (j + 0.5 + (hash2(i, j, this.seed + 167) - 0.5) * 0.42) * DRAINAGE_SPACING;
-    const { elevation, biome } = this.relief(x, z);
+    const { elevation: full, biome, hills } = this.relief(x, z);
+    const elevation = full - hills * (1 - Number(globalThis.process?.env?.DRAIN_K ?? 1));
     node = { i, j, x, z, elevation, highland: biome.highlands, lakeland: biome.lakeland };
     this.riverNodes.set(key, node);
     return node;
