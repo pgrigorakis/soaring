@@ -1,0 +1,37 @@
+# Issue #89 sky-cloud performance comparison
+
+## Method
+
+- Ran the held-vantage GPU benchmark against baseline commit `7deb789aa90c0efa1952e6c0c19999314682ab55` and the cloud implementation.
+- Used the same seed (5), 5 km visibility, 1440×900 viewport, DPR 2, and 60 warm-up plus 300 measured frames per vantage.
+- Interleaved three rounds on Chromium 154 with ANGLE Metal on an Apple M4 Pro. GPU timer queries were available.
+- GPU p50 is the render-call time for the whole scene. It is an estimate of the cloud shader's added cost, not an isolated shader measurement.
+
+Command:
+
+```sh
+BENCH_BUILDS="baseline=http://127.0.0.1:4198,clouds=http://127.0.0.1:4197" \
+BENCH_ROUNDS=3 BENCH_FRAMES=300 BENCH_WARMUP=60 \
+BENCH_OUT=test-results/issue-89/paired-clean \
+npx playwright test -c playwright.bench.config.ts tests/perf-bench.bench.ts
+```
+
+## GPU p50 results
+
+Times are milliseconds. Each cell lists rounds 1, 2, and 3. The delta compares the median of each build's three rounds.
+
+| Vantage | Baseline | Clouds | Median delta |
+| --- | --- | --- | ---: |
+| Lake, noon | 6.93 / 7.02 / 6.91 | 7.18 / 7.14 / 7.74 | +0.25 |
+| Confluence, noon | 6.04 / 6.07 / 6.09 | 6.14 / 6.13 / 5.90 | +0.06 |
+| River run, golden hour | 9.11 / 5.60 / 9.09 | 9.51 / 9.47 / 9.34 | +0.38 |
+| Network, noon | 6.11 / 6.07 / 5.76 | 6.13 / 5.83 / 5.73 | -0.24 |
+| Origin, night | 5.60 / 5.63 / 5.60 | 5.67 / 5.53 / 5.81 | +0.07 |
+
+The median of the five per-vantage median deltas is **+0.07 ms**. The median across all 15 paired round differences is **+0.10 ms**. Frame-interval p50 remained 16.7 ms for both builds.
+
+The golden-hour baseline had a large round-to-round swing (5.60 ms versus 9.09–9.11 ms). Treat the small GPU deltas as an estimate, not a precise isolated shader cost.
+
+## Artifact note
+
+The Playwright output directory is cleared at the start of a smoke run. This report preserves the benchmark summary. The repeatable screenshot test writes its images and metadata under `test-results/issue-89/`; copies are in `artifacts/issue-89/screenshots/`.

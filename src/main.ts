@@ -146,11 +146,41 @@ sky.material.uniforms.goldenAmount = { value: 0 };
 sky.material.uniforms.blueAmount = { value: 0 };
 sky.material.uniforms.starAmount = { value: 0 };
 sky.material.uniforms.auroraAmount = { value: 0 };
+sky.material.uniforms.cloudTime = { value: 0 };
+sky.material.uniforms.cloudCoverage = { value: 0.5 };
 sky.material.uniforms.moonPosition = { value: new THREE.Vector3(0, -1, 0) };
 sky.material.fragmentShader = sky.material.fragmentShader
   .replace(
     'uniform float mieDirectionalG;',
-    'uniform float mieDirectionalG;\nuniform float skyExposure;\nuniform float nightAmount;\nuniform float goldenAmount;\nuniform float blueAmount;\nuniform float starAmount;\nuniform float auroraAmount;\nuniform vec3 moonPosition;',
+    'uniform float mieDirectionalG;\nuniform float skyExposure;\nuniform float nightAmount;\nuniform float goldenAmount;\nuniform float blueAmount;\nuniform float starAmount;\nuniform float auroraAmount;\nuniform float cloudTime;\nuniform float cloudCoverage;\nuniform vec3 moonPosition;',
+  )
+  .replace(
+    'void main() {',
+    `float cloudHash(vec2 point) {
+			point = fract(point * vec2(123.34, 456.21));
+			point += dot(point, point + 45.32);
+			return fract(point.x * point.y);
+		}
+		float cloudNoise(vec2 point) {
+			vec2 cell = floor(point);
+			vec2 local = fract(point);
+			vec2 blend = local * local * (3.0 - 2.0 * local);
+			float lower = mix(cloudHash(cell), cloudHash(cell + vec2(1.0, 0.0)), blend.x);
+			float upper = mix(cloudHash(cell + vec2(0.0, 1.0)), cloudHash(cell + vec2(1.0, 1.0)), blend.x);
+			return mix(lower, upper, blend.y);
+		}
+		float paintedClouds(vec3 direction) {
+			// Project sky directions into broad, stretched cloud bands with moving value noise.
+			vec2 point = direction.xz / (max(direction.y, 0.025) + 0.19);
+			point = point * vec2(2.8, 6.0) + vec2(cloudTime, 0.0);
+			float mass = cloudNoise(point * 0.3 + vec2(3.0, 12.0)) * 0.28;
+			mass += cloudNoise(point) * 0.6;
+			mass += cloudNoise(point * 2.1 + 8.0) * 0.3;
+			mass += cloudNoise(point * 5.8) * 0.16;
+			mass += cloudNoise(point * 15.0) * 0.06;
+			return mass;
+		}
+		void main() {`,
   )
   .replace(
     'vec3 retColor = pow( texColor, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) );',
@@ -188,7 +218,19 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			float moonDot = dot(direction, moonDir);
 			float moonDisc = smoothstep(0.99942, 0.9997, moonDot);
 			float moonLimb = smoothstep(0.9986, 0.99945, moonDot);
-			retColor += vec3(0.93, 0.95, 1.0) * (moonDisc * 4.5 + moonLimb * 0.12) * smoothstep(0.02, 0.08, moonDir.y);`,
+			retColor += vec3(0.93, 0.95, 1.0) * (moonDisc * 4.5 + moonLimb * 0.12) * smoothstep(0.02, 0.08, moonDir.y);
+			float cloudMass = paintedClouds(direction);
+			float cloudThreshold = mix(0.88, 0.52, clamp(cloudCoverage, 0.0, 1.0));
+			float nightOpening = smoothstep(0.045, 0.22, direction.y) * nightAmount * 0.3;
+			float cloudMask = smoothstep(cloudThreshold + nightOpening, cloudThreshold + 0.2 + nightOpening, cloudMass)
+				* smoothstep(0.014, 0.15, direction.y);
+			vec3 cloudLight = mix(vec3(0.76, 0.84, 0.94), vec3(0.98, 0.98, 1.0), sunUp);
+			cloudLight = mix(cloudLight, vec3(1.0, 0.49, 0.25), goldenAmount * 0.72);
+			vec3 cloudShade = mix(vec3(0.32, 0.39, 0.5), vec3(0.52, 0.36, 0.3), goldenAmount * 0.65);
+			vec3 dayCloud = mix(cloudShade, cloudLight, smoothstep(0.42, 1.0, cloudMass));
+			vec3 nightCloud = mix(vec3(0.012, 0.018, 0.04), vec3(0.06, 0.075, 0.12), smoothstep(0.35, 0.85, cloudMass));
+			vec3 cloudColor = mix(dayCloud, nightCloud, nightAmount);
+			retColor = mix(retColor, cloudColor, cloudMask * mix(0.84, 0.96, nightAmount));`,
   );
 scene.add(sky);
 
@@ -212,7 +254,7 @@ function neutralToneMap(color: THREE.Color, exposure: number): THREE.Color {
   );
 }
 
-// Sample the sky shader itself near the horizon so fog/haze reads as the same color, not a fixed beige.
+// Sample the sky shader near the horizon so fog follows the clouded sky, not a fixed beige.
 // Reused every sample: no per-frame allocation. The probe is a unit box at the origin, so it does not
 // follow the sky mesh; shared uniforms carry the current sun and night mix.
 const fogProbeScene = new THREE.Scene();
@@ -770,6 +812,9 @@ function applyDaylight(body: Daylight, delta: number): void {
   sky.material.uniforms.nightAmount!.value = body.night;
   sky.material.uniforms.goldenAmount!.value = 1 - high;
   sky.material.uniforms.blueAmount!.value = high;
+  // Keep more clouds near dawn and dusk, and let the layer drift on real time.
+  sky.material.uniforms.cloudCoverage!.value = 0.22 + (1 - high) * 0.5;
+  sky.material.uniforms.cloudTime!.value += delta * 0.001;
   hazeStart = 0.4 + high * 0.5;
   sky.material.uniforms.starAmount!.value = smooth01(0.0, -0.12, body.sun.y);
   sky.material.uniforms.auroraAmount!.value = auroraAmount(body,
@@ -979,7 +1024,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
       puffCloudSnapshot: () => PuffCloudSnapshot;
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
@@ -1077,6 +1122,8 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       sunElevation: body.sun.y,
       moonElevation: body.moon.y,
       auroraAmount: auroraAmount(body, auroraSchedule.hasAurora(nightCycle(skySeconds))),
+      cloudCoverage: sky.material.uniforms.cloudCoverage!.value,
+      cloudTime: sky.material.uniforms.cloudTime!.value,
       fog: {
         color: [fog.color.r, fog.color.g, fog.color.b],
         targetColor: [fogGoal.r, fogGoal.g, fogGoal.b],

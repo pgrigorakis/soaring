@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
 
 type TestWindow = Window & {
@@ -787,6 +787,81 @@ test('suspends hidden audio and bounds the first visible simulation step', async
     mutedAudioState,
     persistedMute,
   }, null, 2));
+  expect(errors).toEqual([]);
+});
+
+test('captures painted clouds from one seed and viewpoint across the day', async ({ page }, testInfo) => {
+  test.setTimeout(270_000);
+  const errors = captureErrors(page);
+  const artifactDir = 'test-results/issue-89';
+  await mkdir(artifactDir, { recursive: true });
+  await page.addInitScript(() => localStorage.setItem('soaring.world-seed.v1', '5'));
+  await page.goto('/?smoke');
+  await expect(page.locator('canvas')).toBeVisible();
+
+  const initial = await page.evaluate(() => {
+    document.querySelector('#intro')?.classList.add('hidden');
+    const snapshot = window.__SOARING__.snapshot();
+    window.__SOARING__.reviewFlight!({
+      x: snapshot.position[0]!, z: snapshot.position[2]!, heading: snapshot.heading,
+    });
+    window.__SOARING__.lookAtBody('chase');
+    return window.__SOARING__.snapshot();
+  });
+  await page.waitForFunction((frame) => {
+    const snapshot = window.__SOARING__.snapshot();
+    return snapshot.renderedFrames > frame && snapshot.pending === 0;
+  }, initial.renderedFrames, { timeout: 120_000 });
+
+  const states = [
+    { name: 'dawn', phase: 0.28 },
+    { name: 'midday-noon', phase: 0.5 },
+    { name: 'golden-hour', phase: 0.7 },
+    { name: 'dusk', phase: 0.72 },
+    { name: 'night', phase: 0 },
+  ];
+  const captures: Array<{
+    name: string;
+    phase: number;
+    cloudCoverage: number;
+    cloudTime: number;
+    position: number[];
+    heading: number;
+  }> = [];
+
+  for (const state of states) {
+    const frame = await page.evaluate((phase) => {
+      window.__SOARING__.setTimeOfDay(phase);
+      return window.__SOARING__.snapshot().renderedFrames;
+    }, state.phase);
+    await page.waitForFunction((before) => window.__SOARING__.snapshot().renderedFrames > before, frame);
+    const snapshot = await page.evaluate(() => window.__SOARING__.snapshot());
+    const shot = await page.screenshot({ path: `${artifactDir}/clouds-${state.name}.png` });
+    expect(shot.byteLength).toBeGreaterThan(1000);
+    await testInfo.attach(`clouds-${state.name}`, { body: shot, contentType: 'image/png' });
+    captures.push({
+      name: state.name,
+      phase: snapshot.timeOfDay,
+      cloudCoverage: snapshot.cloudCoverage,
+      cloudTime: snapshot.cloudTime,
+      position: snapshot.position,
+      heading: snapshot.heading,
+    });
+  }
+
+  const noon = captures.find((capture) => capture.name === 'midday-noon')!;
+  const dawn = captures.find((capture) => capture.name === 'dawn')!;
+  const dusk = captures.find((capture) => capture.name === 'dusk')!;
+  const night = captures.find((capture) => capture.name === 'night')!;
+  expect(dawn.cloudCoverage).toBeGreaterThan(noon.cloudCoverage + 0.3);
+  expect(dusk.cloudCoverage).toBeGreaterThan(noon.cloudCoverage + 0.3);
+  expect(night.cloudCoverage).toBeGreaterThan(noon.cloudCoverage + 0.3);
+  expect(captures.at(-1)!.cloudTime).toBeGreaterThan(captures[0]!.cloudTime);
+  for (const capture of captures) {
+    expect(capture.position).toEqual(initial.position);
+    expect(capture.heading).toBe(initial.heading);
+  }
+  await writeFile(`${artifactDir}/clouds.json`, JSON.stringify({ seed: 5, captures }, null, 2));
   expect(errors).toEqual([]);
 });
 
