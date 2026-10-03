@@ -123,25 +123,56 @@ test('renders high-detail terrain, streams, and supports camera controls', async
   expect(errors).toEqual([]);
 });
 
-test('caps total render pixels through resize, DPR changes, Low power, and smoke mode', async ({ page }) => {
+test('caps normal rendering at two million pixels through viewport and DPR changes', async ({ page }) => {
   test.setTimeout(45_000);
-  const cdp = await page.context().newCDPSession(page);
-  const setMetrics = async (width: number, height: number, deviceScaleFactor: number) => {
-    await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile: false });
-    await page.waitForFunction(({ expectedWidth, expectedHeight, expectedDpr }) =>
-      window.innerWidth === expectedWidth && window.innerHeight === expectedHeight && devicePixelRatio === expectedDpr,
-    { expectedWidth: width, expectedHeight: height, expectedDpr: deviceScaleFactor });
-    // Chromium changes DPR through emulation without sending the native resize event.
-    await page.evaluate(() => window.dispatchEvent(new Event('resize')));
-  };
-  const metrics = () => page.evaluate(() => {
-    const canvas = document.querySelector('canvas')!;
-    const snapshot = window.__SOARING__.snapshot();
-    return { dpr: devicePixelRatio, css: [innerWidth, innerHeight], render: [canvas.width, canvas.height],
-      pixels: canvas.width * canvas.height, ratio: snapshot.pixelRatio, lowPower: snapshot.lowPower,
-      diagnosticRender: [snapshot.renderWidth, snapshot.renderHeight], diagnosticPixels: snapshot.renderPixels };
-  });
-  await page.setViewportSize({ width: 1200, height: 800 });
+  await preparePixelBudgetPage(page);
+  await setPixelBudgetLowPower(page, false);
+  await setPixelBudgetMetrics(page, 1000, 700, 2);
+  let measured = await readPixelBudgetMetrics(page);
+  expect(measured.ratio).toBe(1.5);
+  expectRenderWithinPixelBudget(measured);
+
+  await setPixelBudgetMetrics(page, 1512, 982, 2);
+  measured = await readPixelBudgetMetrics(page);
+  const ratioLimit = Math.sqrt(2_000_000 / (measured.css[0]! * measured.css[1]!));
+  expect(measured.lowPower).toBe(false);
+  expect(measured.ratio).toBeLessThanOrEqual(Math.min(1.5, ratioLimit));
+  expectRenderWithinPixelBudget(measured);
+
+  await setPixelBudgetMetrics(page, 1512, 982, 1);
+  measured = await readPixelBudgetMetrics(page);
+  expect(measured.ratio).toBeLessThanOrEqual(1);
+  expectRenderWithinPixelBudget(measured);
+});
+
+test('caps Low power rendering during DPR and large viewport changes', async ({ page }) => {
+  test.setTimeout(45_000);
+  await preparePixelBudgetPage(page);
+  await setPixelBudgetMetrics(page, 1512, 982, 2);
+
+  let measured = await readPixelBudgetMetrics(page);
+  expect(measured.lowPower).toBe(true);
+  expect(measured.ratio).toBe(1);
+  expectRenderWithinPixelBudget(measured);
+
+  await setPixelBudgetMetrics(page, 1600, 1400, 2);
+  measured = await readPixelBudgetMetrics(page);
+  expect(measured.lowPower).toBe(true);
+  expect(measured.ratio).toBeLessThanOrEqual(Math.min(1, Math.sqrt(2_000_000 / (1600 * 1400))));
+  expectRenderWithinPixelBudget(measured);
+});
+
+test('keeps smoke rendering at its reduced ratio within the pixel budget', async ({ page }) => {
+  test.setTimeout(45_000);
+  await preparePixelBudgetPage(page, '/?smoke');
+
+  const measured = await readPixelBudgetMetrics(page);
+  expect(measured.ratio).toBe(0.25);
+  expectRenderWithinPixelBudget(measured);
+});
+
+async function preparePixelBudgetPage(page: Page, path = '/'): Promise<void> {
+  await page.setViewportSize({ width: 1000, height: 700 });
   await page.addInitScript(() => {
     localStorage.setItem('soaring.world-seed.v1', '123456789');
     localStorage.setItem('soaring.scenic-visit.v1', '0');
@@ -150,48 +181,46 @@ test('caps total render pixels through resize, DPR changes, Low power, and smoke
       cameraDistance: 100, terrainVisibility: 720, showThermal: true, minFlightHeight: 45, maxFlightHeight: 180,
     }));
   });
-  await page.goto('/');
+  await page.goto(path);
   await expect(page.locator('canvas')).toBeVisible();
-  await page.evaluate(() => {
+}
+
+async function setPixelBudgetLowPower(page: Page, enabled: boolean): Promise<void> {
+  await page.evaluate((lowPower) => {
     const input = document.querySelector<HTMLInputElement>('#low-power')!;
-    if (!input.checked) throw new Error('Expected Low power during light-weight startup');
-    input.checked = false;
+    if (!lowPower && !input.checked) throw new Error('Expected Low power during light-weight startup');
+    input.checked = lowPower;
     input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, enabled);
+  await page.waitForFunction((lowPower) => window.__SOARING__.snapshot().lowPower === lowPower, enabled);
+}
+
+async function setPixelBudgetMetrics(page: Page, width: number, height: number, deviceScaleFactor: number): Promise<void> {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile: false });
+  await page.waitForFunction(({ expectedWidth, expectedHeight, expectedDpr }) =>
+    window.innerWidth === expectedWidth && window.innerHeight === expectedHeight && devicePixelRatio === expectedDpr,
+  { expectedWidth: width, expectedHeight: height, expectedDpr: deviceScaleFactor });
+  // Chromium changes DPR through emulation without sending the native resize event.
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  await cdp.detach();
+}
+
+async function readPixelBudgetMetrics(page: Page) {
+  return page.evaluate(() => {
+    const canvas = document.querySelector('canvas')!;
+    const snapshot = window.__SOARING__.snapshot();
+    return { css: [innerWidth, innerHeight], render: [canvas.width, canvas.height],
+      pixels: canvas.width * canvas.height, ratio: snapshot.pixelRatio, lowPower: snapshot.lowPower,
+      diagnosticRender: [snapshot.renderWidth, snapshot.renderHeight], diagnosticPixels: snapshot.renderPixels };
   });
-  await setMetrics(1512, 982, 2);
-  let measured = await metrics();
-  expect(measured.ratio).toBeLessThanOrEqual(Math.sqrt(2_000_000 / (measured.css[0]! * measured.css[1]!)));
+}
+
+function expectRenderWithinPixelBudget(measured: Awaited<ReturnType<typeof readPixelBudgetMetrics>>): void {
   expect(measured.pixels).toBeLessThanOrEqual(2_000_000);
   expect(measured.diagnosticRender).toEqual(measured.render);
   expect(measured.diagnosticPixels).toBe(measured.pixels);
-
-  await setMetrics(1512, 982, 1);
-  measured = await metrics();
-  expect(measured.ratio).toBeLessThanOrEqual(1);
-  expect(measured.pixels).toBeLessThanOrEqual(2_000_000);
-  await page.evaluate(() => {
-    const input = document.querySelector<HTMLInputElement>('#low-power')!;
-    input.checked = true;
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  await page.waitForFunction(() => window.__SOARING__.snapshot().lowPower);
-
-  await setMetrics(1512, 982, 2);
-  measured = await metrics();
-  expect(measured.ratio).toBeLessThanOrEqual(1);
-  expect(measured.pixels).toBeLessThanOrEqual(2_000_000);
-  await setMetrics(1600, 1400, 2);
-  measured = await metrics();
-  expect(measured.ratio).toBeLessThanOrEqual(Math.min(1, Math.sqrt(2_000_000 / (1600 * 1400))));
-  expect(measured.pixels).toBeLessThanOrEqual(2_000_000);
-
-  await page.goto('/?smoke');
-  await expect(page.locator('canvas')).toBeVisible();
-  measured = await metrics();
-  expect(measured.ratio).toBe(0.25);
-  expect(measured.pixels).toBeLessThanOrEqual(2_000_000);
-  await cdp.detach();
-});
+}
 
 async function advanceToThermal(page: Page): Promise<void> {
   // Exercise the real navigator in the same bounded steps as the frame loop. The old
