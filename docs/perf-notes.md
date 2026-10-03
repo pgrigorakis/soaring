@@ -4,7 +4,7 @@ This ledger records how Soaring measures render cost and every result. Add new r
 
 ## What the bench measures
 
-`npm run bench` loads the dev build with `?profile`, holds five fixed vantages, and records for each one:
+`npm run bench` loads the dev build with `?profile`, holds five fixed vantages, and records for each one. `npm run parity` uses those same vantages and controls to capture the finished 8-bit canvas without adding production hooks or capture overhead.
 
 - **Frame interval**: the gap between `requestAnimationFrame` timestamps. This is cadence and latency. It includes idle time, so it is pinned to the display refresh (16.7 ms at 60 Hz) whenever the frame fits the budget.
 - **Main-thread work**: time inside the frame callback, including render command submission. It excludes GPU execution and idle waiting. "CPU busy" is the sum of work divided by the sum of frame intervals.
@@ -31,6 +31,27 @@ A held view measures steady render cost. It is **not** a sustained-flight hitch 
 - Other options: `BENCH_ROUNDS`, `BENCH_FRAMES`, `BENCH_WARMUP`, `BENCH_DPR`, `BENCH_OUT`.
 - `npm run test:smoke` runs `tests/perf-bench.smoke.ts`. It checks repeatable counts, held state, unavailable and disjoint GPU handling, query cleanup, and that production builds carry no profiler.
 
+## Picture parity
+
+`npm run parity` captures two reads of every fixed vantage, using seed 5, the normal dev renderer, and 60 settling frames. It reports mean absolute RGB level difference, the share of pixels with any changed RGB channel, and the largest channel difference with its pixel coordinates. The repeated same-build comparison is the measured noise floor; it is a measurement, not an acceptance threshold.
+
+Artifacts go to a new timestamped directory under `artifacts/look-parity/`, outside Playwright's disposable `test-results/` folder. Set `PARITY_VANTAGES` to a comma-separated subset of the five bench vantage names for a focused comparison. Each vantage has gzip-compressed RGBA captures and metadata; `parity.json` records the build commit, working-tree state, machine, browser, graphics renderer, viewport, pixel ratios, parameters, and measured differences. The tool fails rather than overwrite an existing artifact directory. To compare a saved capture, set `PARITY_REFERENCE` to its artifact directory. The comparison refuses dimension, browser, graphics renderer, viewport, pixel-ratio, machine, OS, architecture, or headless-mode mismatches. Build commits may differ because the tool is for comparing builds. Use `PARITY_URL`, `PARITY_SEED`, `PARITY_DPR`, `PARITY_REPEATS`, and `PARITY_OUT` to select the build, repeat count, and output path. No visual acceptance threshold is built in.
+
+The approved-look inventory and its review links are in [approved-looks.md](design/approved-looks.md).
+
+### Actual-browser parity run
+
+A two-read local run on 2026-10-03 used Chromium 154.0.8037.93, ANGLE Metal on Apple M4 Pro, 1440×900 CSS viewport, DPR 2, render pixel ratio 1.75, seed 5, and all five bench vantages. The commit was `2870e8f821adec23c357ba3ffddd9d6d67de60d9` with a dirty working tree. The saved output is `artifacts/look-parity/2026-10-03T07-51-50.264Z-2870e8f821ad/` on the capture machine; the directory is ignored and versioned by the tool, not checked into source control.
+
+| vantage | same-build mean (levels) | changed-pixel share | worst channel difference |
+| --- | ---: | ---: | ---: |
+| lake-noon | 0.2091 | 31.19% | 126 |
+| confluence-noon | 0.4442 | 31.89% | 156 |
+| river-run-golden-hour | 4.1095 | 37.98% | 191 |
+| network-noon | 3.2523 | 45.78% | 223 |
+| origin-night | 0.2323 | 13.20% | 100 |
+
+These are measurements, not approval thresholds. Water ripples and the thermal marker pulse still animate during a held view, so the same-build floor can include visible motion. The tool reports that floor beside any reference diff and does not classify a picture as accepted or rejected.
 ## Baseline 1: b6a0f4c (includes async fog #105)
 
 Command: `BENCH_ROUNDS=3 BENCH_FRAMES=300 BENCH_WARMUP=60 BENCH_DPR=2 npm run bench`

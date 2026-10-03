@@ -11,9 +11,10 @@ npm test             # deterministic generation and navigation tests
 npm run check        # unit tests, TypeScript check, and production build
 npm run test:smoke   # real Chromium render, streaming, and control checks
 npm run bench        # held-vantage performance benchmark
+npm run parity       # development-only finished-picture parity capture
 ```
 
-The scripts are defined in `package.json`. Playwright smoke tests use `playwright.config.ts`; the performance benchmark uses `playwright.bench.config.ts` and does not run in CI. See [performance notes](perf-notes.md) for benchmark options and recorded results.
+The scripts are defined in `package.json`. Playwright smoke tests use `playwright.config.ts`; the performance benchmark uses `playwright.bench.config.ts` and picture parity uses `playwright.parity.config.ts`. Both bench tools are local development tools and do not run in CI. See [performance notes](perf-notes.md) for benchmark and parity options, artifact handling, and recorded results.
 
 ## Test modes and evidence
 
