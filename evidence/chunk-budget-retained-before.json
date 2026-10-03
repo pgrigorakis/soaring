@@ -1,0 +1,41 @@
+{
+  "camera": {
+    "x": 1440,
+    "y": 500,
+    "z": -100,
+    "lookX": 1440,
+    "lookY": 300,
+    "lookZ": 200
+  },
+  "before": {
+    "buildTiming": {
+      "chunks": 1228,
+      "meanMs": 11.720846904556993,
+      "maxMs": 62.19999998807907
+    },
+    "chunks": 598,
+    "pending": 0,
+    "pixelRatio": 1,
+    "qualityStep": 0,
+    "visibleDistance": 5000,
+    "frameCap": null,
+    "geometries": 207
+  },
+  "after": {
+    "buildTiming": {
+      "chunks": 1401,
+      "meanMs": 11.808565309224683,
+      "maxMs": 62.19999998807907
+    },
+    "chunks": 605,
+    "pending": 0,
+    "pixelRatio": 1,
+    "qualityStep": 0,
+    "visibleDistance": 5000,
+    "frameCap": null,
+    "geometries": 232
+  },
+  "fps": 54.3,
+  "maxGap": 199.89999999999782,
+  "p95": 33.29999999999927
+}

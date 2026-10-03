@@ -1,0 +1,42 @@
+{
+  "pose": {
+    "x": 1440,
+    "z": 0,
+    "heading": 0
+  },
+  "before": {
+    "buildTiming": {
+      "chunks": 1042,
+      "meanMs": 14.170153550875163,
+      "maxMs": 75.59999990463257,
+      "maxSliceMs": 1,
+      "maxUpdateMs": 4.599999964237213,
+      "allocated": 867,
+      "reused": 180
+    },
+    "chunks": 598,
+    "pending": 0,
+    "pixelRatio": 1,
+    "qualityStep": 0,
+    "visibleDistance": 5000
+  },
+  "after": {
+    "buildTiming": {
+      "chunks": 1110,
+      "meanMs": 15.479009008783478,
+      "maxMs": 75.59999990463257,
+      "maxSliceMs": 1.100000023841858,
+      "maxUpdateMs": 4.599999964237213,
+      "allocated": 867,
+      "reused": 249
+    },
+    "chunks": 68,
+    "pending": 537,
+    "pixelRatio": 1,
+    "qualityStep": 0,
+    "visibleDistance": 1029.0971247494113
+  },
+  "fps": 60.1,
+  "maxGap": 16.80000000000291,
+  "p95": 16.80000000000291
+}

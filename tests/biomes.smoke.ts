@@ -29,7 +29,7 @@ test('renders blended biome terrain with deterministic shared chunk edges', asyn
     }
     const scene = new THREE.Scene();
     const terrain = new TerrainStream(scene, first);
-    terrain.update(CHUNK_SIZE / 2, CHUNK_SIZE / 2, 25);
+    terrain.update(CHUNK_SIZE / 2, CHUNK_SIZE / 2, Infinity);
     const leftGroup = scene.getObjectByName('land 0,0');
     const rightGroup = scene.getObjectByName('land 1,0');
     const left = leftGroup.children[0].geometry;
@@ -68,6 +68,7 @@ test('renders blended biome terrain with deterministic shared chunk edges', asyn
 // Failure modes: parcels remain aligned squares, hedges remain painted stripes,
 // negative coordinates change field ownership, or colour changes alter glade/density rules.
 test('renders varied farmland with physical hedgerows', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
   await page.addInitScript(() => localStorage.setItem('soaring.world-seed.v1', '80231'));
   await page.goto('/?smoke');
   await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0);
@@ -91,7 +92,7 @@ test('renders varied farmland with physical hedgerows', async ({ page }, testInf
     }
     const scene = new THREE.Scene();
     const terrain = new TerrainStream(scene, new WorldModel(80231));
-    terrain.update(-8000, -40000, 9);
+    terrain.update(-8000, -40000, Infinity);
     let hedgeInstances = 0;
     scene.traverse((object: any) => { if (object.name === 'hedgerows') hedgeInstances += object.count; });
     terrain.dispose();

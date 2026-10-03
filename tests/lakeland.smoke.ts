@@ -23,7 +23,10 @@ test('renders a long valley lake with a wooded island, beach and seamless water 
     const terrain = new TerrainStream(scene, world);
     const chunks: any[] = [];
     const make = (cx: number, cz: number, size: number, tier: string) => {
-      const chunk = terrain.createChunk({ x: cx, z: cz, chunkSize: size, tier, trees: 'none' });
+      const build = terrain.createChunk({ x: cx, z: cz, chunkSize: size, tier, trees: 'none' });
+      let result = build.next();
+      while (!result.done) result = build.next();
+      const chunk = result.value;
       chunks.push(chunk);
       return chunk.group;
     };

@@ -227,6 +227,9 @@ let fogSampleDisposed = false;
 let fogSamplingFailed = false;
 let fogSampleCount = 0;
 let fogReadbackFailures = 0;
+type FogReadCompletion = { revision: number; phase: number; samples: number; targetColor: number[]; color: number[]; failures: number };
+let fogReadCompletion: FogReadCompletion | null = null;
+let fogDiscardedReads = 0;
 function sampleHorizonColor(): void {
   if (fogSamplePending || fogSampleDisposed || fogSamplingFailed) return;
   fogSamplePending = true;
@@ -259,10 +262,19 @@ function sampleHorizonColor(): void {
   }
 
   void renderer.readRenderTargetPixelsAsync(fogTarget, 0, 0, 1, 1, fogPixel).then((pixel) => {
-    if (fogSampleDisposed || revision !== fogInputRevision) return;
+    if (fogSampleDisposed) return;
+    if (revision !== fogInputRevision) {
+      if (import.meta.env.DEV) fogDiscardedReads += 1;
+      return;
+    }
     fogSample.setRGB(pixel[0]! / 255, pixel[1]! / 255, pixel[2]! / 255);
     fogGoal.copy(neutralToneMap(fogSample, exposure));
     fogSampleCount += 1;
+    if (import.meta.env.DEV) {
+      // Latch one coherent successful completion; a continuous sampler need not become idle.
+      fogReadCompletion = { revision, phase: skySeconds / DAY_SECONDS, samples: fogSampleCount,
+        targetColor: [fogGoal.r, fogGoal.g, fogGoal.b], color: [fog.color.r, fog.color.g, fog.color.b], failures: fogReadbackFailures };
+    }
   }).catch(() => {
     if (fogSampleDisposed) return;
     fogReadbackFailures += 1;
@@ -324,7 +336,7 @@ function applyRenderQuality(): void {
   keyLight.castShadow = shadowsEnabled;
   terrain.setReach(terrainReach());
 }
-let lastChunkBuilds = terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, settings.lowPower ? 1 : 49);
+let lastChunkBuilds = terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, settings.lowPower ? 2 : 4);
 
 let orbitYaw = 0;
 let orbitPitch = 0;
@@ -827,7 +839,7 @@ function frame(now: number): void {
   }
   camera.position.copy(cameraPosition).sub(renderOrigin);
   camera.lookAt(renderLookAt.copy(lookAt).sub(renderOrigin));
-  lastChunkBuilds = terrain.update(cameraPosition.x, cameraPosition.z, settings.lowPower ? 1 : 2);
+  lastChunkBuilds = terrain.update(cameraPosition.x, cameraPosition.z, settings.lowPower ? 2 : 4);
   updateFog();
   if (!skyPaused) skySeconds += rawDelta;
   const body = currentDaylight();
@@ -865,6 +877,8 @@ function frame(now: number): void {
       `FPS          ${fpsSmoothed.toFixed(0)}`,
       `chunks       ${terrain.chunkCount} (${terrain.pendingCount} pending)`,
       `build ms     ${terrain.buildTiming.meanMs.toFixed(2)} mean · ${terrain.buildTiming.maxMs.toFixed(2)} max`,
+      `stream ms    ${terrain.buildTiming.maxUpdateMs.toFixed(2)} update max · ${terrain.buildTiming.maxSliceMs.toFixed(2)} slice max`,
+      `buffers      ${terrain.buildTiming.allocated} allocated · ${terrain.buildTiming.reused} reused`,
       `biome        ${Object.entries(world.sample(state.x, state.z).biome).map(([name, weight]) => `${name} ${weight.toFixed(2)}`).join(' · ')}`,
       `LOD          near ${terrain.tierCounts.near} · mid ${terrain.tierCounts.mid} · far ${terrain.tierCounts.far}`,
       `visibility   ${fog.far.toFixed(0)} / ${effectiveTerrainVisibility().toFixed(0)} m`,
@@ -909,7 +923,8 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
+      fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
       profile?: { begin: () => void; end: () => void; report: () => ProfileReport };
       reviewFlight?: (start: { x: number; z: number; heading: number } | null) => void;
@@ -929,6 +944,7 @@ declare global {
 if (import.meta.env.DEV) window.__SOARING__ = {
   ...(profiler ? { profile: { begin: () => profiler.begin(), end: () => profiler.end(), report: () => profiler.report() } } : {}),
   ...(import.meta.env.DEV ? {
+    fogSamples: () => ({ revision: fogInputRevision, discarded: fogDiscardedReads, completion: fogReadCompletion }),
     // Freeze only navigation for repeatable lighting comparisons. The normal
     // chase camera, renderer, streaming and light loop remain unchanged.
     reviewFlight: (pose: { x: number; z: number; heading: number } | null) => {
@@ -970,7 +986,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       cameraDistance: settings.cameraDistance,
       frameCap: currentFrameCap(),
       lowPower: settings.lowPower,
-      chunkBuildBudget: settings.lowPower ? 1 : 2,
+      chunkBuildBudget: settings.lowPower ? 2 : 4,
       qualityStep,
       pixelRatio: renderer.getPixelRatio(),
       shadowsEnabled: renderer.shadowMap.enabled,
