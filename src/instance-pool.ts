@@ -29,8 +29,9 @@ export class InstancePool {
     const slot = this.free.pop() ?? this.mesh.count++;
     const elements = this.mesh.instanceMatrix.array;
     matrix.toArray(elements, slot * 16);
-    elements[slot * 16 + 12]! -= this.mesh.position.x;
-    elements[slot * 16 + 14]! -= this.mesh.position.z;
+    // Subtract in float64 before storing, or float32 rounding of the world position defeats the anchor.
+    elements[slot * 16 + 12] = matrix.elements[12] - this.mesh.position.x;
+    elements[slot * 16 + 14] = matrix.elements[14] - this.mesh.position.z;
     this.touch(slot);
     if (color && this.mesh.instanceColor) {
       color.toArray(this.mesh.instanceColor.array, slot * 3);

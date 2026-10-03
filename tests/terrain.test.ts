@@ -154,10 +154,11 @@ describe('terrain streaming', () => {
     const chunk = scene.getObjectByName(`land ${cell.x},${cell.z}`)!;
     const expected = world.treesInArea(cell.x * CHUNK_SIZE, cell.z * CHUNK_SIZE, CHUNK_SIZE, 29);
     const placed = pooled(scene, 'near tree trunks', chunk).map((position) => [position.x, position.z]).sort((a, b) => a[0]! - b[0]!);
-    expected.sort((a, b) => a.x - b.x).forEach((tree, index) => {
-      expect(placed[index]![0]).toBeCloseTo(tree.x, 2);
-      expect(placed[index]![1]).toBeCloseTo(tree.z, 2);
-    });
+    // Only the anchor-relative offset is rounded to float32, so far trees keep sub-millimetre placement.
+    expect(placed).toEqual(expected.sort((a, b) => a.x - b.x).map((tree) => [
+      Math.fround(tree.x - pool.position.x) + pool.position.x,
+      Math.fround(tree.z - pool.position.z) + pool.position.z,
+    ]));
     const usage = terrain.poolUsage;
     expect(usage['near tree trunks']!.used).toBeGreaterThan(0);
     for (const entry of Object.values(usage)) expect(entry.grown).toBe(0);
