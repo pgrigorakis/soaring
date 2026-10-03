@@ -359,9 +359,9 @@ export class WorldModel {
   sample(x: number, z: number): LandscapeSample {
     const { mountainRegion, elevation, biome, hills } = this.relief(x, z);
     const highland = biome.highlands;
-    // The rendered ground and the drainage lattice read the same continuous landform.
+    // The drainage lattice reads the landform without the 520 m hills; the rendered ground adds them.
     // None of the landform terms is blended through the 500 m lattice.
-    const bare = elevation;
+    const bare = elevation + hills;
     const detail = fbm(x / 125, z / 125, this.seed + 31, 3) * 4.2 + fbm(x / 46, z / 46, this.seed + 37, 2) * 1.05;
     const reliefScale = valleyReliefScale(highland);
 
@@ -514,11 +514,11 @@ export class WorldModel {
   }
 
   /**
-   * Broad landform. Drainage and the rendered ground share this field, so rivers follow the visible relief.
-   * Carved river height never feeds back into biome selection.
+   * Broad landform. Drainage reads `elevation`, so rivers follow the broad relief; the rendered
+   * ground adds the 520 m lowland `hills`. Carved river height never feeds back into biome selection.
    *
    * Three terms, each at its own scale, none passed through the 500 m drainage lattice:
-   * lowland (#86 fills the hill term), massif (#87 replaces the ridge), summits (#88).
+   * lowland, massif (#87 replaces the ridge), summits (#88).
    */
   private relief(x: number, z: number) {
     // Biome eligibility stays on the unwarped value-noise field. #93 owns selection.
@@ -536,13 +536,13 @@ export class WorldModel {
     const biome = biomeWeights(mountainRegion, climate, candidate, hillsField, lakeField);
     const warped = warpLandform(x, z, this.seed);
     const hills = this.peatShelf(x, z, landform, this.lowlandHills(warped.x, warped.z, landform));
-    const elevation = this.lowlandTerm(warped.x, warped.z, landform) + hills
+    const elevation = this.lowlandTerm(warped.x, warped.z, landform)
       + this.massifTerm(warped.x, warped.z, landform, mountainRegion)
       + this.summitTerm(x, z, landform);
     return { elevation, mountainRegion, biome, hills };
   }
 
-  /** Lowland and highland base, on warped gradient noise. The 520 m hills are added in `relief`. */
+  /** Lowland and highland base, on warped gradient noise. The 520 m hills are separate, in `lowlandHills`. */
   private lowlandTerm(x: number, z: number, landform: BiomeWeights): number {
     const broad = gradientFbm(x / 3200, z / 3200, this.seed + 7, 4);
     return landform.hills * (BIOME_PROFILES.hills.heightOffset + broad * BIOME_PROFILES.hills.heightAmplitude)
@@ -551,7 +551,11 @@ export class WorldModel {
       + landform.highlands * (28 + broad * 52);
   }
 
-  /** Fly-with-me lowland hills on warped coordinates, blended by the landform biome weights. */
+  /**
+   * Fly-with-me lowland hills on warped coordinates, blended by the landform biome weights.
+   * Captain decision on #86: these are ground only. The 500 m drainage lattice cannot
+   * resolve a 520 m hill, so reading them there turns hollows into lakes.
+   */
   private lowlandHills(x: number, z: number, landform: BiomeWeights): number {
     const height = landform.hills * LOWLAND_HILL_HEIGHT.hills + landform.woodland * LOWLAND_HILL_HEIGHT.woodland
       + landform.moor * LOWLAND_HILL_HEIGHT.moor;
@@ -608,12 +612,16 @@ export class WorldModel {
 
   /** Small dark pools on genuinely flat, high Moor tops, separate from drainage lakes. */
   private peatPool(x: number, z: number, biome: BiomeWeights, bank: number): { distance: number; surface: number } | null {
-    if (biome.moor < 0.98 || bank < 850) return null;
+    if (biome.moor < 0.98 || bank < 1000) return null;
     const site = this.peatSite(x, z);
     if (!site || site.distance > 26) return null;
-    const surface = this.relief(site.x, site.z).elevation - 0.5;
-    if (surface < 110 || Math.abs(this.relief(site.x + 36, site.z).elevation - surface - 0.5) > 2.2
-      || Math.abs(this.relief(site.x, site.z + 36).elevation - surface - 0.5) > 2.2) return null;
+    const ground = (px: number, pz: number) => {
+      const { elevation, hills } = this.relief(px, pz);
+      return elevation + hills;
+    };
+    const surface = ground(site.x, site.z) - 0.5;
+    if (surface < 110 || Math.abs(ground(site.x + 36, site.z) - surface - 0.5) > 2.2
+      || Math.abs(ground(site.x, site.z + 36) - surface - 0.5) > 2.2) return null;
     return { distance: site.distance, surface };
   }
 
@@ -881,8 +889,7 @@ export class WorldModel {
     if (node !== undefined) return node;
     const x = (i + 0.5 + (hash2(i, j, this.seed + 163) - 0.5) * 0.42) * DRAINAGE_SPACING;
     const z = (j + 0.5 + (hash2(i, j, this.seed + 167) - 0.5) * 0.42) * DRAINAGE_SPACING;
-    const { elevation: full, biome, hills } = this.relief(x, z);
-    const elevation = full - hills * (1 - Number(globalThis.process?.env?.DRAIN_K ?? 1));
+    const { elevation, biome } = this.relief(x, z);
     node = { i, j, x, z, elevation, highland: biome.highlands, lakeland: biome.lakeland };
     this.riverNodes.set(key, node);
     return node;
