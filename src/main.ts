@@ -46,11 +46,12 @@ function loadSettings(): StoredSettings {
 }
 
 function loadSeed(): number {
-  const saved = Number(localStorage.getItem(SEED_KEY));
-  if (Number.isInteger(saved) && saved !== 0) return saved | 0;
+  const stored = localStorage.getItem(SEED_KEY);
+  const saved = Number(stored);
+  if (stored !== null && Number.isInteger(saved) && saved >= 0 && saved <= 0xffff_ffff) return saved;
   const values = new Uint32Array(1);
   crypto.getRandomValues(values);
-  const seed = (values[0] ?? 1) | 0 || 1;
+  const seed = values[0] ?? 1;
   localStorage.setItem(SEED_KEY, String(seed));
   return seed;
 }
@@ -925,7 +926,7 @@ declare global {
     };
   }
 }
-window.__SOARING__ = {
+if (import.meta.env.DEV) window.__SOARING__ = {
   ...(profiler ? { profile: { begin: () => profiler.begin(), end: () => profiler.end(), report: () => profiler.report() } } : {}),
   ...(import.meta.env.DEV ? {
     // Freeze only navigation for repeatable lighting comparisons. The normal
