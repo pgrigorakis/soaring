@@ -1,0 +1,2934 @@
+{
+  "command": "BENCH_BUILDS=base=http://127.0.0.1:4401,pools=http://127.0.0.1:4402 BENCH_ROUNDS=3 BENCH_FRAMES=300 BENCH_WARMUP=60 BENCH_DPR=2 npm run bench",
+  "generated": "2026-10-03T14:21:43.377Z",
+  "results": [
+    {
+      "build": {
+        "commit": "215998e8d2f7240b85648d1c57283f3cf747b9fe",
+        "dirty": false,
+        "url": "http://127.0.0.1:4401"
+      },
+      "environment": {
+        "machine": {
+          "cpu": "Apple M4 Pro",
+          "cores": 12,
+          "memoryGiB": 24,
+          "os": "Darwin 27.2.0",
+          "arch": "arm64"
+        },
+        "browser": "chromium 154.0.8037.93",
+        "headless": true,
+        "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+        "viewport": [
+          1440,
+          900
+        ],
+        "devicePixelRatio": 2,
+        "pixelRatio": 1.75
+      },
+      "parameters": {
+        "seed": 5,
+        "smoke": false,
+        "frames": 300,
+        "warmupFrames": 60,
+        "visibility": 5000,
+        "profileFlag": "?profile"
+      },
+      "gpu": {
+        "status": "available",
+        "reason": null,
+        "discardedDisjoint": 0
+      },
+      "leakedQueries": 0,
+      "vantages": [
+        {
+          "name": "lake-noon",
+          "parameters": {
+            "spot": "lake",
+            "x": -6257.3215465503745,
+            "z": 6162.24704799708,
+            "heading": 0,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -6257.3215465503745,
+              "y": 257.3696985315354,
+              "z": 6102.24704799708,
+              "lookX": -6257.3215465503745,
+              "lookY": 218.36969853153542,
+              "lookZ": 6200.24704799708
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 300,
+            "triangles": 188062,
+            "constant": true
+          },
+          "held": {
+            "chunks": 598,
+            "chunksAtEnd": 598,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -6257.3215465503745,
+              227.36969853153542,
+              6162.24704799708
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999998545,
+            "p50": 16.69999999999709,
+            "p95": 16.799999999995634,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.665886287625412
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1.699999988079071,
+            "p5": 1.800000011920929,
+            "p50": 2,
+            "p95": 2.399999976158142,
+            "p99": 2.600000023841858,
+            "max": 3.099999964237213,
+            "mean": 2.0443333331743876
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 1.600000023841858,
+            "p5": 1.699999988079071,
+            "p50": 1.899999976158142,
+            "p95": 2.299999952316284,
+            "p99": 2.5,
+            "max": 3.099999964237213,
+            "mean": 1.9356666666269302
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.408125,
+            "p5": 2.862,
+            "p50": 6.885458,
+            "p95": 7.769999,
+            "p99": 8.073458,
+            "max": 8.448874,
+            "mean": 6.35144229
+          },
+          "mainThreadBusyShare": 0.12307599685984959,
+          "gpuBusyShare": 0.38237897834681234,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "confluence-noon",
+          "parameters": {
+            "spot": "confluence",
+            "x": -2238.350281768944,
+            "z": -6831.407652574126,
+            "heading": 1.5707963267948966,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -2298.350281768944,
+              "y": 251.6479762779689,
+              "z": -6831.407652574126,
+              "lookX": -2200.350281768944,
+              "lookY": 212.6479762779689,
+              "lookZ": -6831.407652574126
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 412,
+            "triangles": 245050,
+            "constant": true
+          },
+          "held": {
+            "chunks": 598,
+            "chunksAtEnd": 598,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -2238.350281768944,
+              221.6479762779689,
+              -6831.407652574126
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.59999999999127,
+            "p50": 16.69999999999709,
+            "p95": 16.70000000001164,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.66622073578599
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 2.399999976158142,
+            "p5": 2.599999964237213,
+            "p50": 2.800000011920929,
+            "p95": 3,
+            "p99": 3.199999988079071,
+            "max": 3.200000047683716,
+            "mean": 2.7806666672229765
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 2.300000011920929,
+            "p5": 2.5,
+            "p50": 2.699999988079071,
+            "p95": 2.900000035762787,
+            "p99": 3.099999964237213,
+            "max": 3.200000047683716,
+            "mean": 2.67600000222524
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.138125,
+            "p5": 2.406791,
+            "p50": 5.844125,
+            "p95": 6.1325,
+            "p99": 6.324333,
+            "max": 6.44125,
+            "mean": 5.367864496666668
+          },
+          "mainThreadBusyShare": 0.1674024723404421,
+          "gpuBusyShare": 0.32315767960346703,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "river-run-golden-hour",
+          "parameters": {
+            "spot": "run",
+            "x": -7790.479390121764,
+            "z": -7771.0382654157,
+            "heading": -1.6172866662973575,
+            "timeOfDay": 0.72,
+            "visibility": 5000,
+            "camera": {
+              "x": -7730.544218994014,
+              "y": 241.49980434727507,
+              "z": -7768.249849756698,
+              "lookX": -7828.438331836005,
+              "lookY": 202.49980434727507,
+              "lookZ": -7772.804261999735
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 475,
+            "triangles": 533342,
+            "constant": true
+          },
+          "held": {
+            "chunks": 597,
+            "chunksAtEnd": 597,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.72,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -7790.479390121764,
+              211.49980434727507,
+              -7771.0382654157
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.59999999999127,
+            "p5": 16.59999999999127,
+            "p50": 16.69999999999709,
+            "p95": 16.70000000001164,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.666220735785945
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 2.800000011920929,
+            "p5": 2.900000035762787,
+            "p50": 3.300000011920929,
+            "p95": 3.800000011920929,
+            "p99": 4.099999964237213,
+            "max": 4.400000035762787,
+            "mean": 3.3219999984900155
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 2.699999988079071,
+            "p5": 2.800000011920929,
+            "p50": 3.199999988079071,
+            "p95": 3.699999988079071,
+            "p99": 3.899999976158142,
+            "max": 4.100000023841858,
+            "mean": 3.212999999523163
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 3.390625,
+            "p5": 3.654791,
+            "p50": 4.824708,
+            "p95": 11.240916,
+            "p99": 12.65925,
+            "max": 14.855708,
+            "mean": 5.73120629666667
+          },
+          "mainThreadBusyShare": 0.19999197293847434,
+          "gpuBusyShare": 0.34503168425911096,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "network-noon",
+          "parameters": {
+            "spot": "network",
+            "x": -2238.350281768944,
+            "z": -6831.407652574126,
+            "heading": 3.141592653589793,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -2238.350281768944,
+              "y": 251.6479762779689,
+              "z": -6771.407652574126,
+              "lookX": -2238.350281768944,
+              "lookY": 212.6479762779689,
+              "lookZ": -6869.407652574126
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 438,
+            "triangles": 263446,
+            "constant": true
+          },
+          "held": {
+            "chunks": 599,
+            "chunksAtEnd": 599,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -2238.350281768944,
+              221.6479762779689,
+              -6831.407652574126
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999976717,
+            "p50": 16.699999999982538,
+            "p95": 16.70000000001164,
+            "p99": 16.79999999998836,
+            "max": 16.800000000017462,
+            "mean": 16.665886287625437
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 2.599999964237213,
+            "p5": 2.699999988079071,
+            "p50": 3,
+            "p95": 3.300000011920929,
+            "p99": 3.5,
+            "max": 3.699999988079071,
+            "mean": 2.9843333341677982
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 2.5,
+            "p5": 2.600000023841858,
+            "p50": 2.899999976158142,
+            "p95": 3.299999952316284,
+            "p99": 3.400000035762787,
+            "max": 3.599999964237213,
+            "mean": 2.8890000011523567
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.369791,
+            "p5": 5.692708,
+            "p50": 5.976333,
+            "p95": 6.391374,
+            "p99": 6.678999,
+            "max": 6.983999,
+            "mean": 5.908901286666669
+          },
+          "mainThreadBusyShare": 0.17966727544105848,
+          "gpuBusyShare": 0.35573646645662305,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "origin-night",
+          "parameters": {
+            "spot": "origin",
+            "x": 0,
+            "z": 0,
+            "heading": 0,
+            "timeOfDay": 0,
+            "visibility": 5000,
+            "camera": {
+              "x": 0,
+              "y": 295.8255293840833,
+              "z": -60,
+              "lookX": 0,
+              "lookY": 256.8255293840833,
+              "lookZ": 38
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 391,
+            "triangles": 221244,
+            "constant": true
+          },
+          "held": {
+            "chunks": 605,
+            "chunksAtEnd": 605,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              0,
+              265.8255293840833,
+              0
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999976717,
+            "p50": 16.699999999982538,
+            "p95": 16.79999999998836,
+            "p99": 16.800000000017462,
+            "max": 16.800000000017462,
+            "mean": 16.66622073578599
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 2.199999988079071,
+            "p5": 2.300000011920929,
+            "p50": 2.5,
+            "p95": 2.800000011920929,
+            "p99": 3,
+            "max": 3.199999988079071,
+            "mean": 2.540999999245008
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 2.100000023841858,
+            "p5": 2.299999952316284,
+            "p50": 2.400000035762787,
+            "p95": 2.700000047683716,
+            "p99": 2.900000035762787,
+            "max": 3,
+            "mean": 2.4503333342075346
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 5.112833,
+            "p5": 5.440375,
+            "p50": 5.667458,
+            "p95": 5.838541,
+            "p99": 5.926374,
+            "max": 6.128875,
+            "mean": 5.654806853333335
+          },
+          "mainThreadBusyShare": 0.15297399256973443,
+          "gpuBusyShare": 0.3404322636057143,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        }
+      ],
+      "label": "base",
+      "round": 1
+    },
+    {
+      "build": {
+        "commit": "215998e8d2f7240b85648d1c57283f3cf747b9fe",
+        "dirty": false,
+        "url": "http://127.0.0.1:4402"
+      },
+      "environment": {
+        "machine": {
+          "cpu": "Apple M4 Pro",
+          "cores": 12,
+          "memoryGiB": 24,
+          "os": "Darwin 27.2.0",
+          "arch": "arm64"
+        },
+        "browser": "chromium 154.0.8037.93",
+        "headless": true,
+        "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+        "viewport": [
+          1440,
+          900
+        ],
+        "devicePixelRatio": 2,
+        "pixelRatio": 1.75
+      },
+      "parameters": {
+        "seed": 5,
+        "smoke": false,
+        "frames": 300,
+        "warmupFrames": 60,
+        "visibility": 5000,
+        "profileFlag": "?profile"
+      },
+      "gpu": {
+        "status": "available",
+        "reason": null,
+        "discardedDisjoint": 0
+      },
+      "leakedQueries": 0,
+      "vantages": [
+        {
+          "name": "lake-noon",
+          "parameters": {
+            "spot": "lake",
+            "x": -6257.3215465503745,
+            "z": 6162.24704799708,
+            "heading": 0,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -6257.3215465503745,
+              "y": 257.3696985315354,
+              "z": 6102.24704799708,
+              "lookX": -6257.3215465503745,
+              "lookY": 218.36969853153542,
+              "lookZ": 6200.24704799708
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 173,
+            "triangles": 370710,
+            "constant": true
+          },
+          "held": {
+            "chunks": 598,
+            "chunksAtEnd": 598,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -6257.3215465503745,
+              227.36969853153542,
+              6162.24704799708
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999998545,
+            "p50": 16.69999999999709,
+            "p95": 16.700000000004366,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.665886287625412
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1,
+            "p5": 1,
+            "p50": 1.199999988079071,
+            "p95": 1.399999976158142,
+            "p99": 1.5,
+            "max": 1.899999976158142,
+            "mean": 1.1736666665474573
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 0.8999999761581421,
+            "p5": 0.8999999761581421,
+            "p50": 1.0999999642372131,
+            "p95": 1.2000000476837158,
+            "p99": 1.399999976158142,
+            "max": 1.5999999642372131,
+            "mean": 1.0659999998410543
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.534916,
+            "p5": 2.806,
+            "p50": 7.255958,
+            "p95": 8.3185,
+            "p99": 9.419875,
+            "max": 11.113749,
+            "mean": 6.660930586666669
+          },
+          "mainThreadBusyShare": 0.0706588268275245,
+          "gpuBusyShare": 0.4010112532359375,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "confluence-noon",
+          "parameters": {
+            "spot": "confluence",
+            "x": -2238.350281768944,
+            "z": -6831.407652574126,
+            "heading": 1.5707963267948966,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -2298.350281768944,
+              "y": 251.6479762779689,
+              "z": -6831.407652574126,
+              "lookX": -2200.350281768944,
+              "lookY": 212.6479762779689,
+              "lookZ": -6831.407652574126
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 182,
+            "triangles": 521886,
+            "constant": true
+          },
+          "held": {
+            "chunks": 598,
+            "chunksAtEnd": 598,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -2238.350281768944,
+              221.6479762779689,
+              -6831.407652574126
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.59999999999127,
+            "p50": 16.69999999999709,
+            "p95": 16.70000000001164,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.66588628762539
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1,
+            "p5": 1.0999999642372131,
+            "p50": 1.2999999523162842,
+            "p95": 1.5,
+            "p99": 1.7000000476837158,
+            "max": 3.699999988079071,
+            "mean": 1.2800000019868214
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 0.8999999761581421,
+            "p5": 1,
+            "p50": 1.100000023841858,
+            "p95": 1.399999976158142,
+            "p99": 1.600000023841858,
+            "max": 3.399999976158142,
+            "mean": 1.1743333343664806
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.401166,
+            "p5": 3.19025,
+            "p50": 6.428666,
+            "p95": 7.317916,
+            "p99": 7.921624,
+            "max": 8.775291,
+            "mean": 6.223825329999994
+          },
+          "mainThreadBusyShare": 0.07706046448918286,
+          "gpuBusyShare": 0.3746959922538186,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "river-run-golden-hour",
+          "parameters": {
+            "spot": "run",
+            "x": -7790.479390121764,
+            "z": -7771.0382654157,
+            "heading": -1.6172866662973575,
+            "timeOfDay": 0.72,
+            "visibility": 5000,
+            "camera": {
+              "x": -7730.544218994014,
+              "y": 241.49980434727507,
+              "z": -7768.249849756698,
+              "lookX": -7828.438331836005,
+              "lookY": 202.49980434727507,
+              "lookZ": -7772.804261999735
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 170,
+            "triangles": 1246626,
+            "constant": true
+          },
+          "held": {
+            "chunks": 597,
+            "chunksAtEnd": 597,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.72,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -7790.479390121764,
+              211.49980434727507,
+              -7771.0382654157
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.59999999999127,
+            "p50": 16.69999999999709,
+            "p95": 16.79999999998836,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.665551839464882
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1,
+            "p5": 1.100000023841858,
+            "p50": 1.2000000476837158,
+            "p95": 1.4000000357627869,
+            "p99": 1.5999999642372131,
+            "max": 1.7999999523162842,
+            "mean": 1.2616666662693024
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 0.8999999761581421,
+            "p5": 1,
+            "p50": 1.100000023841858,
+            "p95": 1.300000011920929,
+            "p99": 1.4000000357627869,
+            "max": 1.5,
+            "mean": 1.1516666664679844
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 3.583499,
+            "p5": 3.681166,
+            "p50": 4.722625,
+            "p95": 10.977541,
+            "p99": 12.408124,
+            "max": 13.434874,
+            "mean": 5.752832706666666
+          },
+          "mainThreadBusyShare": 0.07595825805354017,
+          "gpuBusyShare": 0.34634754404976936,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "network-noon",
+          "parameters": {
+            "spot": "network",
+            "x": -2238.350281768944,
+            "z": -6831.407652574126,
+            "heading": 3.141592653589793,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -2238.350281768944,
+              "y": 251.6479762779689,
+              "z": -6771.407652574126,
+              "lookX": -2238.350281768944,
+              "lookY": 212.6479762779689,
+              "lookZ": -6869.407652574126
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 178,
+            "triangles": 513566,
+            "constant": true
+          },
+          "held": {
+            "chunks": 599,
+            "chunksAtEnd": 599,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -2238.350281768944,
+              221.6479762779689,
+              -6831.407652574126
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999976717,
+            "p50": 16.699999999982538,
+            "p95": 16.70000000001164,
+            "p99": 16.79999999998836,
+            "max": 16.800000000017462,
+            "mean": 16.665886287625437
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1,
+            "p5": 1.0999999642372131,
+            "p50": 1.199999988079071,
+            "p95": 1.4000000357627869,
+            "p99": 1.5,
+            "max": 1.600000023841858,
+            "mean": 1.224333333770434
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 0.8999999761581421,
+            "p5": 1,
+            "p50": 1.100000023841858,
+            "p95": 1.300000011920929,
+            "p99": 1.399999976158142,
+            "max": 1.4000000357627869,
+            "mean": 1.1259999984502793
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.419749,
+            "p5": 4.411375,
+            "p50": 5.922166,
+            "p95": 6.373625,
+            "p99": 6.978249,
+            "max": 8.318875,
+            "mean": 5.883463556666668
+          },
+          "mainThreadBusyShare": 0.0737091369089783,
+          "gpuBusyShare": 0.354205026389195,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "origin-night",
+          "parameters": {
+            "spot": "origin",
+            "x": 0,
+            "z": 0,
+            "heading": 0,
+            "timeOfDay": 0,
+            "visibility": 5000,
+            "camera": {
+              "x": 0,
+              "y": 295.8255293840833,
+              "z": -60,
+              "lookX": 0,
+              "lookY": 256.8255293840833,
+              "lookZ": 38
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 179,
+            "triangles": 384196,
+            "constant": true
+          },
+          "held": {
+            "chunks": 605,
+            "chunksAtEnd": 605,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              0,
+              265.8255293840833,
+              0
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999976717,
+            "p50": 16.699999999982538,
+            "p95": 16.70000000001164,
+            "p99": 16.800000000017462,
+            "max": 16.800000000017462,
+            "mean": 16.66622073578599
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1.0999999642372131,
+            "p5": 1.100000023841858,
+            "p50": 1.2999999523162842,
+            "p95": 1.5,
+            "p99": 1.5,
+            "max": 2.199999988079071,
+            "mean": 1.2736666697263717
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 1,
+            "p5": 1.0999999642372131,
+            "p50": 1.199999988079071,
+            "p95": 1.300000011920929,
+            "p99": 1.5,
+            "max": 2,
+            "mean": 1.1836666677395502
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.131499,
+            "p5": 2.302249,
+            "p50": 5.5425,
+            "p95": 6.483458,
+            "p99": 7.837374,
+            "max": 8.767749,
+            "mean": 5.154788370000001
+          },
+          "mainThreadBusyShare": 0.07667763704405013,
+          "gpuBusyShare": 0.31033001103708385,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        }
+      ],
+      "label": "pools",
+      "round": 1
+    },
+    {
+      "build": {
+        "commit": "215998e8d2f7240b85648d1c57283f3cf747b9fe",
+        "dirty": false,
+        "url": "http://127.0.0.1:4401"
+      },
+      "environment": {
+        "machine": {
+          "cpu": "Apple M4 Pro",
+          "cores": 12,
+          "memoryGiB": 24,
+          "os": "Darwin 27.2.0",
+          "arch": "arm64"
+        },
+        "browser": "chromium 154.0.8037.93",
+        "headless": true,
+        "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+        "viewport": [
+          1440,
+          900
+        ],
+        "devicePixelRatio": 2,
+        "pixelRatio": 1.75
+      },
+      "parameters": {
+        "seed": 5,
+        "smoke": false,
+        "frames": 300,
+        "warmupFrames": 60,
+        "visibility": 5000,
+        "profileFlag": "?profile"
+      },
+      "gpu": {
+        "status": "available",
+        "reason": null,
+        "discardedDisjoint": 0
+      },
+      "leakedQueries": 0,
+      "vantages": [
+        {
+          "name": "lake-noon",
+          "parameters": {
+            "spot": "lake",
+            "x": -6257.3215465503745,
+            "z": 6162.24704799708,
+            "heading": 0,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -6257.3215465503745,
+              "y": 257.3696985315354,
+              "z": 6102.24704799708,
+              "lookX": -6257.3215465503745,
+              "lookY": 218.36969853153542,
+              "lookZ": 6200.24704799708
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 300,
+            "triangles": 188062,
+            "constant": true
+          },
+          "held": {
+            "chunks": 598,
+            "chunksAtEnd": 598,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -6257.3215465503745,
+              227.36969853153542,
+              6162.24704799708
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999998545,
+            "p50": 16.69999999999709,
+            "p95": 16.799999999995634,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.666220735785945
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1.600000023841858,
+            "p5": 2,
+            "p50": 2.100000023841858,
+            "p95": 2.5,
+            "p99": 2.599999964237213,
+            "max": 2.799999952316284,
+            "mean": 2.162666666706403
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 1.600000023841858,
+            "p5": 1.899999976158142,
+            "p50": 2,
+            "p95": 2.300000011920929,
+            "p99": 2.5,
+            "max": 2.699999988079071,
+            "mean": 2.0516666666666667
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.36375,
+            "p5": 2.454833,
+            "p50": 6.8735,
+            "p95": 7.861208,
+            "p99": 9.430375,
+            "max": 10.008791,
+            "mean": 5.601645603333331
+          },
+          "mainThreadBusyShare": 0.13019746347967598,
+          "gpuBusyShare": 0.3372318351661586,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "confluence-noon",
+          "parameters": {
+            "spot": "confluence",
+            "x": -2238.350281768944,
+            "z": -6831.407652574126,
+            "heading": 1.5707963267948966,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -2298.350281768944,
+              "y": 251.6479762779689,
+              "z": -6831.407652574126,
+              "lookX": -2200.350281768944,
+              "lookY": 212.6479762779689,
+              "lookZ": -6831.407652574126
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 412,
+            "triangles": 245050,
+            "constant": true
+          },
+          "held": {
+            "chunks": 598,
+            "chunksAtEnd": 598,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -2238.350281768944,
+              221.6479762779689,
+              -6831.407652574126
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.59999999999127,
+            "p50": 16.69999999999709,
+            "p95": 16.79999999998836,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.665886287625437
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 2.399999976158142,
+            "p5": 2.699999988079071,
+            "p50": 2.900000035762787,
+            "p95": 3.199999988079071,
+            "p99": 3.400000035762787,
+            "max": 3.600000023841858,
+            "mean": 2.9110000030199688
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 2.399999976158142,
+            "p5": 2.599999964237213,
+            "p50": 2.800000011920929,
+            "p95": 3.099999964237213,
+            "p99": 3.299999952316284,
+            "max": 3.5,
+            "mean": 2.817666662931442
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 1.871583,
+            "p5": 2.472916,
+            "p50": 7.146374,
+            "p95": 8.455458,
+            "p99": 8.770666,
+            "max": 8.924374,
+            "mean": 6.472092583333333
+          },
+          "mainThreadBusyShare": 0.1752523531347935,
+          "gpuBusyShare": 0.3896425468082114,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "river-run-golden-hour",
+          "parameters": {
+            "spot": "run",
+            "x": -7790.479390121764,
+            "z": -7771.0382654157,
+            "heading": -1.6172866662973575,
+            "timeOfDay": 0.72,
+            "visibility": 5000,
+            "camera": {
+              "x": -7730.544218994014,
+              "y": 241.49980434727507,
+              "z": -7768.249849756698,
+              "lookX": -7828.438331836005,
+              "lookY": 202.49980434727507,
+              "lookZ": -7772.804261999735
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 475,
+            "triangles": 533342,
+            "constant": true
+          },
+          "held": {
+            "chunks": 597,
+            "chunksAtEnd": 597,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.72,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -7790.479390121764,
+              211.49980434727507,
+              -7771.0382654157
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.59999999999127,
+            "p50": 16.69999999999709,
+            "p95": 16.70000000001164,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.665886287625437
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 3,
+            "p5": 3.099999964237213,
+            "p50": 3.299999952316284,
+            "p95": 3.600000023841858,
+            "p99": 3.800000011920929,
+            "max": 4.299999952316284,
+            "mean": 3.289333332180977
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 2.899999976158142,
+            "p5": 3,
+            "p50": 3.199999988079071,
+            "p95": 3.5,
+            "p99": 3.699999988079071,
+            "max": 4.199999988079071,
+            "mean": 3.1916666648785275
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 3.360999,
+            "p5": 3.624625,
+            "p50": 9.05475,
+            "p95": 10.068624,
+            "p99": 10.513583,
+            "max": 10.602333,
+            "mean": 7.559205893333334
+          },
+          "mainThreadBusyShare": 0.19802933909700626,
+          "gpuBusyShare": 0.4550905596917576,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "network-noon",
+          "parameters": {
+            "spot": "network",
+            "x": -2238.350281768944,
+            "z": -6831.407652574126,
+            "heading": 3.141592653589793,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -2238.350281768944,
+              "y": 251.6479762779689,
+              "z": -6771.407652574126,
+              "lookX": -2238.350281768944,
+              "lookY": 212.6479762779689,
+              "lookZ": -6869.407652574126
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 438,
+            "triangles": 263446,
+            "constant": true
+          },
+          "held": {
+            "chunks": 599,
+            "chunksAtEnd": 599,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -2238.350281768944,
+              221.6479762779689,
+              -6831.407652574126
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999976717,
+            "p50": 16.699999999982538,
+            "p95": 16.79999999998836,
+            "p99": 16.79999999998836,
+            "max": 16.800000000017462,
+            "mean": 16.66622073578599
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 2.399999976158142,
+            "p5": 2.800000011920929,
+            "p50": 3,
+            "p95": 3.399999976158142,
+            "p99": 3.600000023841858,
+            "max": 3.800000011920929,
+            "mean": 3.0299999986092248
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 2.300000011920929,
+            "p5": 2.699999988079071,
+            "p50": 2.900000035762787,
+            "p95": 3.200000047683716,
+            "p99": 3.5,
+            "max": 3.699999988079071,
+            "mean": 2.9283333331346513
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.4125,
+            "p5": 5.643541,
+            "p50": 5.960999,
+            "p95": 6.389499,
+            "p99": 6.505458,
+            "max": 7.917,
+            "mean": 5.830430069999999
+          },
+          "mainThreadBusyShare": 0.1824129072850308,
+          "gpuBusyShare": 0.3510051816102094,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "origin-night",
+          "parameters": {
+            "spot": "origin",
+            "x": 0,
+            "z": 0,
+            "heading": 0,
+            "timeOfDay": 0,
+            "visibility": 5000,
+            "camera": {
+              "x": 0,
+              "y": 295.8255293840833,
+              "z": -60,
+              "lookX": 0,
+              "lookY": 256.8255293840833,
+              "lookZ": 38
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 391,
+            "triangles": 221244,
+            "constant": true
+          },
+          "held": {
+            "chunks": 605,
+            "chunksAtEnd": 605,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              0,
+              265.8255293840833,
+              0
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.599999999976717,
+            "p5": 16.599999999976717,
+            "p50": 16.699999999982538,
+            "p95": 16.70000000001164,
+            "p99": 16.79999999998836,
+            "max": 16.800000000017462,
+            "mean": 16.665551839464882
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 2.399999976158142,
+            "p5": 2.5,
+            "p50": 2.800000011920929,
+            "p95": 3.200000047683716,
+            "p99": 3.400000035762787,
+            "max": 3.900000035762787,
+            "mean": 2.8516666664679846
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 2.199999988079071,
+            "p5": 2.5,
+            "p50": 2.799999952316284,
+            "p95": 3.100000023841858,
+            "p99": 3.300000011920929,
+            "max": 3.800000011920929,
+            "mean": 2.7643333321809767
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 1.784624,
+            "p5": 2.333124,
+            "p50": 6.145499,
+            "p95": 7.665416,
+            "p99": 9.032749,
+            "max": 9.514958,
+            "mean": 5.795244336666667
+          },
+          "mainThreadBusyShare": 0.17168372465189552,
+          "gpuBusyShare": 0.3489009233393536,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        }
+      ],
+      "label": "base",
+      "round": 2
+    },
+    {
+      "build": {
+        "commit": "215998e8d2f7240b85648d1c57283f3cf747b9fe",
+        "dirty": false,
+        "url": "http://127.0.0.1:4402"
+      },
+      "environment": {
+        "machine": {
+          "cpu": "Apple M4 Pro",
+          "cores": 12,
+          "memoryGiB": 24,
+          "os": "Darwin 27.2.0",
+          "arch": "arm64"
+        },
+        "browser": "chromium 154.0.8037.93",
+        "headless": true,
+        "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+        "viewport": [
+          1440,
+          900
+        ],
+        "devicePixelRatio": 2,
+        "pixelRatio": 1.75
+      },
+      "parameters": {
+        "seed": 5,
+        "smoke": false,
+        "frames": 300,
+        "warmupFrames": 60,
+        "visibility": 5000,
+        "profileFlag": "?profile"
+      },
+      "gpu": {
+        "status": "available",
+        "reason": null,
+        "discardedDisjoint": 0
+      },
+      "leakedQueries": 0,
+      "vantages": [
+        {
+          "name": "lake-noon",
+          "parameters": {
+            "spot": "lake",
+            "x": -6257.3215465503745,
+            "z": 6162.24704799708,
+            "heading": 0,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -6257.3215465503745,
+              "y": 257.3696985315354,
+              "z": 6102.24704799708,
+              "lookX": -6257.3215465503745,
+              "lookY": 218.36969853153542,
+              "lookZ": 6200.24704799708
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 173,
+            "triangles": 370710,
+            "constant": true
+          },
+          "held": {
+            "chunks": 598,
+            "chunksAtEnd": 598,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -6257.3215465503745,
+              227.36969853153542,
+              6162.24704799708
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999998545,
+            "p50": 16.69999999999709,
+            "p95": 16.700000000004366,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.666220735785966
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 0.699999988079071,
+            "p5": 1.0999999642372131,
+            "p50": 1.199999988079071,
+            "p95": 1.4000000357627869,
+            "p99": 1.5,
+            "max": 1.5999999642372131,
+            "mean": 1.2186666661500931
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 0.5,
+            "p5": 0.9000000357627869,
+            "p50": 1.100000023841858,
+            "p95": 1.300000011920929,
+            "p99": 1.4000000357627869,
+            "max": 1.4000000357627869,
+            "mean": 1.1073333324988683
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 6.8345,
+            "p5": 6.885249,
+            "p50": 6.940541,
+            "p95": 7.473249,
+            "p99": 7.559375,
+            "max": 9.337,
+            "mean": 7.099582289999997
+          },
+          "mainThreadBusyShare": 0.07336651144746902,
+          "gpuBusyShare": 0.42741103848932377,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "confluence-noon",
+          "parameters": {
+            "spot": "confluence",
+            "x": -2238.350281768944,
+            "z": -6831.407652574126,
+            "heading": 1.5707963267948966,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -2298.350281768944,
+              "y": 251.6479762779689,
+              "z": -6831.407652574126,
+              "lookX": -2200.350281768944,
+              "lookY": 212.6479762779689,
+              "lookZ": -6831.407652574126
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 182,
+            "triangles": 521886,
+            "constant": true
+          },
+          "held": {
+            "chunks": 598,
+            "chunksAtEnd": 598,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -2238.350281768944,
+              221.6479762779689,
+              -6831.407652574126
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.59999999999127,
+            "p50": 16.69999999999709,
+            "p95": 16.79999999998836,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.665886287625437
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1,
+            "p5": 1.0999999642372131,
+            "p50": 1.199999988079071,
+            "p95": 1.4000000357627869,
+            "p99": 1.5,
+            "max": 2.100000023841858,
+            "mean": 1.2283333351214727
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 0.8999999761581421,
+            "p5": 1,
+            "p50": 1.100000023841858,
+            "p95": 1.300000011920929,
+            "p99": 1.399999976158142,
+            "max": 2,
+            "mean": 1.1303333326180776
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 6.034583,
+            "p5": 6.079208,
+            "p50": 6.122499,
+            "p95": 6.666374,
+            "p99": 6.732208,
+            "max": 6.790124,
+            "mean": 6.263118646666665
+          },
+          "mainThreadBusyShare": 0.07394995094147044,
+          "gpuBusyShare": 0.37706158696393755,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "river-run-golden-hour",
+          "parameters": {
+            "spot": "run",
+            "x": -7790.479390121764,
+            "z": -7771.0382654157,
+            "heading": -1.6172866662973575,
+            "timeOfDay": 0.72,
+            "visibility": 5000,
+            "camera": {
+              "x": -7730.544218994014,
+              "y": 241.49980434727507,
+              "z": -7768.249849756698,
+              "lookX": -7828.438331836005,
+              "lookY": 202.49980434727507,
+              "lookZ": -7772.804261999735
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 170,
+            "triangles": 1246626,
+            "constant": true
+          },
+          "held": {
+            "chunks": 597,
+            "chunksAtEnd": 597,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.72,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -7790.479390121764,
+              211.49980434727507,
+              -7771.0382654157
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.59999999999127,
+            "p5": 16.59999999999127,
+            "p50": 16.69999999999709,
+            "p95": 16.70000000001164,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.665886287625437
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1,
+            "p5": 1.0999999642372131,
+            "p50": 1.2000000476837158,
+            "p95": 1.4000000357627869,
+            "p99": 1.600000023841858,
+            "max": 1.699999988079071,
+            "mean": 1.24199999888738
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 0.8999999761581421,
+            "p5": 1,
+            "p50": 1.100000023841858,
+            "p95": 1.300000011920929,
+            "p99": 1.4000000357627869,
+            "max": 1.5,
+            "mean": 1.1386666681369146
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 3.465624,
+            "p5": 3.745624,
+            "p50": 5.366291,
+            "p95": 10.30875,
+            "p99": 11.397166,
+            "max": 13.679458,
+            "mean": 6.298858263333334
+          },
+          "mainThreadBusyShare": 0.07477273176661386,
+          "gpuBusyShare": 0.37921323653950323,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "network-noon",
+          "parameters": {
+            "spot": "network",
+            "x": -2238.350281768944,
+            "z": -6831.407652574126,
+            "heading": 3.141592653589793,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -2238.350281768944,
+              "y": 251.6479762779689,
+              "z": -6771.407652574126,
+              "lookX": -2238.350281768944,
+              "lookY": 212.6479762779689,
+              "lookZ": -6869.407652574126
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 178,
+            "triangles": 513566,
+            "constant": true
+          },
+          "held": {
+            "chunks": 599,
+            "chunksAtEnd": 599,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -2238.350281768944,
+              221.6479762779689,
+              -6831.407652574126
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999976717,
+            "p50": 16.699999999982538,
+            "p95": 16.79999999998836,
+            "p99": 16.800000000017462,
+            "max": 16.800000000017462,
+            "mean": 16.665886287625437
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1,
+            "p5": 1.0999999642372131,
+            "p50": 1.2000000476837158,
+            "p95": 1.4000000357627869,
+            "p99": 1.600000023841858,
+            "max": 2,
+            "mean": 1.2529999991257985
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 0.8999999761581421,
+            "p5": 1,
+            "p50": 1.100000023841858,
+            "p95": 1.300000011920929,
+            "p99": 1.5,
+            "max": 1.800000011920929,
+            "mean": 1.1529999993244806
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 1.954291,
+            "p5": 2.245249,
+            "p50": 3.443499,
+            "p95": 9.659208,
+            "p99": 10.037166,
+            "max": 10.459833,
+            "mean": 4.579383673333336
+          },
+          "mainThreadBusyShare": 0.07543497014664348,
+          "gpuBusyShare": 0.27569486905741364,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "origin-night",
+          "parameters": {
+            "spot": "origin",
+            "x": 0,
+            "z": 0,
+            "heading": 0,
+            "timeOfDay": 0,
+            "visibility": 5000,
+            "camera": {
+              "x": 0,
+              "y": 295.8255293840833,
+              "z": -60,
+              "lookX": 0,
+              "lookY": 256.8255293840833,
+              "lookZ": 38
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 179,
+            "triangles": 384196,
+            "constant": true
+          },
+          "held": {
+            "chunks": 605,
+            "chunksAtEnd": 605,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              0,
+              265.8255293840833,
+              0
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999976717,
+            "p50": 16.699999999982538,
+            "p95": 16.70000000001164,
+            "p99": 16.800000000017462,
+            "max": 16.800000000017462,
+            "mean": 16.66622073578599
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1,
+            "p5": 1.0999999642372131,
+            "p50": 1.2000000476837158,
+            "p95": 1.4000000357627869,
+            "p99": 1.5,
+            "max": 1.800000011920929,
+            "mean": 1.243999999165535
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 0.8999999761581421,
+            "p5": 1,
+            "p50": 1.100000023841858,
+            "p95": 1.300000011920929,
+            "p99": 1.4000000357627869,
+            "max": 1.699999988079071,
+            "mean": 1.1443333353598912
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.0285,
+            "p5": 2.288708,
+            "p50": 6.0495,
+            "p95": 8.061125,
+            "p99": 8.425374,
+            "max": 8.9445,
+            "mean": 5.644063550000006
+          },
+          "mainThreadBusyShare": 0.07489163584637575,
+          "gpuBusyShare": 0.33978549225397264,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        }
+      ],
+      "label": "pools",
+      "round": 2
+    },
+    {
+      "build": {
+        "commit": "215998e8d2f7240b85648d1c57283f3cf747b9fe",
+        "dirty": false,
+        "url": "http://127.0.0.1:4401"
+      },
+      "environment": {
+        "machine": {
+          "cpu": "Apple M4 Pro",
+          "cores": 12,
+          "memoryGiB": 24,
+          "os": "Darwin 27.2.0",
+          "arch": "arm64"
+        },
+        "browser": "chromium 154.0.8037.93",
+        "headless": true,
+        "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+        "viewport": [
+          1440,
+          900
+        ],
+        "devicePixelRatio": 2,
+        "pixelRatio": 1.75
+      },
+      "parameters": {
+        "seed": 5,
+        "smoke": false,
+        "frames": 300,
+        "warmupFrames": 60,
+        "visibility": 5000,
+        "profileFlag": "?profile"
+      },
+      "gpu": {
+        "status": "available",
+        "reason": null,
+        "discardedDisjoint": 0
+      },
+      "leakedQueries": 0,
+      "vantages": [
+        {
+          "name": "lake-noon",
+          "parameters": {
+            "spot": "lake",
+            "x": -6257.3215465503745,
+            "z": 6162.24704799708,
+            "heading": 0,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -6257.3215465503745,
+              "y": 257.3696985315354,
+              "z": 6102.24704799708,
+              "lookX": -6257.3215465503745,
+              "lookY": 218.36969853153542,
+              "lookZ": 6200.24704799708
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 300,
+            "triangles": 188062,
+            "constant": true
+          },
+          "held": {
+            "chunks": 598,
+            "chunksAtEnd": 598,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -6257.3215465503745,
+              227.36969853153542,
+              6162.24704799708
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.599999999998545,
+            "p5": 16.599999999998545,
+            "p50": 16.69999999999709,
+            "p95": 16.700000000004366,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.665886287625412
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1.800000011920929,
+            "p5": 2.099999964237213,
+            "p50": 2.399999976158142,
+            "p95": 2.699999988079071,
+            "p99": 2.800000011920929,
+            "max": 3,
+            "mean": 2.3753333324193955
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 1.699999988079071,
+            "p5": 2,
+            "p50": 2.299999952316284,
+            "p95": 2.5,
+            "p99": 2.699999988079071,
+            "max": 2.800000011920929,
+            "mean": 2.264666663805644
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.465499,
+            "p5": 2.739208,
+            "p50": 9.377458,
+            "p95": 11.309875,
+            "p99": 11.64825,
+            "max": 11.887166,
+            "mean": 8.251760606666657
+          },
+          "mainThreadBusyShare": 0.1430033512724647,
+          "gpuBusyShare": 0.496784768918946,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "confluence-noon",
+          "parameters": {
+            "spot": "confluence",
+            "x": -2238.350281768944,
+            "z": -6831.407652574126,
+            "heading": 1.5707963267948966,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -2298.350281768944,
+              "y": 251.6479762779689,
+              "z": -6831.407652574126,
+              "lookX": -2200.350281768944,
+              "lookY": 212.6479762779689,
+              "lookZ": -6831.407652574126
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 412,
+            "triangles": 245050,
+            "constant": true
+          },
+          "held": {
+            "chunks": 598,
+            "chunksAtEnd": 598,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -2238.350281768944,
+              221.6479762779689,
+              -6831.407652574126
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.59999999999127,
+            "p50": 16.69999999999709,
+            "p95": 16.70000000001164,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.66588628762539
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 2.299999952316284,
+            "p5": 2.600000023841858,
+            "p50": 2.900000035762787,
+            "p95": 3.300000011920929,
+            "p99": 3.5,
+            "max": 3.900000035762787,
+            "mean": 2.942999999721845
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 2.299999952316284,
+            "p5": 2.599999964237213,
+            "p50": 2.800000011920929,
+            "p95": 3.199999988079071,
+            "p99": 3.300000011920929,
+            "max": 3.800000011920929,
+            "mean": 2.8376666669050854
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.150874,
+            "p5": 2.484333,
+            "p50": 6.484,
+            "p95": 8.545249,
+            "p99": 10.353916,
+            "max": 10.709708,
+            "mean": 6.517733646666668
+          },
+          "mainThreadBusyShare": 0.1771788645454747,
+          "gpuBusyShare": 0.39239029800726544,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "river-run-golden-hour",
+          "parameters": {
+            "spot": "run",
+            "x": -7790.479390121764,
+            "z": -7771.0382654157,
+            "heading": -1.6172866662973575,
+            "timeOfDay": 0.72,
+            "visibility": 5000,
+            "camera": {
+              "x": -7730.544218994014,
+              "y": 241.49980434727507,
+              "z": -7768.249849756698,
+              "lookX": -7828.438331836005,
+              "lookY": 202.49980434727507,
+              "lookZ": -7772.804261999735
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 475,
+            "triangles": 533342,
+            "constant": true
+          },
+          "held": {
+            "chunks": 597,
+            "chunksAtEnd": 597,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.72,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -7790.479390121764,
+              211.49980434727507,
+              -7771.0382654157
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.59999999999127,
+            "p50": 16.69999999999709,
+            "p95": 16.70000000001164,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.666220735785945
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 3.199999988079071,
+            "p5": 3.300000011920929,
+            "p50": 3.699999988079071,
+            "p95": 4.199999988079071,
+            "p99": 4.300000011920929,
+            "max": 4.399999976158142,
+            "mean": 3.6760000006357827
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 3,
+            "p5": 3.199999988079071,
+            "p50": 3.599999964237213,
+            "p95": 4,
+            "p99": 4.199999988079071,
+            "max": 4.399999976158142,
+            "mean": 3.5653333330154418
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 3.254375,
+            "p5": 3.596625,
+            "p50": 5.399833,
+            "p95": 11.9745,
+            "p99": 12.39225,
+            "max": 13.067624,
+            "mean": 6.876629399999997
+          },
+          "mainThreadBusyShare": 0.2213035800671728,
+          "gpuBusyShare": 0.4139887662546158,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "network-noon",
+          "parameters": {
+            "spot": "network",
+            "x": -2238.350281768944,
+            "z": -6831.407652574126,
+            "heading": 3.141592653589793,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -2238.350281768944,
+              "y": 251.6479762779689,
+              "z": -6771.407652574126,
+              "lookX": -2238.350281768944,
+              "lookY": 212.6479762779689,
+              "lookZ": -6869.407652574126
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 438,
+            "triangles": 263446,
+            "constant": true
+          },
+          "held": {
+            "chunks": 599,
+            "chunksAtEnd": 599,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -2238.350281768944,
+              221.6479762779689,
+              -6831.407652574126
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999976717,
+            "p50": 16.699999999982538,
+            "p95": 16.70000000001164,
+            "p99": 16.800000000017462,
+            "max": 16.800000000017462,
+            "mean": 16.665886287625437
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 2.899999976158142,
+            "p5": 3.099999964237213,
+            "p50": 3.399999976158142,
+            "p95": 3.699999988079071,
+            "p99": 4.100000023841858,
+            "max": 4.300000011920929,
+            "mean": 3.3909999976555505
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 2.899999976158142,
+            "p5": 3,
+            "p50": 3.300000011920929,
+            "p95": 3.600000023841858,
+            "p99": 4,
+            "max": 4.199999988079071,
+            "mean": 3.2963333316644032
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 5.793,
+            "p5": 6.326749,
+            "p50": 8.285208,
+            "p95": 8.74875,
+            "p99": 9.012833,
+            "max": 9.133375,
+            "mean": 8.059787160000003
+          },
+          "mainThreadBusyShare": 0.20415002695042525,
+          "gpuBusyShare": 0.4852272978667893,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "origin-night",
+          "parameters": {
+            "spot": "origin",
+            "x": 0,
+            "z": 0,
+            "heading": 0,
+            "timeOfDay": 0,
+            "visibility": 5000,
+            "camera": {
+              "x": 0,
+              "y": 295.8255293840833,
+              "z": -60,
+              "lookX": 0,
+              "lookY": 256.8255293840833,
+              "lookZ": 38
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 391,
+            "triangles": 221244,
+            "constant": true
+          },
+          "held": {
+            "chunks": 605,
+            "chunksAtEnd": 605,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              0,
+              265.8255293840833,
+              0
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999976717,
+            "p50": 16.699999999982538,
+            "p95": 16.70000000001164,
+            "p99": 16.800000000017462,
+            "max": 16.800000000017462,
+            "mean": 16.665886287625437
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 2.300000011920929,
+            "p5": 2.600000023841858,
+            "p50": 3,
+            "p95": 3.400000035762787,
+            "p99": 3.5,
+            "max": 3.900000035762787,
+            "mean": 2.973333332737287
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 2.200000047683716,
+            "p5": 2.599999964237213,
+            "p50": 2.899999976158142,
+            "p95": 3.300000011920929,
+            "p99": 3.400000035762787,
+            "max": 3.700000047683716,
+            "mean": 2.8803333352009455
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 5.227125,
+            "p5": 5.980166,
+            "p50": 8.230791,
+            "p95": 8.873249,
+            "p99": 9.033749,
+            "max": 9.278249,
+            "mean": 7.849126566666667
+          },
+          "mainThreadBusyShare": 0.1790050369892607,
+          "gpuBusyShare": 0.47254479540847993,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        }
+      ],
+      "label": "base",
+      "round": 3
+    },
+    {
+      "build": {
+        "commit": "215998e8d2f7240b85648d1c57283f3cf747b9fe",
+        "dirty": false,
+        "url": "http://127.0.0.1:4402"
+      },
+      "environment": {
+        "machine": {
+          "cpu": "Apple M4 Pro",
+          "cores": 12,
+          "memoryGiB": 24,
+          "os": "Darwin 27.2.0",
+          "arch": "arm64"
+        },
+        "browser": "chromium 154.0.8037.93",
+        "headless": true,
+        "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+        "viewport": [
+          1440,
+          900
+        ],
+        "devicePixelRatio": 2,
+        "pixelRatio": 1.75
+      },
+      "parameters": {
+        "seed": 5,
+        "smoke": false,
+        "frames": 300,
+        "warmupFrames": 60,
+        "visibility": 5000,
+        "profileFlag": "?profile"
+      },
+      "gpu": {
+        "status": "available",
+        "reason": null,
+        "discardedDisjoint": 0
+      },
+      "leakedQueries": 0,
+      "vantages": [
+        {
+          "name": "lake-noon",
+          "parameters": {
+            "spot": "lake",
+            "x": -6257.3215465503745,
+            "z": 6162.24704799708,
+            "heading": 0,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -6257.3215465503745,
+              "y": 257.3696985315354,
+              "z": 6102.24704799708,
+              "lookX": -6257.3215465503745,
+              "lookY": 218.36969853153542,
+              "lookZ": 6200.24704799708
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 173,
+            "triangles": 370710,
+            "constant": true
+          },
+          "held": {
+            "chunks": 598,
+            "chunksAtEnd": 598,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -6257.3215465503745,
+              227.36969853153542,
+              6162.24704799708
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999998545,
+            "p50": 16.69999999999709,
+            "p95": 16.799999999995634,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.665886287625412
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 0.9000000357627869,
+            "p5": 1.100000023841858,
+            "p50": 1.300000011920929,
+            "p95": 1.5999999642372131,
+            "p99": 1.7000000476837158,
+            "max": 2.199999988079071,
+            "mean": 1.3059999990463256
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 0.800000011920929,
+            "p5": 1,
+            "p50": 1.199999988079071,
+            "p95": 1.399999976158142,
+            "p99": 1.5,
+            "max": 2.199999988079071,
+            "mean": 1.1913333342472712
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.488166,
+            "p5": 2.608875,
+            "p50": 7.029749,
+            "p95": 10.041291,
+            "p99": 11.290499,
+            "max": 11.526458,
+            "mean": 6.198786716666668
+          },
+          "mainThreadBusyShare": 0.07862575499466153,
+          "gpuBusyShare": 0.3731885804017579,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "confluence-noon",
+          "parameters": {
+            "spot": "confluence",
+            "x": -2238.350281768944,
+            "z": -6831.407652574126,
+            "heading": 1.5707963267948966,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -2298.350281768944,
+              "y": 251.6479762779689,
+              "z": -6831.407652574126,
+              "lookX": -2200.350281768944,
+              "lookY": 212.6479762779689,
+              "lookZ": -6831.407652574126
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 182,
+            "triangles": 521886,
+            "constant": true
+          },
+          "held": {
+            "chunks": 598,
+            "chunksAtEnd": 598,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -2238.350281768944,
+              221.6479762779689,
+              -6831.407652574126
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.59999999999127,
+            "p50": 16.69999999999709,
+            "p95": 16.79999999998836,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.666220735785945
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1,
+            "p5": 1.100000023841858,
+            "p50": 1.300000011920929,
+            "p95": 1.5999999642372131,
+            "p99": 1.699999988079071,
+            "max": 2,
+            "mean": 1.3046666671832403
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 0.8999999761581421,
+            "p5": 1,
+            "p50": 1.199999988079071,
+            "p95": 1.4000000357627869,
+            "p99": 1.600000023841858,
+            "max": 1.699999988079071,
+            "mean": 1.207666666706403
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 1.994416,
+            "p5": 2.297041,
+            "p50": 6.289916,
+            "p95": 7.025083,
+            "p99": 9.35775,
+            "max": 10.195666,
+            "mean": 5.1589506300000005
+          },
+          "mainThreadBusyShare": 0.07854390756039739,
+          "gpuBusyShare": 0.31058058857762105,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "river-run-golden-hour",
+          "parameters": {
+            "spot": "run",
+            "x": -7790.479390121764,
+            "z": -7771.0382654157,
+            "heading": -1.6172866662973575,
+            "timeOfDay": 0.72,
+            "visibility": 5000,
+            "camera": {
+              "x": -7730.544218994014,
+              "y": 241.49980434727507,
+              "z": -7768.249849756698,
+              "lookX": -7828.438331836005,
+              "lookY": 202.49980434727507,
+              "lookZ": -7772.804261999735
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 170,
+            "triangles": 1246626,
+            "constant": true
+          },
+          "held": {
+            "chunks": 597,
+            "chunksAtEnd": 597,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.72,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -7790.479390121764,
+              211.49980434727507,
+              -7771.0382654157
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.59999999999127,
+            "p50": 16.69999999999709,
+            "p95": 16.70000000001164,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "mean": 16.666220735785945
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1,
+            "p5": 1.0999999642372131,
+            "p50": 1.2999999523162842,
+            "p95": 1.5,
+            "p99": 1.800000011920929,
+            "max": 1.9000000357627869,
+            "mean": 1.2889999979734421
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 0.8999999761581421,
+            "p5": 1,
+            "p50": 1.199999988079071,
+            "p95": 1.4000000357627869,
+            "p99": 1.5999999642372131,
+            "max": 1.699999988079071,
+            "mean": 1.1869999994834264
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 3.6495,
+            "p5": 3.915833,
+            "p50": 5.327375,
+            "p95": 12.665875,
+            "p99": 13.850749,
+            "max": 14.794666,
+            "mean": 6.37527952
+          },
+          "mainThreadBusyShare": 0.07760073835929379,
+          "gpuBusyShare": 0.38380636057152023,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "network-noon",
+          "parameters": {
+            "spot": "network",
+            "x": -2238.350281768944,
+            "z": -6831.407652574126,
+            "heading": 3.141592653589793,
+            "timeOfDay": 0.5,
+            "visibility": 5000,
+            "camera": {
+              "x": -2238.350281768944,
+              "y": 251.6479762779689,
+              "z": -6771.407652574126,
+              "lookX": -2238.350281768944,
+              "lookY": 212.6479762779689,
+              "lookZ": -6869.407652574126
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 178,
+            "triangles": 513566,
+            "constant": true
+          },
+          "held": {
+            "chunks": 599,
+            "chunksAtEnd": 599,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0.5,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              -2238.350281768944,
+              221.6479762779689,
+              -6831.407652574126
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999976717,
+            "p50": 16.699999999982538,
+            "p95": 16.79999999998836,
+            "p99": 16.800000000017462,
+            "max": 16.800000000017462,
+            "mean": 16.66588628762534
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1.0999999642372131,
+            "p5": 1.199999988079071,
+            "p50": 1.300000011920929,
+            "p95": 1.5,
+            "p99": 1.699999988079071,
+            "max": 1.7999999523162842,
+            "mean": 1.3233333323399226
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 1,
+            "p5": 1.0999999642372131,
+            "p50": 1.199999988079071,
+            "p95": 1.4000000357627869,
+            "p99": 1.5,
+            "max": 1.699999988079071,
+            "mean": 1.2219999994834263
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 5.95175,
+            "p5": 5.991125,
+            "p50": 6.355958,
+            "p95": 9.003458,
+            "p99": 9.461666,
+            "max": 9.819416,
+            "mean": 6.566469776666663
+          },
+          "mainThreadBusyShare": 0.07966928211394085,
+          "gpuBusyShare": 0.3953243830145912,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "origin-night",
+          "parameters": {
+            "spot": "origin",
+            "x": 0,
+            "z": 0,
+            "heading": 0,
+            "timeOfDay": 0,
+            "visibility": 5000,
+            "camera": {
+              "x": 0,
+              "y": 295.8255293840833,
+              "z": -60,
+              "lookX": 0,
+              "lookY": 256.8255293840833,
+              "lookZ": 38
+            }
+          },
+          "rendered": 300,
+          "counts": {
+            "calls": 179,
+            "triangles": 384196,
+            "constant": true
+          },
+          "held": {
+            "chunks": 605,
+            "chunksAtEnd": 605,
+            "pendingAtStart": 0,
+            "pendingAtEnd": 0,
+            "timeOfDay": 0,
+            "qualityStep": 0,
+            "frameCap": null,
+            "position": [
+              0,
+              265.8255293840833,
+              0
+            ],
+            "pixelRatio": 1.75
+          },
+          "frameIntervalMs": {
+            "samples": 299,
+            "min": 16.5,
+            "p5": 16.599999999976717,
+            "p50": 16.699999999982538,
+            "p95": 16.70000000001164,
+            "p99": 16.800000000017462,
+            "max": 16.800000000017462,
+            "mean": 16.665886287625437
+          },
+          "mainThreadWorkMs": {
+            "samples": 300,
+            "min": 1.0999999642372131,
+            "p5": 1.199999988079071,
+            "p50": 1.300000011920929,
+            "p95": 1.600000023841858,
+            "p99": 1.7000000476837158,
+            "max": 2.800000011920929,
+            "mean": 1.3660000016291935
+          },
+          "renderSubmitMs": {
+            "samples": 300,
+            "min": 1,
+            "p5": 1.0999999642372131,
+            "p50": 1.2000000476837158,
+            "p95": 1.5,
+            "p99": 1.5999999642372131,
+            "max": 2.699999988079071,
+            "mean": 1.2650000015894571
+          },
+          "gpuMs": {
+            "samples": 300,
+            "min": 2.133,
+            "p5": 2.555916,
+            "p50": 5.981624,
+            "p95": 8.420499,
+            "p99": 9.431999,
+            "max": 9.546625,
+            "mean": 6.003268393333332
+          },
+          "mainThreadBusyShare": 0.08223796441748261,
+          "gpuBusyShare": 0.3614176954104869,
+          "gpu": {
+            "reason": null,
+            "valid": 300,
+            "discardedDisjoint": 0,
+            "discardedInvalid": 0,
+            "skipped": 0
+          }
+        }
+      ],
+      "label": "pools",
+      "round": 3
+    }
+  ]
+}
