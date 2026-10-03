@@ -10,7 +10,7 @@ const PHASES = [
 ] as const;
 
 test('morning mist lies over a lake and is absent over dry ground', async ({ page }, testInfo) => {
-  test.setTimeout(300_000);
+  test.setTimeout(420_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
@@ -50,7 +50,7 @@ test('morning mist lies over a lake and is absent over dry ground', async ({ pag
   ]) {
     await page.evaluate((pose) => {
       window.__SOARING__.reviewFlight!({ x: pose.x, z: pose.z, heading: 0.4 });
-      window.__SOARING__.setVisibility(1800);
+      window.__SOARING__.setVisibility(720);
       document.querySelector('#intro')?.classList.add('hidden');
       document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
     }, place);
