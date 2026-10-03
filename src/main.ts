@@ -1043,6 +1043,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       // Wider than the marker window so smoke tests can see thermals the marker must exclude.
       thermalCandidates: world.nearbyThermals(navigator.state.x, navigator.state.z, 6).map((thermal) => [thermal.x, thermal.z]),
       tiers: terrain.tierCounts,
+      pools: terrain.poolUsage,
       timeOfDay: body.phase,
       sunElevation: body.sun.y,
       moonElevation: body.moon.y,

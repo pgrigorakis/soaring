@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ChunkBuffers } from './chunk-buffers';
 import { InstancePool } from './instance-pool';
+import { WaterPool } from './water-pool';
 import { fbm, hash2, type LandscapeSample, type Tree, WorldModel } from './world';
 
 /** Snow stays white; lighting supplies the blue shade. Steep faces remain granite. */
@@ -95,6 +96,8 @@ const TREE_SPACING = 29;
 // Shared pool capacities fit the densest Woodland ring measured by scripts/audit-tree-pools.mjs,
 // including a one-chunk move before rebuilds finish, with headroom. A full pool grows rather than drop trees.
 const POOL_CAPACITY = { midTrees: 40_000, nearTrunks: 12_000, cones: 7_500, broadleaf: 7_500, birch: 1_500 };
+// Water blocks of 16 quads. The capacity grows if a lake-heavy ring needs more.
+const WATER_CAPACITY = 2048;
 // Instance data stays relative to an anchor near the stream, so long flights keep float32 precision.
 const POOL_ANCHOR_DISTANCE = 8000;
 
@@ -193,6 +196,7 @@ export class TerrainStream {
   private readonly nearTrunkPool: InstancePool;
   // Conifers draw a lower and an upper cone from the same pool.
   private readonly crownPools: InstancePool[];
+  private readonly waterPool: WaterPool;
 
   // Reach is the horizontal distance from the camera's tile that must be loaded.
   constructor(scene: THREE.Object3D, world: WorldModel, reach = MIN_VISIBILITY) {
@@ -204,6 +208,9 @@ export class TerrainStream {
     this.nearTrunkPool = new InstancePool(scene, 'near tree trunks', POOL_CAPACITY.nearTrunks, this.trunkGeometry, this.trunkMaterial, false, true);
     this.crownPools = (['cones', 'broadleaf', 'birch'] as const).map((kind, index) =>
       new InstancePool(scene, `near ${kind}`, POOL_CAPACITY[kind], this.crownGeometries[index]!, this.foliageMaterials[index]!, true, true));
+    this.waterPool = new WaterPool(scene, WATER_CAPACITY, this.waterMaterial);
+    // Water lies on the ground under every other transparent object, so it blends first.
+    this.waterPool.mesh.renderOrder = -1;
     this.terrainMaterial.onBeforeCompile = (shader) => {
       shader.uniforms.shadowFadeRange = this.shadowFadeRange;
       shader.fragmentShader = shader.fragmentShader.replace(
@@ -496,7 +503,9 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     }
   }
 
-  private get pools(): InstancePool[] { return [this.midTrunkPool, this.midCrownPool, this.nearTrunkPool, ...this.crownPools]; }
+  private get pools(): (InstancePool | WaterPool)[] {
+    return [this.midTrunkPool, this.midCrownPool, this.nearTrunkPool, ...this.crownPools, this.waterPool];
+  }
 
   /** Live and total slots per shared pool, for diagnostics and tests. */
   get poolUsage(): Record<string, { used: number; capacity: number; grown: number }> {
@@ -551,11 +560,14 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     const owned = buffers;
     let complete = false;
     const pooled: InstancePool[] = [];
+    const waterBlocks: number[] = [];
     const slots: number[] = [];
     const release = () => {
       group.traverse((object) => { if (object instanceof THREE.InstancedMesh) object.dispose(); });
       slots.forEach((slot, index) => pooled[index]!.remove(slot));
       slots.length = 0;
+      this.waterPool.remove(waterBlocks);
+      waterBlocks.length = 0;
       this.release(tier, owned);
     };
     try {
@@ -679,7 +691,9 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
         }
       }
       const waterGeometry = yield* this.createWaterGeometry(originX, originZ, chunkSize, waterSegments, wet, levels, waterDepth, buffers);
-      if (waterGeometry) group.add(new THREE.Mesh(waterGeometry, this.waterMaterial));
+      // The shared water pool draws a copy; the tile keeps its built water as a hidden source mesh.
+      const waterSource = waterGeometry ? new THREE.Mesh(waterGeometry, this.waterMaterial) : null;
+      if (waterSource) { waterSource.visible = false; group.add(waterSource); }
 
       const trees = treeMode === 'none' ? [] : yield* this.world.buildTreesInArea(originX, originZ, CHUNK_SIZE, TREE_SPACING);
       const rocks = this.createRocks(chunkX, chunkZ, config.rocks, originX, originZ);
@@ -706,6 +720,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       // Pool slots are claimed in the build's last slice, so trees appear together with their tile.
       if (treeMode === 'near') this.placeNearTrees(trees, pooled, slots);
       else this.placeFarTrees(trees, pooled, slots);
+      if (waterGeometry) waterBlocks.push(...this.waterPool.add(waterGeometry, originX, originZ));
       complete = true;
       return { group, tier, descriptor: `${tier}:${treeMode}`, dispose: release };
     } finally {
