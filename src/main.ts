@@ -13,8 +13,8 @@ import { WORLD_CACHE_LIMIT, WorldModel } from './world';
 type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; lowPower: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
 const CAMERA_DISTANCE = { min: 10, max: 100, default: 100 } as const;
 const CAMERA_CLOSE_HEIGHT = 3;
-// The previous 178 m default sat 31% of its follow distance above the eagle.
-const CAMERA_FAR_HEIGHT = 178 * 0.31;
+// The previous far height was 178 m x 0.31; the camera now sits one third as high at full zoom-out.
+const CAMERA_FAR_HEIGHT = 178 * 0.31 / 3;
 const RENDER_ORIGIN_DISTANCE = 10_000;
 const SETTINGS_KEY = 'soaring.settings.v1';
 const SEED_KEY = 'soaring.world-seed.v1';
@@ -344,6 +344,9 @@ let heldViewpoint: { x: number; y: number; z: number; lookX: number; lookY: numb
 let captureClear = false;
 let reviewFlightPaused = false;
 let dragging = false;
+let dragTravel = 0;
+let lastDragEnd = -Infinity;
+let resettingOrbit = false;
 let pointerX = 0;
 let pointerY = 0;
 const wrapAngle = (angle: number): number => Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -359,6 +362,8 @@ let rideBlend = 0;
 
 renderer.domElement.addEventListener('pointerdown', (event) => {
   dragging = true;
+  dragTravel = 0;
+  resettingOrbit = false;
   pointerX = event.clientX;
   pointerY = event.clientY;
   renderer.domElement.setPointerCapture(event.pointerId);
@@ -366,6 +371,7 @@ renderer.domElement.addEventListener('pointerdown', (event) => {
 });
 renderer.domElement.addEventListener('pointermove', (event) => {
   if (!dragging) return;
+  dragTravel += Math.abs(event.clientX - pointerX) + Math.abs(event.clientY - pointerY);
   orbitYaw -= (event.clientX - pointerX) * 0.005;
   orbitPitch = Math.max(-0.85, Math.min(0.52, orbitPitch + (event.clientY - pointerY) * 0.0035));
   pointerX = event.clientX;
@@ -373,11 +379,24 @@ renderer.domElement.addEventListener('pointermove', (event) => {
 });
 const releasePointer = (event: PointerEvent) => {
   dragging = false;
+  if (dragTravel > 4) lastDragEnd = performance.now();
   if (renderer.domElement.hasPointerCapture(event.pointerId)) renderer.domElement.releasePointerCapture(event.pointerId);
   renderer.domElement.classList.remove('dragging');
 };
 renderer.domElement.addEventListener('pointerup', releasePointer);
 renderer.domElement.addEventListener('pointercancel', releasePointer);
+renderer.domElement.addEventListener('dblclick', () => {
+  // A drag that just ended, or ends this click pair, must not reset the view.
+  if (dragTravel > 4 || performance.now() - lastDragEnd < 600) return;
+  orbitYaw = wrapAngle(orbitYaw);
+  resettingOrbit = true;
+});
+let zoomTarget = settings.cameraDistance;
+renderer.domElement.addEventListener('wheel', (event) => {
+  event.preventDefault();
+  const pixels = event.deltaY * (event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 33 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 400 : 1);
+  zoomTarget = Math.min(CAMERA_DISTANCE.max, Math.max(CAMERA_DISTANCE.min, zoomTarget * Math.exp(pixels * 0.0015)));
+}, { passive: false });
 
 app.insertAdjacentHTML('beforeend', `
   <div id="veil"></div>
@@ -524,11 +543,21 @@ showThermalInput.addEventListener('change', () => {
   thermalMarker.update(navigator.state, navigator.activeThermal, settings.showThermal, performance.now() / 1000);
   saveSettings();
 });
-distanceInput.addEventListener('input', () => {
-  settings.cameraDistance = Number(distanceInput.value);
-  distanceValue.value = `${Math.round(settings.cameraDistance)} m`;
+function setCameraDistance(distance: number): void {
+  settings.cameraDistance = distance;
+  distanceInput.value = String(distance);
+  distanceValue.value = `${Math.round(distance)} m`;
   saveSettings();
+}
+distanceInput.addEventListener('input', () => {
+  zoomTarget = Number(distanceInput.value);
+  setCameraDistance(zoomTarget);
 });
+function easeCameraDistance(seconds: number): void {
+  if (settings.cameraDistance === zoomTarget) return;
+  const gap = zoomTarget - settings.cameraDistance;
+  setCameraDistance(Math.abs(gap) < 0.05 ? zoomTarget : settings.cameraDistance + gap * (1 - Math.exp(-seconds * 9)));
+}
 minHeightInput.addEventListener('input', () => {
   settings.minFlightHeight = Math.min(Number(minHeightInput.value), settings.maxFlightHeight - FLIGHT_HEIGHT_LIMITS.gap);
   updateFlightHeight();
@@ -817,16 +846,22 @@ function frame(now: number): void {
     cameraPosition.set(heldViewpoint.x, heldViewpoint.y, heldViewpoint.z);
     lookAt.set(heldViewpoint.lookX, heldViewpoint.lookY, heldViewpoint.lookZ);
   } else {
-    if (!dragging) {
-      const returnRate = 1 - Math.exp(-rawDelta * 0.42);
-      orbitYaw += (0 - orbitYaw) * returnRate;
-      orbitPitch += (0 - orbitPitch) * returnRate;
+    if (resettingOrbit) {
+      const resetRate = 1 - Math.exp(-rawDelta * 4);
+      orbitYaw += (0 - orbitYaw) * resetRate;
+      orbitPitch += (0 - orbitPitch) * resetRate;
+      if (Math.abs(orbitYaw) < 0.002 && Math.abs(orbitPitch) < 0.002) {
+        orbitYaw = 0;
+        orbitPitch = 0;
+        resettingOrbit = false;
+      }
     }
     // Thermal-riding: follow more loosely and yaw slower than the eagle so it moves around the frame.
     rideBlend += ((state.behavior === 'thermal-riding' ? 1 : 0) - rideBlend) * (1 - Math.exp(-rawDelta * 0.65));
     cameraHeading += wrapAngle(state.heading - cameraHeading) * (1 - Math.exp(-rawDelta * (2.6 - rideBlend * 2.1)));
     const backward = new THREE.Vector3(-Math.sin(cameraHeading), 0, -Math.cos(cameraHeading));
     const side = new THREE.Vector3(Math.cos(cameraHeading), 0, -Math.sin(cameraHeading));
+    easeCameraDistance(rawDelta);
     const distance = settings.cameraDistance;
     const desired = new THREE.Vector3(state.x, state.y, state.z)
       .addScaledVector(backward, Math.cos(orbitYaw) * distance)
@@ -923,7 +958,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
       profile?: { begin: () => void; end: () => void; report: () => ProfileReport };
@@ -954,6 +989,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       cameraHeading = pose.heading;
       orbitYaw = 0;
       orbitPitch = 0;
+      resettingOrbit = false;
       rideBlend = 0;
       skyLook = null;
       heldViewpoint = null;
@@ -984,6 +1020,8 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       visibleDistance: fog.far,
       requestedDistance: settings.terrainVisibility,
       cameraDistance: settings.cameraDistance,
+      orbitYaw,
+      orbitPitch,
       frameCap: currentFrameCap(),
       lowPower: settings.lowPower,
       chunkBuildBudget: settings.lowPower ? 2 : 4,
