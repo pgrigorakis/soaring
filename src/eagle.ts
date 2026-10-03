@@ -26,7 +26,7 @@ function fbm1d(x: number, seed: number): number {
 }
 
 export type FlightHeightRange = { min: number; max: number };
-export const FLIGHT_HEIGHT_LIMITS = { min: 50, max: 240, gap: 20 } as const;
+export const FLIGHT_HEIGHT_LIMITS = { min: 50, max: 500, gap: 20 } as const;
 export const DEFAULT_FLIGHT_HEIGHT: FlightHeightRange = { min: 65, max: 210 };
 
 export const GLIDE_SINK_RATE = 1; // m/s, per CONTEXT.md: Gliding

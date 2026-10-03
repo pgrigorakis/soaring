@@ -95,7 +95,7 @@ describe('autonomous eagle navigation', () => {
 
   it('normalizes invalid and inverted flight height preferences to safe bounds', () => {
     expect(normalizeFlightHeight(Number.NaN, Infinity)).toEqual({ min: 65, max: 210 });
-    expect(normalizeFlightHeight(230, 40)).toEqual({ min: 220, max: 240 });
+    expect(normalizeFlightHeight(490, 40)).toEqual({ min: 480, max: 500 });
   });
 
   it('sinks while gliding, trading height for distance with no flapping', () => {
