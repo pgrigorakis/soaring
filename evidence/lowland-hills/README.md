@@ -34,7 +34,7 @@ node scripts/measure-relief.mjs test-results/baseline/src/world.ts evidence/lowl
 
 ## Navigation and validation
 
-`npm run check`: 56 tests pass, TypeScript check and production build pass. `npm run test:smoke`: 31 tests pass. Logs are `check.log` and `smoke.log`.
+`npm run check`: 56 tests pass, TypeScript check and production build pass. `npm run test:smoke`: 34 tests pass after rebasing on the merged pixel cap. Logs are `check.log` and `smoke.log`.
 
 The captain approved a seed-0-only route-progress exception: about 30.1% net displacement instead of the previous 35% minimum. The test permits 30% for seed 0 only. Other seeds retain 35%. Route revisits, cache limits and all clearance assertions remain unchanged. Navigation behavior was not changed.
 
