@@ -47,6 +47,23 @@ const MAX_LAKE_RADIUS = 360;
 const SHELF = 150;
 const MAX_TREE_SLOPE = 0.6;
 const TREE_BANK_CLEARANCE = 18;
+/**
+ * Captain decision on #85: the world top is about 1,050 m, fly-with-me scale.
+ * #87 and #88 share this scale. Snow stays on its current line until #87.
+ */
+export const WORLD_TOP = 1050;
+/** Valley influence before the height scale. Highland valleys multiply this by the relief scale. */
+const VALLEY_REACH = 1600;
+/** Maximum warped lake plus node jitter, from the previous reach search. */
+const MAX_LAKE_REACH = 1470;
+/**
+ * Massif lift on the current ridge shape. Tuned so sampled crests reach WORLD_TOP.
+ * #87 replaces the ridge with a ridged multifractal and keeps this scale.
+ */
+const MASSIF_LIFT = 1040;
+/** Continental warp, matching fly-with-me: about 700 m at a 2.2 km scale. */
+const LANDFORM_WARP = 700;
+const LANDFORM_WARP_WAVELENGTH = 2200;
 const NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]] as const;
 
 type RiverNode = {
@@ -162,6 +179,72 @@ export function fbm(x: number, z: number, seed: number, octaves = 5): number {
   return value / total;
 }
 
+const GRADIENTS = new Float32Array(64 * 2);
+for (let index = 0; index < 64; index += 1) {
+  const angle = (index / 64) * Math.PI * 2;
+  GRADIENTS[index * 2] = Math.cos(angle);
+  GRADIENTS[index * 2 + 1] = Math.sin(angle);
+}
+
+const fade = (value: number) => value * value * value * (value * (value * 6 - 15) + 10);
+
+/**
+ * Gradient (Perlin) noise. The value at a lattice point is zero, but the slope
+ * is the gradient, so landforms have no level spot on the lattice. fly-with-me
+ * `noise.js` is the reference; appearance noise stays on value noise.
+ */
+export function gradientNoise(x: number, z: number, seed: number): number {
+  const ix = Math.floor(x);
+  const iz = Math.floor(z);
+  const fx = x - ix;
+  const fz = z - iz;
+  const u = fade(fx);
+  const v = fade(fz);
+  const dot = (gx: number, gz: number, ox: number, oz: number) => {
+    const index = Math.floor(hash2(gx, gz, seed) * 64);
+    return GRADIENTS[index * 2]! * ox + GRADIENTS[index * 2 + 1]! * oz;
+  };
+  const n00 = dot(ix, iz, fx, fz);
+  const n10 = dot(ix + 1, iz, fx - 1, fz);
+  const n01 = dot(ix, iz + 1, fx, fz - 1);
+  const n11 = dot(ix + 1, iz + 1, fx - 1, fz - 1);
+  const nx0 = n00 + (n10 - n00) * u;
+  const nx1 = n01 + (n11 - n01) * u;
+  return (nx0 + (nx1 - nx0) * v) * 1.6;
+}
+
+/** Fractal gradient noise in about [-1, 1]. Landform terms use this, not `fbm`. */
+export function gradientFbm(x: number, z: number, seed: number, octaves = 4, lacunarity = 2, gain = 0.5): number {
+  let value = 0;
+  let amplitude = 1;
+  let frequency = 1;
+  let total = 0;
+  for (let octave = 0; octave < octaves; octave += 1) {
+    value += gradientNoise(x * frequency, z * frequency, seed + octave * 131) * amplitude;
+    total += amplitude;
+    amplitude *= gain;
+    frequency *= lacunarity;
+  }
+  return value / total;
+}
+
+/** Wander landform coordinates by about 700 m so ridges and hills do not line up with the axes. */
+function warpLandform(x: number, z: number, seed: number): { x: number; z: number } {
+  return {
+    x: x + LANDFORM_WARP * gradientFbm(x / LANDFORM_WARP_WAVELENGTH + 31.7, z / LANDFORM_WARP_WAVELENGTH - 12.3, seed + 2203, 3),
+    z: z + LANDFORM_WARP * gradientFbm(x / LANDFORM_WARP_WAVELENGTH - 54.1, z / LANDFORM_WARP_WAVELENGTH + 77.9, seed + 2210, 3),
+  };
+}
+
+/**
+ * Valley width in full Highlands. Crests stand about 900 m from rivers, so the
+ * blend cannot grow by the full 1,050/420 height ratio or the tops disappear.
+ * Depth still scales: the floor stays near the water while the landform is taller.
+ * Width grows until a crest at 900 m bank still reaches most of its height.
+ */
+const VALLEY_WIDTH_SCALE = 1.15;
+const valleyReliefScale = (highland: number) => 1 + highland * (VALLEY_WIDTH_SCALE - 1);
+
 const nodeKey = (i: number, j: number) => (i + 2 ** 20) * 2 ** 21 + j + 2 ** 20;
 
 function getLru<K, V>(cache: Map<K, V>, key: K): V | undefined {
@@ -265,18 +348,22 @@ export class WorldModel {
   sample(x: number, z: number): LandscapeSample {
     const { mountainRegion, elevation, biome } = this.relief(x, z);
     const highland = biome.highlands;
-    // Preserve ridge crests between drainage nodes without changing the drainage field.
-    const bare = mix(this.baseHeight(x, z), elevation, highland);
+    // The rendered ground and the drainage lattice read the same continuous landform.
+    // None of the landform terms is blended through the 500 m lattice.
+    const bare = elevation;
     const detail = fbm(x / 125, z / 125, this.seed + 31, 3) * 4.2 + fbm(x / 46, z / 46, this.seed + 37, 2) * 1.05;
+    const reliefScale = valleyReliefScale(highland);
 
     // The nearest channel owns the valley. A second channel blends in only near a divide,
     // so a higher neighbor cannot lift this river onto a ridge or leave a cliff at the shore.
+    // Width and depth scale with the new relief, so a taller massif does not become a slot.
     type Shore = { shoreDist: number; surface: number; lake: boolean; distance: number; half: number; islandDistance?: number; islandRadius?: number };
     let nearest: Shore | null = null;
     let second: Shore | null = null;
     let wet: Shore | null = null;
+    const accepted: Shore[] = [];
     const coneOf = (shore: Shore) => {
-      const distance = Math.max(0, shore.shoreDist);
+      const distance = Math.max(0, shore.shoreDist) / reliefScale;
       const gentle = distance * (shore.lake ? 0.05 : 0.075);
       const valley = 0.008 * distance + 0.00032 * Math.max(0, distance - 180) ** 2;
       return shore.surface + mix(gentle, valley, highland);
@@ -294,16 +381,19 @@ export class WorldModel {
     for (const original of shores) {
       const shore: Shore = { ...original };
       if (original.largeLake) {
-        // Reshape lake shores around higher tributaries and neighboring lakes. The
-        // clearance grows with the level difference, leaving room for a gentle bank.
+        // Reshape lake shores around higher tributaries and neighboring lakes.
         // Only the lake mask changes; river beds, levels and routing stay unchanged.
+        // The old pull (2×shelf + drop×3) was tuned for tens of metres of drop.
+        // At the new height that pull erases long lakes and their islands.
+        // One shelf plus a short drop term still clears a bank; the valley cone does the rest.
         for (const other of shores) {
           const drop = other.surface - shore.surface;
           if (other === original || drop <= 0.3) continue;
-          shore.shoreDist = Math.max(shore.shoreDist, 2 * SHELF + 48 + drop * 3 - other.shoreDist);
+          shore.shoreDist = Math.max(shore.shoreDist, SHELF + 48 + Math.min(drop, 40) - other.shoreDist);
         }
       }
-      if (shore.shoreDist > 1600) continue;
+      if (shore.shoreDist > VALLEY_REACH * reliefScale) continue;
+      accepted.push(shore);
       if (!nearest || shore.shoreDist < nearest.shoreDist) {
         second = nearest;
         nearest = shore;
@@ -317,10 +407,27 @@ export class WorldModel {
     let bank = nearest?.shoreDist ?? Infinity;
     let surface = nearest?.surface ?? bare;
     if (nearest) {
-      const primary = coneOf(nearest);
-      const share = second ? 0.5 * (1 - smootherstep(0, 48, second.shoreDist - nearest.shoreDist)) : 0;
-      height = mix(primary, second ? coneOf(second) : primary, share);
-      const land = smootherstep(mix(280, 380, highland), mix(900, 1050, highland), Math.max(0, nearest.shoreDist));
+      const tallDivide = accepted.some((other) => Math.abs(other.surface - nearest.surface) > 80);
+      if (!tallDivide) {
+        const share = second ? 0.5 * (1 - smootherstep(0, 48, second.shoreDist - nearest.shoreDist)) : 0;
+        height = mix(coneOf(nearest), second ? coneOf(second) : coneOf(nearest), share);
+      } else {
+        // Weight by distance, not by which channel is nearest, so a divide in tall
+        // country cannot jump when the nearest channel changes.
+        let mixed = 0;
+        let weight = 0;
+        for (const shore of accepted) {
+          const influence = Math.exp(-Math.max(0, shore.shoreDist) / (220 * reliefScale));
+          mixed += coneOf(shore) * influence;
+          weight += influence;
+        }
+        height = weight > 0 ? mixed / weight : coneOf(nearest);
+      }
+      const land = smootherstep(
+        mix(280, 380, highland) * reliefScale,
+        mix(900, 1050, highland) * reliefScale,
+        Math.max(0, nearest.shoreDist),
+      );
       height = mix(height, bare, land);
     }
     let river = false;
@@ -391,13 +498,18 @@ export class WorldModel {
     return { height, mountainRegion, surface, bank, moisture, forest, rock, water: lake || river, river, biome, glade, field, hedge, fieldEdge, moorPatch, peat, island };
   }
 
-  /** Broad landform. Drainage and the rendered hills share this field, so rivers follow the visible relief. */
+  /**
+   * Broad landform. Drainage and the rendered ground share this field, so rivers follow the visible relief.
+   * Carved river height never feeds back into biome selection.
+   *
+   * Three terms, each at its own scale, none passed through the 500 m drainage lattice:
+   * lowland (#86 fills the hill term), massif (#87 replaces the ridge), summits (#88).
+   */
   private relief(x: number, z: number) {
+    // Biome eligibility stays on the unwarped value-noise field. #93 owns selection.
     const broad = fbm(x / 3200, z / 3200, this.seed + 7, 4);
     const mountainRegion = smootherstep(0.04, 0.48, fbm(x / BIOME_SELECTION.reliefWavelength, z / BIOME_SELECTION.reliefWavelength, this.seed + 61, 3));
     const climate = clamp01(0.5 + fbm(x / BIOME_SELECTION.climateWavelength, z / BIOME_SELECTION.climateWavelength, this.seed + 127, 3));
-    // Candidate upland profile resolves height eligibility before final blending. Drainage
-    // sees this same blended elevation; carved river height never feeds back into selection.
     const dry = 1 - transition(BIOME_SELECTION.moorThreshold, climate);
     const candidate = 65 + broad * 45 + dry * (85 + broad * 15);
     const hillsField = clamp01(0.5 + fbm(x / BIOME_SELECTION.hillsWavelength, z / BIOME_SELECTION.hillsWavelength, this.seed + 129, 3));
@@ -407,14 +519,51 @@ export class WorldModel {
     // allocation reserves no lake territory, exactly as before issue 59.
     const landform = biomeWeights(mountainRegion, climate, candidate, hillsField);
     const biome = biomeWeights(mountainRegion, climate, candidate, hillsField, lakeField);
-    const ridges = biome.highlands > 0 ? 1 - Math.abs(fbm(x / 1550, z / 1550, this.seed + 47, 4)) : 0;
-    const ridge = clamp01((ridges - 0.34) / 0.66);
-    const mountains = mountainRegion * ridge * ridge * 380;
-    const elevation = landform.hills * (BIOME_PROFILES.hills.heightOffset + broad * BIOME_PROFILES.hills.heightAmplitude)
+    const warped = warpLandform(x, z, this.seed);
+    const elevation = this.lowlandTerm(warped.x, warped.z, landform)
+      + this.massifTerm(warped.x, warped.z, landform, mountainRegion)
+      + this.summitTerm(x, z, landform);
+    return { elevation, mountainRegion, biome };
+  }
+
+  /**
+   * Lowland and highland base, on warped gradient noise. #86 adds the 520 m hill
+   * term in `lowlandHills`, blended by these same biome weights.
+   */
+  private lowlandTerm(x: number, z: number, landform: BiomeWeights): number {
+    const broad = gradientFbm(x / 3200, z / 3200, this.seed + 7, 4);
+    return landform.hills * (BIOME_PROFILES.hills.heightOffset + broad * BIOME_PROFILES.hills.heightAmplitude)
       + landform.woodland * (BIOME_PROFILES.woodland.heightOffset + broad * BIOME_PROFILES.woodland.heightAmplitude)
       + landform.moor * (BIOME_PROFILES.moor.heightOffset + broad * BIOME_PROFILES.moor.heightAmplitude)
-      + landform.highlands * (28 + broad * 52 + mountains);
-    return { elevation, mountainRegion, biome };
+      + landform.highlands * (28 + broad * 52)
+      + this.lowlandHills(x, z, landform);
+  }
+
+  /** #86 seam. The hill term is not part of this ticket. */
+  private lowlandHills(_x: number, _z: number, _landform: BiomeWeights): number {
+    return 0;
+  }
+
+  /**
+   * Highland massif. #87 replaces this ridge with a warped ridged multifractal
+   * and keeps MASSIF_LIFT, the scale that reaches WORLD_TOP.
+   */
+  private massifTerm(x: number, z: number, landform: BiomeWeights, mountainRegion: number): number {
+    if (landform.highlands === 0) return 0;
+    // Wavelength grows with the lift, so this ridge is not a cliff at the new height.
+    // #87 replaces the shape and can sharpen it.
+    const wavelength = 1550 * (MASSIF_LIFT / 380);
+    const ridges = 1 - Math.abs(gradientFbm(x / wavelength, z / wavelength, this.seed + 47, 4));
+    const ridge = clamp01((ridges - 0.34) / 0.66);
+    return landform.highlands * mountainRegion * ridge * ridge * MASSIF_LIFT;
+  }
+
+  /**
+   * #88 seam. Pyramid summits use barely warped coordinates, so this term receives
+   * the raw point rather than the 700 m landform warp. It is zero until #88.
+   */
+  private summitTerm(_x: number, _z: number, _landform: BiomeWeights): number {
+    return 0;
   }
 
   /** Small dark pools on genuinely flat, high Moor tops, separate from drainage lakes. */
@@ -428,24 +577,10 @@ export class WorldModel {
     const radius = 32 + hash2(cx, cz, this.seed + 196) * 22;
     const distance = Math.hypot(x - centerX, z - centerZ) - radius;
     if (distance > 26) return null;
-    const surface = this.baseHeight(centerX, centerZ) - 0.5;
-    if (surface < 110 || Math.abs(this.baseHeight(centerX + 36, centerZ) - surface - 0.5) > 2.2
-      || Math.abs(this.baseHeight(centerX, centerZ + 36) - surface - 0.5) > 2.2) return null;
+    const surface = this.relief(centerX, centerZ).elevation - 0.5;
+    if (surface < 110 || Math.abs(this.relief(centerX + 36, centerZ).elevation - surface - 0.5) > 2.2
+      || Math.abs(this.relief(centerX, centerZ + 36).elevation - surface - 0.5) > 2.2) return null;
     return { distance, surface };
-  }
-
-  private baseHeight(x: number, z: number): number {
-    const gx = x / DRAINAGE_SPACING - 0.5;
-    const gz = z / DRAINAGE_SPACING - 0.5;
-    const i = Math.floor(gx);
-    const j = Math.floor(gz);
-    const tx = smooth(gx - i);
-    const tz = smooth(gz - j);
-    return mix(
-      mix(this.node(i, j).elevation, this.node(i + 1, j).elevation, tx),
-      mix(this.node(i, j + 1).elevation, this.node(i + 1, j + 1).elevation, tx),
-      tz,
-    );
   }
 
   /** River reaches and lake discs that can shape the ground near a point. */
@@ -455,8 +590,8 @@ export class WorldModel {
     const key = nodeKey(ci, cj);
     let reaches = getLru(this.nearbyReaches, key);
     if (reaches === undefined) {
-      // 1,470 m maximum warped lake + 1,600 m valley influence, plus node jitter.
-      const margin = 7;
+      // Lowland keeps the old 7-cell search. Steeper country widens it with the valley.
+      const margin = this.reachMargin(ci, cj);
       reaches = this.reachesIn(
         (ci - margin) * DRAINAGE_SPACING,
         (cj - margin) * DRAINAGE_SPACING,
@@ -466,6 +601,18 @@ export class WorldModel {
       this.nearbyReaches.set(key, reaches);
     }
     return reaches;
+  }
+
+  /** Cells in flat country keep the previous search. Highland cells cover the scaled valley. */
+  private reachMargin(ci: number, cj: number): number {
+    let highland = 0;
+    for (const dx of [0.02, 0.5, 0.98]) {
+      for (const dz of [0.02, 0.5, 0.98]) {
+        highland = Math.max(highland, this.relief((ci + dx) * DRAINAGE_SPACING, (cj + dz) * DRAINAGE_SPACING).biome.highlands);
+      }
+    }
+    if (highland === 0) return 7;
+    return Math.ceil((MAX_LAKE_REACH + VALLEY_REACH * valleyReliefScale(highland)) / DRAINAGE_SPACING) + 1;
   }
 
   /** Nearest lake disc (basin or cirque) and the distance from its shore; negative inside the water. */
