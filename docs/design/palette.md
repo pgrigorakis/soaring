@@ -36,7 +36,7 @@ Renderer settings that go with it:
 
 The noon haze on the board (`#8FAEB8` → `#9CC3DA`) is the expected result of these changes, not a constant to set: the haze is sampled from the sky every 0.35 s.
 
-Water surface `#2A8FA8` is the vertex tint, not the full rendered colour. The shared water shader mixes 65% depth colour with 35% of that tint on every water surface. Depth colour runs from shallow `#3FB0B8` to deep `#1D5E8A` between 0.7 m and 3.2 m. Before that mix, non-river water in a mountain region tints the vertex colour toward `#2A7FA0` by Highlands weight, and toward the same shallow/deep pair between 2 m and 18 m by Lakeland weight. Peat replaces the vertex tint with `#2E4A4A`. Sun and moon glint colours are in the Lakeland table and apply to all water.
+Water surface `#2A8FA8` is the vertex tint, not the full rendered colour. The shared water shader mixes 65% depth colour with 35% of that tint on every water surface. Depth colour runs from shallow `#78B4A3` to deep `#2B6C73` between 0.7 m and 3.2 m. Before that mix, non-river water in a mountain region tints the vertex colour toward `#2A7FA0` by Highlands weight, and toward the same shallow/deep pair between 2 m and 18 m by Lakeland weight. Peat replaces the vertex tint with `#2E4A4A`. Sun and moon glint colours are in the Lakeland table and apply to all water.
 
 The time-of-day strip on the colour-pass board is illustrative. The real sky comes from the Preetham `Sky` addon and the day cycle in `src/main.ts`.
 
@@ -72,8 +72,8 @@ Each biome's terrain colour is a weighted blend of its palette (see the biome we
 
 | Role | Hex |
 | --- | --- |
-| Deep water | `#1D5E8A` |
-| Shallows | `#3FB0B8` |
+| Deep water | `#2B6C73` |
+| Shallows | `#78B4A3` |
 | Beach | `#E3CD8B` |
 | Reeds | `#9FB65A` |
 | Lake cliff | `#8A8174` |
