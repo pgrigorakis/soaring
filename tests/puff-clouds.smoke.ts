@@ -22,7 +22,10 @@ test('keeps forty seeded puffs, drifts and wraps them, and adds one draw call', 
   await page.goto('/?smoke');
   await page.evaluate(() => {
     const api = window.__SOARING__ as unknown as CloudHarness;
-    api.pauseFlight();
+    const state = api.snapshot();
+    // Puff bodies fade in with camera height. Hold the bird above the deck so
+    // the puff mesh is in the frame.
+    api.reviewFlight({ x: state.position[0]!, y: 700, z: state.position[2]!, heading: state.heading });
     api.setTimeOfDay(0.5);
   });
   await page.waitForFunction(() => {
@@ -64,6 +67,8 @@ test('keeps forty seeded puffs, drifts and wraps them, and adds one draw call', 
   const withPuffs = await page.evaluate(() => (window.__SOARING__ as unknown as CloudHarness).snapshot().drawCalls);
   expect(withPuffs).toBe(withoutPuffs + 1);
 
+  // Paused flight now pauses cloud motion too. Resume before measuring drift.
+  await page.evaluate(() => window.__SOARING__.reviewFlight!(null));
   await page.waitForTimeout(1800);
   const drifted = await page.evaluate(() => {
     const api = window.__SOARING__ as unknown as CloudHarness;

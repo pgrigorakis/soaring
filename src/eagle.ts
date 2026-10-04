@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { globalWind, type Wind } from './wind';
+import { CLOUD_DECK, CLOUD_HEIGHT_SCALE, CLOUD_HIGH_CRUISE } from './cloud-layer';
+import { DAY_SECONDS } from './sky-cycle';
 import { fbm, hash2, highlandWeight, type Shore, Thermal, WorldModel } from './world';
 
 export type EagleBehavior = 'gliding' | 'thermal-seeking' | 'thermal-riding' | 'ridge-soaring';
@@ -205,8 +207,15 @@ export class EagleNavigator {
   private climbNeed = -Infinity;
   private detour: number | null = null;
   private lastShore: { x: number; z: number; time: number } | null = null;
+  private cloudBlend = 0;
+  private cloudVelocity = 0;
+  private cloudFlight = false;
+  private cloudOrigin = 0;
+  private opening: 'abeam' | 'climb' | 'hold' | 'dive' | null = null;
+  private openingSince = 0;
+  private openingBearing = 0;
 
-  constructor(world: WorldModel, start: { x: number; z: number; heading: number }, heightRange = DEFAULT_FLIGHT_HEIGHT) {
+  constructor(world: WorldModel, start: { x: number; z: number; heading: number }, heightRange = DEFAULT_FLIGHT_HEIGHT, openingBearing?: number) {
     this.world = world;
     this.seedAngle = hash2(0, 0, world.seed + COMPASS_SEED) * Math.PI * 2;
     this.heightRange = normalizeFlightHeight(heightRange.min, heightRange.max);
@@ -217,6 +226,20 @@ export class EagleNavigator {
     this.groundEnvelope = ground;
     this.state = { x: start.x, y: ground + clamp(105, this.heightRange.min, this.heightRange.max), z: start.z, heading: start.heading, bank: 0, behavior: 'gliding', flapping: false };
     this.chooseScenicTarget();
+    if (openingBearing !== undefined) {
+      this.opening = 'abeam';
+      this.openingBearing = openingBearing;
+      this.state.heading = openingBearing + Math.PI / 2;
+    }
+  }
+
+  get flightSeconds(): number {
+    return this.totalTime;
+  }
+
+  /** Opening slows only the day clock while climbing/holding, not flight time. */
+  get openingDayRate(): number {
+    return this.opening === 'climb' || this.opening === 'hold' ? 0.55 : 1;
   }
 
   get flightGround(): number {
@@ -245,8 +268,10 @@ export class EagleNavigator {
 
   update(deltaSeconds: number): EagleState {
     const dt = Math.min(deltaSeconds, 0.1);
+    const previousY = this.state.y;
     this.behaviorTime += dt;
     this.totalTime += dt;
+    this.updateCloudSchedule(dt);
     this.groundSampleAge += dt;
     if (this.groundSampleAge >= 0.5) {
       this.groundEnvelope = this.highestGround(this.state.x, this.state.z);
@@ -277,6 +302,9 @@ export class EagleNavigator {
       }
     }
 
+    // Powered cloud flight sets the visible flap flag each frame. It must not
+    // extend an ordinary flap burst once the scheduled altitude is reached.
+    if (this.cloudFlight && (this.state.behavior === 'gliding' || this.state.behavior === 'thermal-seeking')) this.state.flapping = false;
     // Re-check: the block above may have just switched behavior this frame.
     if (this.state.behavior === 'thermal-riding') {
       this.state.flapping = false;
@@ -287,9 +315,72 @@ export class EagleNavigator {
       this.flyTowardTarget(dt, ground);
     }
     if (this.state.behavior !== 'ridge-soaring') this.state.crab = (this.state.crab ?? 0) * Math.exp(-dt / RIDGE.easeSeconds);
+    this.crossCloudDeck(dt, ground, previousY, mountain);
     const current = this.world.sample(this.state.x, this.state.z);
     this.state.y = Math.max(this.state.y, Math.max(current.height, current.water ? current.surface : current.height) + TERRAIN_SAFETY_MARGIN);
     return this.state;
+  }
+
+  /** FWM's half-day schedule: low for 300 s, high for the final 150 s of 450 s. */
+  private updateCloudSchedule(dt: number): void {
+    const timing = DAY_SECONDS / 600;
+    if (this.opening === 'abeam' && this.totalTime >= 13 * timing) {
+      this.opening = 'climb';
+      this.openingSince = this.totalTime;
+    } else if (this.opening === 'climb' && (this.state.y >= CLOUD_DECK + 140 * CLOUD_HEIGHT_SCALE
+      // Soaring climbs at 4 m/s, not FWM's 11 m/s. Allow the full lowland ascent.
+      || this.totalTime - this.openingSince >= 240)) {
+      this.opening = 'hold';
+      this.openingSince = this.totalTime;
+    } else if (this.opening === 'hold' && this.totalTime - this.openingSince >= 10 * timing) {
+      this.opening = 'dive';
+      this.openingSince = this.totalTime;
+    } else if (this.opening === 'dive' && this.totalTime - this.openingSince >= 30 * timing) {
+      this.opening = null;
+      this.cloudOrigin = this.totalTime;
+    }
+    const high = this.opening ? this.opening === 'climb' || this.opening === 'hold'
+      : (this.totalTime - this.cloudOrigin) % (300 * timing) > 200 * timing;
+    this.cloudBlend += (Number(high) - this.cloudBlend) * (1 - Math.exp(-dt * 0.5));
+    if (this.opening) {
+      // Fly abeam for five reference seconds, then turn toward the sunrise.
+      const bearing = this.openingBearing + (this.totalTime < 5 * timing ? Math.PI / 2 : 0);
+      this.target = { x: this.state.x + Math.sin(bearing) * 2000,
+        z: this.state.z + Math.cos(bearing) * 2000 };
+    }
+  }
+
+  private crossCloudDeck(dt: number, ground: number, previousY: number, mountain: number): void {
+    // Highlands stand in FWM's mountain role and stay out of the lowland cloud
+    // schedule, as does ground that already protrudes through the deck. Keep their
+    // established lift, routing and ceiling rules. Safety always outranks the target.
+    if (mountain >= 0.5 || ground + this.heightRange.min >= CLOUD_DECK - 90 * CLOUD_HEIGHT_SCALE) {
+      this.cloudVelocity = 0;
+      return;
+    }
+    if (dt <= 0) return;
+    if (this.cloudBlend > 0.001) this.cloudFlight = true;
+    if (!this.cloudFlight) return;
+    const low = ground + clamp(110 + fbm1d(this.totalTime / 80, this.world.seed + 521) * 40,
+      this.heightRange.min, this.heightRange.max);
+    const high = CLOUD_HIGH_CRUISE + fbm1d(this.totalTime / 100, this.world.seed + 523) * 30 * CLOUD_HEIGHT_SCALE;
+    if (this.cloudBlend < 0.001 && previousY <= ground + this.heightRange.max) {
+      this.cloudVelocity = 0;
+      this.cloudFlight = false;
+      return;
+    }
+    // Thermals and ridges keep their no-flap lift and ceiling rules. The next
+    // glide or seek resumes the powered crossing; their episode limits stay intact.
+    if (this.state.behavior === 'thermal-riding' || this.state.behavior === 'ridge-soaring') return;
+    const target = Math.max(low + (high - low) * this.cloudBlend, this.climbNeed,
+      ground + this.heightRange.min + 10);
+    const requested = clamp((target - previousY) * 0.12, -16, FLAP_CLIMB_RATE);
+    this.cloudVelocity += (requested - this.cloudVelocity) * (1 - Math.exp(-dt * (requested > this.cloudVelocity ? 2.6 : 0.9)));
+    // Do not cancel a normal safety climb when the schedule requests descent.
+    const normalClimb = this.state.y > previousY ? (this.state.y - previousY) / dt : -Infinity;
+    const velocity = Math.max(this.cloudVelocity, normalClimb);
+    this.state.y = previousY + velocity * dt;
+    this.state.flapping = velocity > 0;
   }
 
   /** Sample the 250 m disk, not just the point below the bird. Refresh at 2 Hz. */

@@ -12,7 +12,8 @@ test('puff faces follow sky light and night exposure decreases without a global 
     }));
   });
   await page.goto('/?smoke&profile');
-  await page.evaluate(() => window.__SOARING__.reviewFlight!({ x: 0, z: 0, heading: 4.8 }));
+  // Hold the camera below the cloud deck gates, so the clear-sky rules are measured.
+  await page.evaluate(() => window.__SOARING__.reviewFlight!({ x: 0, y: 360, z: 0, heading: 4.8 }));
   const evidence = [];
   for (const elevation of [52, 3, -6, -12, -52]) {
     const phase = Math.acos(-elevation / 52) / (2 * Math.PI);

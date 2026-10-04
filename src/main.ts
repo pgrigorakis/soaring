@@ -6,7 +6,7 @@ import { Soundscape } from './audio';
 import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS, normalizeFlightHeight } from './eagle';
 import { DEFAULT_VISIBILITY, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
 import { THERMAL_MARKER_RANGE, ThermalMarker } from './thermal-marker';
-import { CloudSea, mistCover } from './cloud-sea';
+import { CloudSea, bindCloudFog } from './cloud-sea';
 import { AuroraSchedule, auroraAmount, DAY_SECONDS, daylight, nightCycle, type Daylight } from './sky-cycle';
 import { FrameProfiler, type ProfileReport } from './profile';
 import { WORLD_CACHE_LIMIT, WorldModel } from './world';
@@ -87,8 +87,11 @@ function pixelRatioForStep(step = qualityStep): number {
 }
 const world = new WorldModel(loadSeed());
 const auroraSchedule = new AuroraSchedule(world.seed);
-const start = world.scenicStart(nextVisit());
-let navigator = new EagleNavigator(world, start, { min: settings.minFlightHeight, max: settings.maxFlightHeight });
+const visit = nextVisit();
+const start = world.scenicStart(visit);
+const openingSun = daylight(DAY_SECONDS * 0.25 - 15).sun;
+let navigator = new EagleNavigator(world, start, { min: settings.minFlightHeight, max: settings.maxFlightHeight },
+  visit === 1 ? Math.atan2(openingSun.x, openingSun.z) : undefined);
 const eagle = new EagleView();
 const soundscape = new Soundscape();
 soundscape.setAmbienceVolume(settings.ambienceVolume);
@@ -149,6 +152,9 @@ sky.material.uniforms.starAmount = { value: 0 };
 sky.material.uniforms.auroraAmount = { value: 0 };
 sky.material.uniforms.cloudTime = { value: 0 };
 sky.material.uniforms.cloudCoverage = { value: 0.5 };
+sky.material.uniforms.cloudAbove = { value: 0 };
+sky.material.uniforms.cloudWhiteout = { value: 0 };
+sky.material.uniforms.deckWhite = { value: new THREE.Color(0xe1e4cb) };
 sky.material.uniforms.moonPosition = { value: new THREE.Vector3(0, -1, 0) };
 sky.material.uniforms.moonLit = { value: 1 };
 sky.material.uniforms.moonSunlight = { value: new THREE.Vector3(0, 1, 0) };
@@ -165,7 +171,7 @@ sky.material.uniforms.twilightHorizonWarm = { value: new THREE.Color() };
 sky.material.fragmentShader = sky.material.fragmentShader
   .replace(
     'uniform float mieDirectionalG;',
-    'uniform float mieDirectionalG;\nuniform float skyExposure;\nuniform float nightAmount;\nuniform float goldenAmount;\nuniform float blueAmount;\nuniform float starAmount;\nuniform float auroraAmount;\nuniform float cloudTime;\nuniform float cloudCoverage;\nuniform vec3 moonPosition;\nuniform float moonLit;\nuniform vec3 moonSunlight;\nuniform vec3 sunTint;\nuniform float lowSun;\nuniform float glowAmount;\nuniform float venusAmount;\nuniform float twilightAmount;\nuniform vec3 twilightZenith;\nuniform vec3 twilightUpper;\nuniform vec3 twilightUpperWarm;\nuniform vec3 twilightHorizon;\nuniform vec3 twilightHorizonWarm;',
+    'uniform float mieDirectionalG;\nuniform float skyExposure;\nuniform float nightAmount;\nuniform float goldenAmount;\nuniform float blueAmount;\nuniform float starAmount;\nuniform float auroraAmount;\nuniform float cloudTime;\nuniform float cloudCoverage;\nuniform vec3 moonPosition;\nuniform float moonLit;\nuniform vec3 moonSunlight;\nuniform vec3 sunTint;\nuniform float lowSun;\nuniform float glowAmount;\nuniform float venusAmount;\nuniform float twilightAmount;\nuniform vec3 twilightZenith;\nuniform vec3 twilightUpper;\nuniform vec3 twilightUpperWarm;\nuniform vec3 twilightHorizon;\nuniform vec3 twilightHorizonWarm;\nuniform float cloudAbove;\nuniform float cloudWhiteout;\nuniform vec3 deckWhite;',
   )
   .replace(
     'void main() {',
@@ -310,7 +316,11 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			retColor = mix(retColor, cloudColor, cloudMask * mix(0.84, 0.96, nightAmount));
 			// Thin cloud edges near the sun catch a bright rim.
 			float cloudEdge = cloudMask * (1.0 - cloudMask) * 4.0;
-			retColor += sunColor * cloudEdge * sunLight15 * 0.7 * (1.0 - nightAmount) * smoothstep(0.025, 0.12, direction.y);`,
+			retColor += sunColor * cloudEdge * sunLight15 * 0.7 * (1.0 - nightAmount) * smoothstep(0.025, 0.12, direction.y);
+			// Shared atmospheric horizon, not a full-screen cloud overlay.
+			float deckHorizon = 1.0 - smoothstep(0.0, 0.32, direction.y);
+			retColor = mix(retColor, deckWhite, cloudAbove * 0.4 * deckHorizon);
+			retColor = mix(retColor, deckWhite, cloudWhiteout * mix(1.0, 0.82, zenith));`,
   );
 scene.add(sky);
 
@@ -338,12 +348,19 @@ function neutralToneMap(color: THREE.Color, exposure: number): THREE.Color {
 // Reused every sample: no per-frame allocation. The probe is a unit box at the origin, so it does not
 // follow the sky mesh; shared uniforms carry the current sun and night mix.
 const fogProbeScene = new THREE.Scene();
-const fogProbe = new THREE.Mesh(sky.geometry, sky.material);
+// Probe ordinary air only. Apply the live cloud gate after readback, so crossing
+// the deck cannot feed an already-whitened horizon back into the night palette.
+const fogProbeMaterial = new THREE.ShaderMaterial({
+  vertexShader: sky.material.vertexShader, fragmentShader: sky.material.fragmentShader,
+  side: sky.material.side,
+  uniforms: { ...sky.material.uniforms, cloudAbove: { value: 0 }, cloudWhiteout: { value: 0 } },
+});
+const fogProbe = new THREE.Mesh(sky.geometry, fogProbeMaterial);
 fogProbeScene.add(fogProbe);
 const fogProbeCamera = new THREE.PerspectiveCamera(1, 1, 0.1, 10);
 const fogTarget = new THREE.WebGLRenderTarget(1, 1);
 const fogPixel = new Uint8Array(4);
-const fogSample = new THREE.Color();
+const fogSample = new THREE.Color(0x8faeb8);
 const fogGoal = new THREE.Color(0x8faeb8);
 const horizonLook = new THREE.Vector3();
 const fogViewport = new THREE.Vector4();
@@ -396,7 +413,7 @@ function sampleHorizonColor(): void {
       return;
     }
     fogSample.setRGB(pixel[0]! / 255, pixel[1]! / 255, pixel[2]! / 255);
-    fogGoal.copy(neutralToneMap(fogSample, exposure));
+    neutralToneMap(fogGoal.copy(fogSample), exposure);
     fogSampleCount += 1;
     if (import.meta.env.DEV) {
       // Latch one coherent successful completion; a continuous sampler need not become idle.
@@ -456,7 +473,15 @@ function terrainReach(): number {
 }
 const terrain = new TerrainStream(worldRoot, world, terrainReach());
 const cloudSea = new CloudSea(worldRoot);
-terrain.bindMist(cloudSea.heightFogUniforms);
+terrain.bindCloudFog(cloudSea.fogUniforms);
+const birdMaterials = new Set<THREE.Material>();
+eagle.group.traverse((object) => {
+  if (object instanceof THREE.Mesh) for (const material of Array.isArray(object.material) ? object.material : [object.material]) birdMaterials.add(material);
+});
+for (const material of birdMaterials) bindCloudFog(material, cloudSea.fogUniforms, false);
+sky.material.uniforms.cloudAbove = cloudSea.fogUniforms.above;
+sky.material.uniforms.cloudWhiteout = cloudSea.fogUniforms.whiteout;
+sky.material.uniforms.deckWhite = cloudSea.cloudWhite;
 const thermalMarker = new ThermalMarker(worldRoot, world);
 function applyRenderQuality(): void {
   const pixelRatio = pixelRatioForStep();
@@ -867,7 +892,7 @@ document.addEventListener('visibilitychange', () => {
   soundWasEnabledBeforeHidden = false;
 });
 // Real time, not the flight time scale, so a 15-minute day stays 15 minutes during accelerated tests.
-let skySeconds = 0.36 * DAY_SECONDS;
+let skySeconds = visit === 1 ? 0.25 * DAY_SECONDS - 15 : 0.36 * DAY_SECONDS;
 let skyPaused = false;
 let skyLook: 'sun' | 'moon' | 'horizon' | null = null;
 const sunDir = new THREE.Vector3();
@@ -910,6 +935,8 @@ function applyTwilight(sunY: number): void {
 function applyDaylight(body: Daylight, delta: number): void {
   sunDir.set(body.sun.x, body.sun.y, body.sun.z);
   moonDir.set(body.moon.x, body.moon.y, body.moon.z);
+  cloudSea.update(navigator.state.x, navigator.state.z, cameraPosition.y, navigator.flightSeconds,
+    sunDir, moonDir, body.sunColor, fogSample, renderOrigin, body.moonLit);
   const high = smooth01(0.12, 0.72, Math.max(0, body.sun.y));
   const day = 1 - body.night;
   sky.material.uniforms.sunPosition!.value.copy(sunDir).multiplyScalar(450000);
@@ -932,10 +959,11 @@ function applyDaylight(body: Daylight, delta: number): void {
   applyTwilight(body.sun.y);
   // Keep more clouds near dawn and dusk, and let the layer drift on real time.
   sky.material.uniforms.cloudCoverage!.value = cloudCoverageOverride ?? 0.22 + (1 - high) * 0.5;
-  sky.material.uniforms.cloudTime!.value += delta * 0.001;
+  sky.material.uniforms.cloudTime!.value = navigator.flightSeconds * 0.001;
   hazeStart = 0.4 + high * 0.5;
   // Stars fade in from about -2 degrees and are full by -6 degrees, while the afterglow is still bright.
-  sky.material.uniforms.starAmount!.value = smooth01(-0.035, -0.105, body.sun.y);
+  sky.material.uniforms.starAmount!.value = smooth01(-0.035, -0.105, body.sun.y)
+    * (1 - cloudSea.fogUniforms.whiteout.value);
   sky.material.uniforms.auroraAmount!.value = auroraAmount(body,
     auroraSchedule.hasAurora(nightCycle(skySeconds)));
   // Keep the sky box around the camera. The sun uniform is a direction, so moving the mesh
@@ -952,7 +980,8 @@ function applyDaylight(body: Daylight, delta: number): void {
   hemisphere.color.setRGB(0.16 + day * 0.68, 0.2 + day * 0.68, 0.36 + day * 0.5);
   hemisphere.groundColor.setRGB(0.08 + day * 0.27, 0.09 + day * 0.3, 0.08 + day * 0.2);
   hemisphere.intensity = 0.65 + day * 1.55;
-  renderer.toneMappingExposure = 1.00 - body.night * 0.2;
+  // FWM dims exposure by 12% above the deck. Night exposure keeps the sky's own rule.
+  renderer.toneMappingExposure = (1.00 - body.night * 0.2) * (1 - 0.12 * cloudSea.fogUniforms.above.value);
   // Puff tops use the same warm-to-cool sky light as the painted cloud layer,
   // not an unlit white face that remains bright after sunset.
   puffSkyLight.setRGB(1, 0.49 + high * 0.49, 0.25 + high * 0.75)
@@ -977,6 +1006,9 @@ function applyDaylight(body: Daylight, delta: number): void {
     fogSampleAge = 0;
     sampleHorizonColor();
   }
+  fogGoal.copy(fogSample).lerp(cloudSea.cloudWhite.value, cloudSea.fogUniforms.above.value * 0.4)
+    .lerp(cloudSea.cloudWhite.value, cloudSea.fogUniforms.whiteout.value);
+  neutralToneMap(fogGoal, renderer.toneMappingExposure);
   fog.color.lerp(fogGoal, 1 - Math.exp(-Math.max(delta, 0.016) * 4));
 }
 
@@ -1063,11 +1095,12 @@ function frame(now: number): void {
   camera.lookAt(renderLookAt.copy(lookAt).sub(renderOrigin));
   lastChunkBuilds = terrain.update(cameraPosition.x, cameraPosition.z, settings.lowPower ? 2 : 4);
   updateFog();
-  if (!skyPaused) skySeconds += rawDelta;
+  if (!skyPaused) skySeconds += rawDelta * navigator.openingDayRate;
   const body = currentDaylight();
   applyDaylight(body, rawDelta);
-  puffClouds.update(state, navigator.wind, delta, cameraPosition, fogGoal, puffSkyLight);
-  cloudSea.update(cameraPosition.x, cameraPosition.z, cameraPosition.y, body.phase, skySeconds, fog, sunDir, body.sunColor, renderOrigin, world);
+  puffClouds.update(state, navigator.wind, reviewFlightPaused ? 0 : delta, cameraPosition, fogGoal, puffSkyLight,
+    cloudSea.snapshot().bodies, cloudSea.fogUniforms.whiteout.value);
+  thermalMarker.setWhiteout(cloudSea.fogUniforms.whiteout.value);
 
   keyLight.target.position.set(cameraPosition.x, world.sample(cameraPosition.x, cameraPosition.z).height, cameraPosition.z);
   updateShadowBasis(keyDir);
@@ -1143,6 +1176,7 @@ window.addEventListener('beforeunload', () => {
   fogSampleDisposed = true;
   profiler?.dispose();
   fogTarget.dispose();
+  fogProbeMaterial.dispose();
   thermalMarker.dispose();
   puffClouds.dispose();
   cloudSea.dispose();
@@ -1152,12 +1186,12 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; moonLit: number; moonIntensity: number; dominant: 'sun' | 'moon'; starAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; morningMist: number; mistReady: boolean };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; moonLit: number; moonIntensity: number; dominant: 'sun' | 'moon'; starAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; cloudLayer: ReturnType<CloudSea['snapshot']> };
       puffCloudSnapshot: () => PuffCloudSnapshot;
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
       profile?: { begin: () => void; end: () => void; report: () => ProfileReport };
-      reviewFlight?: (start: { x: number; z: number; heading: number } | null) => void;
+      reviewFlight?: (start: { x: number; y?: number; z: number; heading: number } | null) => void;
       pauseFlight: () => void;
       setCapturePixelRatio: (ratio: number) => void;
       setTimeScale: (scale: number) => void;
@@ -1171,8 +1205,6 @@ declare global {
       setCaptureClear: (on: boolean) => void;
       setCloudCoverage: (coverage: number | null) => void;
       setVisibility: (meters: number) => void;
-      mistAt: (x: number, z: number) => { cover: number; water: boolean; moisture: number; bank: number; height: number; surface: number };
-      fillMist: (budgetMs: number) => void;
       reviewSpots: () => { coast: { x: number; z: number; surface: number }; lake: { x: number; z: number; surface: number }; basin: { x: number; z: number; surface: number; heading: number }; islands: { x: number; z: number; surface: number } };
     };
   }
@@ -1183,10 +1215,11 @@ if (import.meta.env.DEV) window.__SOARING__ = {
     fogSamples: () => ({ revision: fogInputRevision, discarded: fogDiscardedReads, completion: fogReadCompletion }),
     // Freeze only navigation for repeatable lighting comparisons. The normal
     // chase camera, renderer, streaming and light loop remain unchanged.
-    reviewFlight: (pose: { x: number; z: number; heading: number } | null) => {
+    reviewFlight: (pose: { x: number; y?: number; z: number; heading: number } | null) => {
       reviewFlightPaused = pose !== null;
       if (!pose) return;
       navigator = new EagleNavigator(world, pose, { min: settings.minFlightHeight, max: settings.maxFlightHeight });
+      if (pose.y !== undefined) navigator.state.y = pose.y;
       cameraHeading = pose.heading;
       orbitYaw = 0;
       orbitPitch = 0;
@@ -1271,8 +1304,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
         samples: fogSampleCount,
         failures: fogReadbackFailures,
       },
-      morningMist: cloudSea.morningAmount,
-      mistReady: cloudSea.ready,
+      cloudLayer: cloudSea.snapshot(),
     };
   },
   puffCloudSnapshot: () => puffClouds.snapshot(),
@@ -1301,14 +1333,6 @@ if (import.meta.env.DEV) window.__SOARING__ = {
   setVisibility: (meters: number) => {
     settings.terrainVisibility = meters;
     terrain.setReach(terrainReach());
-  },
-  mistAt: (x: number, z: number) => {
-    const sample = world.sample(x, z);
-    return { cover: mistCover(sample), water: sample.water, moisture: sample.moisture, bank: sample.bank, height: sample.height, surface: sample.surface };
-  },
-  fillMist: (budgetMs: number) => {
-    if (!Number.isFinite(budgetMs) || budgetMs < 0 || budgetMs > 30_000) throw new RangeError('Expected 0–30000 ms');
-    cloudSea.fillNow(world, budgetMs);
   },
   reviewSpots: () => world.reviewSpots(),
 };

@@ -12,7 +12,7 @@ Use a current desktop version of Chrome, Edge, or Firefox.
 
 - Drag on the landscape to orbit the camera. Release to let it return slowly to the trailing view.
 - Move the pointer to reveal the settings control. The cursor and control hide after 3 seconds without pointer movement.
-- Settings provide fullscreen, sound and volume controls, terrain visibility, Low power, Show thermal, flight-height bounds, camera distance, and a new-world action. Show thermal marks thermals within 3.5 km of the eagle; the selected thermal stays hotter. Height bounds persist across reloads. The eagle selects its own height and route within them.
+- Settings provide fullscreen, sound and volume controls, terrain visibility, Low power, Show thermal, flight-height bounds, camera distance, and a new-world action. Show thermal marks thermals within 3.5 km of the eagle; the selected thermal stays hotter. Height bounds persist across reloads. They guide low flight and cap thermal climbs. Scheduled cloud crossings can climb above them, but terrain safety always takes priority.
 - Press `F` to toggle fullscreen. Press `D` to show or hide diagnostics.
 
 Sound is procedural and starts muted on every page load. The two volume settings persist independently. Settings and the world seed live in `localStorage`. A reload keeps the seed but starts the eagle elsewhere in the same world.
@@ -25,7 +25,7 @@ Near the eagle, the landscape shows individual trees and rocks. Farther away, it
 
 ## Day and night
 
-The sky shifts from blue at noon to golden dawn and dusk, then to a dark blue, starry night. Horizon fog follows the sky colour. From dawn until a few minutes after sunrise, low mist lies over lakes and wet ground, then fades. It does not cover dry ground, and the eagle stays above it.
+The sky shifts from blue at noon to golden dawn and dusk, then to a dark blue, starry night. Horizon fog follows the sky colour. A cloud deck sits at 600 m above sea level. Below it, the surface disappears. Inside it, white fog hides even the nearby eagle. Above it, cloud folds and height fog hide low ground, while high mountains can protrude. The eagle crosses the deck on a 450-second flight schedule. A first flight begins before sunrise, climbs toward the sun, holds above the deck, then dives back below it.
 
 ## More information
 

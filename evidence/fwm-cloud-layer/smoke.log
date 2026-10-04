@@ -1,0 +1,113 @@
+== CI=1 SMOKE_SKIP_PERF_BENCH=1 npm run test:smoke -- --shard=1/5 (load 11.87 21.40 22.02)
+
+> soaring-wilderness@0.1.0 test:smoke
+> playwright test --shard=1/5
+
+
+Running 9 tests using 6 workers, shard 1 of 5
+
+  ✓  2 tests/app.smoke.ts:178:1 › keeps smoke rendering at its reduced ratio within the pixel budget (2.0s)
+  ✓  1 tests/app.smoke.ts:157:1 › caps Low power rendering during DPR and large viewport changes (2.1s)
+  ✓  4 tests/app.smoke.ts:277:1 › rebases render coordinates while navigation stays in world coordinates (2.2s)
+  ✓  3 tests/app.smoke.ts:297:1 › tracks the active thermal and persists the visibility setting (4.9s)
+  ✓  7 tests/app.smoke.ts:329:1 › persists safe local-terrain height bounds across reloads (3.0s)
+  ✓  6 tests/app.smoke.ts:127:1 › caps normal rendering at two million pixels through viewport and DPR changes (5.1s)
+  ✓  9 tests/app.smoke.ts:426:1 › mouse wheel zooms the camera and stays in sync with the slider (4.9s)
+  ✓  5 tests/app.smoke.ts:76:1 › renders high-detail terrain, streams, and supports camera controls (8.1s)
+  ✓  8 tests/app.smoke.ts:351:1 › visibility and camera distance persist independently (9.0s)
+
+  9 passed (12.8s)
+shard 1 exit 0
+== CI=1 SMOKE_SKIP_PERF_BENCH=1 npm run test:smoke -- --shard=2/5 (load 13.16 21.38 22.01)
+
+> soaring-wilderness@0.1.0 test:smoke
+> playwright test --shard=2/5
+
+
+Running 9 tests using 6 workers, shard 2 of 5
+
+  ✓  5 tests/app.smoke.ts:605:1 › settings stay scrollable within short desktop and mobile viewports (2.4s)
+  ✓  3 tests/app.smoke.ts:626:1 › migrates prior volume, saves independent controls, and preserves mute on reload (3.5s)
+  ✓  7 tests/app.smoke.ts:656:1 › the first mute gesture and a pending audio start respect the saved mute choice (2.3s)
+  ✓  8 tests/app.smoke.ts:699:1 › suspends hidden audio and bounds the first visible simulation step (2.1s)
+  ✓  1 tests/app.smoke.ts:450:1 › a dragged camera angle stays until a double-click resets it, and a drag never resets (6.0s)
+  ✓  6 tests/app.smoke.ts:528:1 › fullscreen toggle and F keep the idle scene clear while settings and diagnostics still work (6.3s)
+  ✓  9 tests/app.smoke.ts:793:1 › captures painted clouds from one seed and viewpoint across the day (4.9s)
+  ✓  2 tests/app.smoke.ts:481:1 › low-power mode persists, uses its work budget, and focus always caps at 30 fps (12.7s)
+  ✓  4 tests/app.smoke.ts:563:1 › defaults terrain visibility to 5 km and streams bounded work at each LOD tier out to the 5 km max (12.9s)
+
+  9 passed (14.6s)
+shard 2 exit 0
+== CI=1 SMOKE_SKIP_PERF_BENCH=1 npm run test:smoke -- --shard=3/5 (load 14.63 21.34 21.98)
+
+> soaring-wilderness@0.1.0 test:smoke
+> playwright test --shard=3/5
+
+
+Running 9 tests using 6 workers, shard 3 of 5
+
+  ✓  4 tests/chunk-budget.smoke.ts:4:1 › retains valid partial terrain work across a center change (2.9s)
+  ✓  3 tests/app.smoke.ts:956:1 › a blocked browser audio context keeps the mute control usable without page errors (3.2s)
+  ✓  8 tests/climate.smoke.ts:6:1 › climate selects lowland biomes and cools rendered ground deterministically (1.5s)
+  ✓  5 tests/app.smoke.ts:869:1 › renders daytime, aurora, and midnight sky states (5.8s)
+  ✓  1 tests/biomes.smoke.ts:7:1 › renders blended biome terrain with deterministic shared chunk edges (8.9s)
+  ✓  2 tests/biomes.smoke.ts:87:1 › renders varied farmland with physical hedgerows (10.3s)
+  ✓  6 tests/app.smoke.ts:925:1 › shows sea-level water from altitude without page errors (11.9s)
+  ✓  9 tests/cloud-layer.smoke.ts:14:1 › cloud deck hides low ground above and whites out the chase bird inside (21.6s)
+  ✓  7 tests/chunk-budget.smoke.ts:29:1 › resumable streaming cancels safely and reuses detached buffers (23.8s)
+
+  9 passed (28.6s)
+shard 3 exit 0
+== CI=1 SMOKE_SKIP_PERF_BENCH=1 npm run test:smoke -- --shard=4/5 (load 16.66 21.36 21.98)
+
+> soaring-wilderness@0.1.0 test:smoke
+> playwright test --shard=4/5
+
+
+Running 8 tests using 6 workers, shard 4 of 5
+
+  ✓  5 tests/continental.smoke.ts:6:1 › continental terrain interlocks land and common sea-level water (1.9s)
+  ✓  6 tests/cloud-layer.smoke.ts:103:1 › scheduled lowland flight crosses the cloud deck without collision-floor jumps (3.6s)
+  ✓  7 tests/lowland-climate.smoke.ts:6:1 › continental height and climate remain separate fields (2.2s)
+  ✓  4 tests/highlands.smoke.ts:15:1 › one hour through Highlands keeps clearance and climb behavior safe (6.0s)
+  ✓  3 tests/lakeland.smoke.ts:5:1 › sea-level basins use terrain triangles and seamless water across tiers (7.6s)
+  ✓  8 tests/moon-phases.smoke.ts:8:1 › the moon shows real phases, its light follows the lit fraction, and the shadow caster switches dark (5.1s)
+  ✓  1 tests/highlands-cover.smoke.ts:5:1 › Highlands snow caps remain visible from the default chase camera (12.1s)
+  ✓  2 tests/fog-readback.smoke.ts:11:1 › samples horizon fog asynchronously at fixed sky phases (20.9s)
+
+  8 passed (22.6s)
+shard 4 exit 0
+== CI=1 SMOKE_SKIP_PERF_BENCH=1 npm run test:smoke -- --shard=5/5 (load 15.30 20.72 21.73)
+
+> soaring-wilderness@0.1.0 test:smoke
+> playwright test --shard=5/5
+
+
+Running 8 tests using 6 workers, shard 5 of 5
+
+  ✓  1 tests/picture-diff.smoke.ts:21:1 › picture diff refuses dimensions and environment mismatches (4ms)
+  ✓  3 tests/picture-diff.smoke.ts:11:1 › picture diff reports exact changed-pixel statistics (2ms)
+  ✓  7 tests/sky-lighting.smoke.ts:4:1 › puff faces follow sky light and night exposure decreases without a global grade (2.8s)
+  ✓  2 tests/sky-bodies.smoke.ts:46:1 › the moon glows with a face and stars appear with the afterglow (3.0s)
+  ✓  5 tests/sky-dusk.smoke.ts:8:1 › dusk warmth follows the sun, a rose belt faces it, and the low sun is wide (3.3s)
+  ✓  8 tests/sky-twilight.smoke.ts:9:1 › a painted twilight gradient keeps the dusk sky lit and fades out without a step (10.0s)
+  ✓  6 tests/puff-clouds.smoke.ts:19:1 › keeps forty seeded puffs, drifts and wraps them, and adds one draw call (10.2s)
+  ✓  4 tests/puff-clouds.smoke.ts:101:1 › captures the puff deck from low, mid, and high chase flights at noon and golden hour (29.4s)
+
+  8 passed (31.2s)
+shard 5 exit 0
+== CI=1 npm run test:smoke -- tests/perf-bench.smoke.ts
+
+> soaring-wilderness@0.1.0 test:smoke
+> playwright test tests/perf-bench.smoke.ts
+
+
+Running 4 tests using 1 worker
+
+  ✓  1 tests/perf-bench.smoke.ts:23:1 › two runs of one build report identical draw calls and triangles at five held vantages (56.7s)
+  ✓  2 tests/perf-bench.smoke.ts:85:1 › reports GPU timing as unavailable when the timer extension is missing (6.5s)
+  ✓  3 tests/perf-bench.smoke.ts:98:1 › discards GPU timings that follow a disjoint event and deletes every query (7.0s)
+  ✓  4 tests/perf-bench.smoke.ts:119:1 › keeps profiling dev-only: no timer query without ?profile and none in the production bundle (2.9s)
+
+  4 passed (1.3m)
+shard perf-bench exit 0
