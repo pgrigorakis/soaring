@@ -90,7 +90,8 @@ test('the moon glows with a face and stars appear with the afterglow', async ({ 
   expect(timing[3]!.starAmount).toBeGreaterThan(0.99);
 
   const midnight = await showSun(-52, 'moon');
-  expect(midnight.moonElevation).toBeGreaterThan(0.7);
+  // The first midnight's moon is a waxing gibbous, 93 % lit and about 43 degrees up.
+  expect(midnight.moonElevation).toBeGreaterThan(0.6);
   const moon = await measureSky(page, 'midnight-moon', testInfo);
   // The disc stays near white without a flat clip, and its maria and limb vary across it.
   expect(moon.centre).toBeGreaterThan(200);

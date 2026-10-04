@@ -891,8 +891,9 @@ test('renders daytime, aurora, and midnight sky states', async ({ page }) => {
     });
   }
 
-  const horizon = await showPhase(0.25, 'horizon', 'chase');
-  expect(horizon.timeOfDay).toBeCloseTo(0.25, 2);
+  // The first dusk has a full moon, so it rises opposite the setting sun.
+  const horizon = await showPhase(0.75, 'horizon', 'chase');
+  expect(horizon.timeOfDay).toBeCloseTo(0.75, 2);
   expect(Math.abs(horizon.sunElevation)).toBeLessThan(0.05);
   expect(Math.abs(horizon.moonElevation)).toBeLessThan(0.05);
 

@@ -17,13 +17,17 @@ chrome-devtools-axi eval '() => {
 }'
 sleep 1
 # name, sun elevation in degrees, view: sun or moon heads the chase camera at that body; look aims the camera at the moon.
-for shot in sun3:3:sun sun-6:-6:sun sun-12:-12:sun sun-52:-52:sun moon-6:-6:moon moon-12:-12:moon moon-52:-52:look; do
-  IFS=: read -r name elevation view <<< "$shot"
+# Optional: a game day (the moon falls 45 degrees behind the sun each day) and "dusk" for the evening side.
+shots="sun3:3:sun sun-6:-6:sun sun-12:-12:sun sun-52:-52:sun moon-6:-6:moon moon-12:-12:moon moon-52:-52:look"
+shots+=" ${SKY_EXTRA_SHOTS:-}"
+for shot in $shots; do
+  IFS=: read -r name elevation view day side <<< "$shot"
   chrome-devtools-axi eval "async () => {
     const api = window.__SOARING__;
     // Inverse of the scout tools/phases.mjs Soaring arc, without rounding.
-    const phase = Math.acos(-($elevation) / 52) / (2 * Math.PI);
-    api.setTimeOfDay(phase);
+    const morning = Math.acos(-($elevation) / 52) / (2 * Math.PI);
+    const phase = '${side:-}' === 'dusk' ? 1 - morning : morning;
+    api.setTimeOfDay(phase, ${day:-0});
     const body = api.snapshot();
     // Older builds have no body directions in the snapshot; their moon is opposite the sun.
     const target = '$view' === 'moon' ? body.moonDirection : body.sunDirection;

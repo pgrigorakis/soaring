@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AuroraSchedule, DAY_SECONDS, auroraAmount, daylight, type Vec3 } from '../src/sky-cycle';
+import { AuroraSchedule, DAY_SECONDS, LUNAR_DAYS, auroraAmount, daylight, type Vec3 } from '../src/sky-cycle';
 
 function dot(a: Vec3, b: Vec3): number {
   return a.x * b.x + a.y * b.y + a.z * b.z;
@@ -38,7 +38,7 @@ describe('seeded aurora schedule', () => {
 });
 
 describe('world clock sun and moon', () => {
-  it('maps a 15-minute day onto opposite world-fixed bodies', () => {
+  it('maps a 15-minute day onto world-fixed bodies', () => {
     expect(DAY_SECONDS).toBe(15 * 60);
     const midnight = daylight(0);
     const dawn = daylight(DAY_SECONDS * 0.25);
@@ -48,8 +48,6 @@ describe('world clock sun and moon', () => {
     for (const body of [midnight, dawn, noon, dusk]) {
       expect(Math.hypot(body.sun.x, body.sun.y, body.sun.z)).toBeCloseTo(1, 6);
       expect(Math.hypot(body.moon.x, body.moon.y, body.moon.z)).toBeCloseTo(1, 6);
-      expect(dot(body.sun, body.moon)).toBeCloseTo(-1, 6);
-      expect(body.moon).toEqual({ x: -body.sun.x, y: -body.sun.y, z: -body.sun.z });
     }
 
     expect(midnight.phase).toBe(0);
@@ -58,6 +56,7 @@ describe('world clock sun and moon', () => {
     expect(midnight.dominant).toBe('moon');
     expect(midnight.sunIntensity).toBe(0);
     expect(midnight.moonIntensity).toBeGreaterThan(0.5);
+    expect(midnight.moonLit).toBeGreaterThan(0.85);
     expect(midnight.moonColor.b).toBeGreaterThan(midnight.moonColor.r);
 
     expect(dawn.phase).toBeCloseTo(0.25, 6);
@@ -95,5 +94,55 @@ describe('world clock sun and moon', () => {
       expect(Math.max(after.sunIntensity, after.moonIntensity)).toBeLessThan(0.05);
       expect(before.dominant).not.toBe(after.dominant);
     }
+  });
+
+  it('rises opposite the sun as a full moon on the first dusk, then falls 45 degrees behind each day', () => {
+    expect(LUNAR_DAYS).toBe(8);
+    const full = daylight(DAY_SECONDS * 0.75);
+    expect(dot(full.sun, full.moon)).toBeCloseTo(-1, 6);
+    expect(full.moonLit).toBeCloseTo(1, 6);
+
+    // The moon trails the sun. Its face is lit at the orbital angle, toward the sun in the sky.
+    for (let step = 0; step <= LUNAR_DAYS * 8; step += 1) {
+      const body = daylight(DAY_SECONDS * (0.75 + step / 8));
+      expect(Math.hypot(body.moonSunlight.x, body.moonSunlight.y, body.moonSunlight.z)).toBeCloseTo(1, 6);
+      expect((1 - dot(body.moonSunlight, body.moon)) / 2).toBeCloseTo(body.moonLit, 6);
+      expect(dot(body.moonSunlight, body.sun)).toBeGreaterThanOrEqual(dot(body.moon, body.sun) - 1e-9);
+    }
+    expect(daylight(DAY_SECONDS * 2.75).moonLit).toBeCloseTo(0.5, 6);
+    expect(daylight(DAY_SECONDS * 4.75).moonLit).toBeCloseTo(0, 6);
+    expect(daylight(DAY_SECONDS * 6.75).moonLit).toBeCloseTo(0.5, 6);
+    expect(daylight(DAY_SECONDS * 8.75).moonLit).toBeCloseTo(1, 6);
+
+    // Moonrise comes later each night, by about an eighth of a day.
+    const moonrise = (day: number) => {
+      for (let second = 0; second < DAY_SECONDS; second += 1) {
+        const at = DAY_SECONDS * (day + 0.5) + second;
+        if (daylight(at - 1).moon.y <= 0 && daylight(at).moon.y > 0) return second / DAY_SECONDS;
+      }
+      return NaN;
+    };
+    for (let day = 0; day < 3; day += 1) {
+      expect(moonrise(day + 1) - moonrise(day)).toBeGreaterThan(0.09);
+      expect(moonrise(day + 1) - moonrise(day)).toBeLessThan(0.16);
+    }
+  });
+
+  it('moves the moon smoothly and keeps both lights dark whenever the shadow caster switches', () => {
+    let switches = 0;
+    let previous = daylight(0);
+    for (let second = 1; second <= DAY_SECONDS * LUNAR_DAYS; second += 1) {
+      const body = daylight(second);
+      expect(Math.acos(Math.min(1, dot(body.moon, previous.moon)))).toBeLessThan(0.01);
+      expect(Math.abs(body.moonLit - previous.moonLit)).toBeLessThan(0.001);
+      expect(body.dominant).toBe(body.sun.y >= 0 ? 'sun' : 'moon');
+      if (body.dominant !== previous.dominant) {
+        switches += 1;
+        for (const side of [previous, body]) expect(Math.max(side.sunIntensity, side.moonIntensity)).toBeLessThan(0.05);
+      }
+      if (body.sun.y >= 0) expect(body.moonIntensity).toBe(0);
+      previous = body;
+    }
+    expect(switches).toBe(LUNAR_DAYS * 2);
   });
 });

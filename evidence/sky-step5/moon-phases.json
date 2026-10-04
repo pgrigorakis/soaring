@@ -1,0 +1,102 @@
+{
+  "phases": [
+    {
+      "name": "full",
+      "day": 0,
+      "moonLit": 0.9993912953121118,
+      "moonIntensity": 0.5588746508721886,
+      "sunElevation": -0.3420201433256688,
+      "moonElevation": 0.3025007560981045,
+      "dominant": "moon",
+      "litShare": 1,
+      "partial": 0,
+      "halo": 96.39489999999999
+    },
+    {
+      "name": "crescent",
+      "day": 5,
+      "moonLit": 0.16431741517592874,
+      "moonIntensity": 0.13062284209041955,
+      "sunElevation": -0.3420201433256688,
+      "moonElevation": 0.37698059921152843,
+      "dominant": "moon",
+      "litShare": 0.12214166201896264,
+      "partial": 44,
+      "halo": 28.045199999999998
+    },
+    {
+      "name": "half",
+      "day": 6,
+      "moonLit": 0.5246644312014532,
+      "moonIntensity": 0.8870564991464378,
+      "sunElevation": -0.3420201433256688,
+      "moonElevation": 0.7538861801475317,
+      "dominant": "moon",
+      "litShare": 0.5476854433909648,
+      "partial": 49,
+      "halo": 58.7866
+    },
+    {
+      "name": "gibbous",
+      "day": 7,
+      "moonLit": 0.8705633579373846,
+      "moonIntensity": 1.4585341598548098,
+      "sunElevation": -0.3420201433256688,
+      "moonElevation": 0.7319255373235823,
+      "dominant": "moon",
+      "litShare": 0.9269380925822643,
+      "partial": 31,
+      "halo": 85.58845000000001
+    }
+  ],
+  "sunset": [
+    {
+      "elevation": 1,
+      "moonLit": 0.49879800398547625,
+      "moonIntensity": 0,
+      "sunElevation": 0.017452406437284462,
+      "moonElevation": 0.7879316345463208,
+      "dominant": "sun"
+    },
+    {
+      "elevation": 0.2,
+      "moonLit": 0.49975961480120756,
+      "moonIntensity": 0,
+      "sunElevation": 0.0034906514152231952,
+      "moonElevation": 0.7880075893969719,
+      "dominant": "sun"
+    },
+    {
+      "elevation": -0.2,
+      "moonLit": 0.5002403851987922,
+      "moonIntensity": 0.0030362390886333403,
+      "sunElevation": -0.0034906514152228617,
+      "moonElevation": 0.7880075893969719,
+      "dominant": "moon"
+    },
+    {
+      "elevation": -1,
+      "moonLit": 0.5012019960145235,
+      "moonIntensity": 0.0687977412852718,
+      "sunElevation": -0.017452406437284126,
+      "moonElevation": 0.7879316345463208,
+      "dominant": "moon"
+    },
+    {
+      "elevation": -3,
+      "moonLit": 0.503607741168633,
+      "moonIntensity": 0.4580419737896484,
+      "sunElevation": -0.05233595624294477,
+      "moonElevation": 0.7872976441592828,
+      "dominant": "moon"
+    },
+    {
+      "elevation": -6,
+      "moonLit": 0.5072273853264779,
+      "moonIntensity": 0.8622524067354821,
+      "sunElevation": -0.10452846326765423,
+      "moonElevation": 0.7851442161127711,
+      "dominant": "moon"
+    }
+  ]
+}
