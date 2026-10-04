@@ -27,6 +27,7 @@ test('cloud deck hides low ground above and whites out the chase bird inside', a
     window.__SOARING__.setTimeOfDay(0.5);
     document.querySelector('#intro')?.classList.add('hidden');
     document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
+    document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
   });
   const shots: Array<Record<string, unknown>> = [];
   for (const view of VIEWS) {
@@ -100,6 +101,7 @@ test('cloud deck hides low ground above and whites out the chase bird inside', a
 
 // Use the real navigator and procedural world. A complete repeatable trace is
 // emitted even if an assertion fails. This covers the opening and a normal cycle.
+// Seed 5914: from the 448122 lake, the 7 km land field keeps the second cycle over high ground.
 test('scheduled lowland flight crosses the cloud deck without collision-floor jumps', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   await page.goto('/?smoke');
@@ -108,7 +110,7 @@ test('scheduled lowland flight crosses the cloud deck without collision-floor ju
     const eaglePath = '/src/eagle.ts';
     const { WorldModel } = await import(/* @vite-ignore */ worldPath) as typeof import('../src/world');
     const { EagleNavigator, TERRAIN_SAFETY_MARGIN } = await import(/* @vite-ignore */ eaglePath) as typeof import('../src/eagle');
-    const world = new WorldModel(448122);
+    const world = new WorldModel(5914);
     const lake = world.reviewSpots().lake;
     const nav = new EagleNavigator(world, { x: lake.x, z: lake.z, heading: 0.4 }, undefined, 0.4);
     let minClearance = Infinity, corrections = 0, climb = 0;
@@ -124,7 +126,7 @@ test('scheduled lowland flight crosses the cloud deck without collision-floor ju
       if (step % 10 === 0) trace.push({ t: (step + 1) / 10, y: state.y, clearance });
       if (step % 100 === 0) world.trim(20000);
     }
-    return { seed: 448122, lake, minClearance, corrections, climb, trace };
+    return { seed: 5914, lake, minClearance, corrections, climb, trace };
   });
   await writeFile('test-results/cloud-crossing.json', JSON.stringify(metrics, null, 2));
   await testInfo.attach('cloud-crossing', { body: JSON.stringify(metrics), contentType: 'application/json' });

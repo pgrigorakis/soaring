@@ -4,7 +4,7 @@ import { build } from 'esbuild';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 await mkdir('test-results', { recursive: true });
 const reports = [];
-for (const threshold of [.735, .75, .765]) {
+for (const threshold of [.785, .8, .815]) {
   const outfile = `test-results/lake-threshold-${threshold}.mjs`;
   await build({ entryPoints: ['src/world.ts'], outfile, bundle: true, platform: 'node', format: 'esm', plugins: [{ name: 'lake-threshold', setup(builder) {
     builder.onLoad({ filter: /\/biome\.ts$/ }, async ({ path }) => ({ contents: (await readFile(path, 'utf8')).replace(/lakeThreshold: [\d.]+/, `lakeThreshold: ${threshold}`), loader: 'ts' }));

@@ -13,9 +13,11 @@ Use a current desktop version of Chrome, Edge, or Firefox.
 - Drag on the landscape to orbit the camera. Release to let it return slowly to the trailing view.
 - Move the pointer to reveal the settings control. The cursor and control hide after 3 seconds without pointer movement.
 - Settings provide fullscreen, sound and volume controls, terrain visibility, Low power, Show thermal, flight-height bounds, camera distance, and a new-world action. Show thermal marks thermals within 3.5 km of the eagle; the selected thermal stays hotter. Height bounds persist across reloads. They guide low flight and cap thermal climbs. Scheduled cloud crossings can climb above them, but terrain safety always takes priority.
+- The map in the lower-right corner shows the land and the last four days of flight, north up. Click it to step the zoom through 6, 20 and 70 km.
+- Press `M` to open the biome map of the whole trail, or 40 km or 120 km around the eagle. Export PNG saves it with a legend and a scale. Press `M` or `Esc` to close it.
 - Press `F` to toggle fullscreen. Press `D` to show or hide diagnostics.
 
-Sound is procedural and starts muted on every page load. The two volume settings persist independently. Settings and the world seed live in `localStorage`. A reload keeps the seed but starts the eagle elsewhere in the same world.
+Sound is procedural and starts muted on every page load. The two volume settings persist independently. Settings, the world seed and the flight trail live in `localStorage`. A new world starts a new trail. A reload keeps the seed but starts the eagle elsewhere in the same world.
 
 ## Terrain visibility
 

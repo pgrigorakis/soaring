@@ -12,6 +12,9 @@ import { AuroraSchedule, auroraAmount, DAY_SECONDS, daylight, nightCycle, type D
 import { FrameProfiler, type ProfileReport } from './profile';
 import { WORLD_CACHE_LIMIT, WorldModel } from './world';
 import { PuffClouds, type PuffCloudSnapshot } from './puff-clouds';
+import { Trail } from './trail';
+import { Minimap } from './minimap';
+import { MapPanel } from './map-panel';
 
 type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; lowPower: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
 const CAMERA_DISTANCE = { min: 10, max: 100, default: 100 } as const;
@@ -595,6 +598,11 @@ app.insertAdjacentHTML('beforeend', `
   <button class="settings-toggle" id="settings-toggle" type="button" aria-label="Open settings" aria-controls="settings-panel" aria-expanded="false">⚙</button>
   <pre class="diagnostics" id="diagnostics" aria-hidden="true"></pre>
 `);
+// The four-day trail feeds the lower-right minimap and the biome map that M opens.
+const trail = new Trail(world.seed);
+const minimap = new Minimap(world, trail);
+const mapPanel = new MapPanel(world, trail);
+app.append(minimap.element, mapPanel.element);
 
 const controls = document.querySelector<HTMLElement>('#controls')!;
 const panel = document.querySelector<HTMLElement>('#settings-panel')!;
@@ -814,6 +822,14 @@ window.addEventListener('keydown', (event) => {
     void toggleFullscreen();
     return;
   }
+  if (key === 'm') {
+    if (event.ctrlKey || event.metaKey || event.altKey
+      || (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, [contenteditable="true"]'))) return;
+    if (mapPanel.isOpen) mapPanel.close();
+    else void mapPanel.open('trail', navigator.state);
+    return;
+  }
+  if (key === 'escape' && mapPanel.isOpen) mapPanel.close();
   if (key !== 'd') return;
   diagnosticsVisible = !diagnosticsVisible;
   diagnostics.classList.toggle('visible', diagnosticsVisible);
@@ -1029,7 +1045,10 @@ function updateFlight(delta: number, now: number): void {
   const substeps = Math.ceil(delta / 0.1);
   let state = navigator.state;
   if (!reviewFlightPaused) {
-    for (let step = 0; step < substeps; step += 1) state = navigator.update(delta / substeps);
+    for (let step = 0; step < substeps; step += 1) {
+      state = navigator.update(delta / substeps);
+      trail.tick(state.x, state.z, delta / substeps);
+    }
   }
   eagle.update(state, delta);
   thermalMarker.update(state, navigator.activeThermal, settings.showThermal, now / 1000);
@@ -1105,6 +1124,7 @@ function frame(now: number): void {
   lastChunkBuilds = terrain.update(cameraPosition.x, cameraPosition.z, settings.lowPower ? 2 : 4);
   updateFog();
   if (!skyPaused) skySeconds += rawDelta * navigator.openingDayRate;
+  minimap.update(state.x, state.z, state.heading, rawDelta);
   const body = currentDaylight();
   applyDaylight(body, rawDelta);
   puffClouds.update(state, navigator.wind, reviewFlightPaused ? 0 : delta, cameraPosition, fogGoal, puffSkyLight,
@@ -1181,6 +1201,7 @@ window.addEventListener('resize', () => {
 });
 
 window.addEventListener('beforeunload', () => {
+  trail.save();
   lensflare.dispose();
   fogSampleDisposed = true;
   profiler?.dispose();

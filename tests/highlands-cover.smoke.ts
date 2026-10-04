@@ -9,10 +9,11 @@ test('Highlands snow caps remain visible from the default chase camera', async (
   });
   await page.goto('/?smoke');
   await page.evaluate(() => {
-    window.__SOARING__.reviewFlight!({ x: 113000, z: 73100, heading: Math.PI / 4 });
+    window.__SOARING__.reviewFlight!({ x: 140, z: -102760, heading: Math.PI / 4 });
     window.__SOARING__.setVisibility(1800);
     document.querySelector('#intro')?.classList.add('hidden');
     document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
+    document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
   });
   await page.waitForFunction(() => window.__SOARING__.snapshot().pending === 0);
   const cover = await page.evaluate(async () => {
@@ -21,11 +22,11 @@ test('Highlands snow caps remain visible from the default chase camera', async (
     const { snowCover } = await import(/* @vite-ignore */ terrainPath) as typeof import('../src/terrain');
     const { WorldModel } = await import(/* @vite-ignore */ worldPath) as typeof import('../src/world');
     const world = new WorldModel(57);
-    // FWM's continental mask moves mountains. Elevated drainage cirques are gone.
-    const peak = world.sample(113400, 73500);
-    return { height: peak.height, cap: snowCover(peak, 0.2, 113400, 73500, 57),
-      cliff: snowCover(peak, 1, 113400, 73500, 57),
-      below: snowCover({ ...peak, temperature: 0.5 }, 0.2, 113400, 73500, 57) };
+    // The 7 km continental field moved the old peak; this is the highest snow cap within 150 km on a 300 m grid.
+    const peak = world.sample(1200, -101700);
+    return { height: peak.height, cap: snowCover(peak, 0.2, 1200, -101700, 57),
+      cliff: snowCover(peak, 1, 1200, -101700, 57),
+      below: snowCover({ ...peak, temperature: 0.5 }, 0.2, 1200, -101700, 57) };
   });
   expect(cover.height).toBeGreaterThan(800);
   expect(cover.cap).toBe(1);
