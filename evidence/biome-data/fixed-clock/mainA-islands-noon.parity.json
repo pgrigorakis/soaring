@@ -1,0 +1,50 @@
+{
+  "generated": "2026-10-04T14:30:41.780Z",
+  "build": {
+    "commit": "10ccc4b271ae573647dc01decbed50b724550084",
+    "dirty": true
+  },
+  "environment": {
+    "machine": {
+      "cpu": "Apple M4 Pro",
+      "cores": 12,
+      "memoryGiB": 24,
+      "os": "Darwin 27.2.0",
+      "arch": "arm64"
+    },
+    "browser": "chromium 154.0.8037.93",
+    "headless": true
+  },
+  "parameters": {
+    "fixedClock": true,
+    "seed": 5,
+    "repeats": 2,
+    "deviceScaleFactor": 1,
+    "vantages": [
+      "islands-noon"
+    ]
+  },
+  "vantages": {
+    "islands-noon": {
+      "noiseFloor": {
+        "meanDifference": 0,
+        "changedPixelShare": 0,
+        "worstPixel": {
+          "x": 0,
+          "y": 0,
+          "difference": 0,
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    }
+  }
+}

@@ -12,6 +12,9 @@ const dirty = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' 
 const output = process.env.PARITY_OUT ?? `artifacts/look-parity/${new Date().toISOString().replaceAll(':', '-')}-${commit.slice(0, 12)}`;
 const repeats = Number(process.env.PARITY_REPEATS ?? 2);
 const reference = process.env.PARITY_REFERENCE;
+// Failure mode: wall-clock animation and settling drift hide a static refactor regression.
+// Fixed-clock mode is for exact picture comparison, not performance measurement.
+const fixedClock = process.env.PARITY_FIXED_CLOCK === '1';
 const selectedNames = process.env.PARITY_VANTAGES?.split(',').filter(Boolean);
 const selectedVantages = selectedNames ? VANTAGES.filter(({ name }) => selectedNames.includes(name)) : VANTAGES;
 if (selectedNames && (selectedVantages.length === 0 || selectedVantages.length !== selectedNames.length)) throw new Error('PARITY_VANTAGES must name one or more known bench vantages');
@@ -29,6 +32,22 @@ test('capture and compare finished pictures at the performance bench vantages', 
   for (let repeat = 0; repeat < repeats; repeat += 1) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: Number(process.env.PARITY_DPR ?? 2) });
     const page = await context.newPage();
+    if (fixedClock) {
+      await page.clock.install({ time: 0 });
+      await page.clock.pauseAt(1000);
+      await page.addInitScript(() => {
+        // Module loading can consume a few emulated milliseconds after navigation.
+        // Pin animation initialization to zero, then use only emulated RAF time.
+        // This hook is test-only; production animation and CPU budgets are untouched.
+        let frameTime = 0;
+        performance.now = () => frameTime;
+        const requestFrame = window.requestAnimationFrame.bind(window);
+        window.requestAnimationFrame = (callback) => requestFrame((time) => {
+          frameTime = time;
+          callback(time);
+        });
+      });
+    }
     await page.addInitScript((seed) => localStorage.setItem('soaring.world-seed.v1', String(seed)), Number(process.env.PARITY_SEED ?? 5));
     await page.goto(`${process.env.PARITY_URL ?? 'http://127.0.0.1:4198'}/?profile`);
     await page.waitForFunction(() => window.__SOARING__?.profile !== undefined, undefined, { timeout: 60_000 });
@@ -49,6 +68,17 @@ test('capture and compare finished pictures at the performance bench vantages', 
         app.setViewpoint({ x: bx - Math.sin(heading) * 60, y: by + 30, z: bz - Math.cos(heading) * 60,
           lookX: bx + Math.sin(heading) * 38, lookY: by - 9, lookZ: bz + Math.cos(heading) * 38 });
       }, { x: spot.x, z: spot.z, heading, timeOfDay: vantage.timeOfDay, visibility });
+      if (fixedClock) {
+        // Advance the same 160 frames for every held view. Fake performance.now()
+        // also drains the CPU streaming budget within each frame. The scene,
+        // materials, shadows, and animation remain real, at a repeatable time.
+        await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        await page.clock.runFor(2560);
+        const state = await page.evaluate(() => window.__SOARING__.snapshot());
+        console.log(`Fixed clock ${vantage.name}, repeat ${repeat + 1}: ${JSON.stringify({ frames: state.renderedFrames, cap: state.frameCap, cloudTime: state.cloudTime, fog: state.fog, position: state.position })}`);
+        expect(state.pending).toBe(0);
+        expect(state.fog.samples).toBeGreaterThan(0);
+      } else {
       await page.waitForFunction(() => window.__SOARING__.snapshot().pending === 0, undefined, { timeout: 120_000 }).catch(async (error) => {
         const state = await page.evaluate(() => window.__SOARING__.snapshot());
         throw new Error(`Terrain did not settle at ${vantage.name}, repeat ${repeat + 1}: ${JSON.stringify(state)}`, { cause: error });
@@ -56,7 +86,11 @@ test('capture and compare finished pictures at the performance bench vantages', 
       await page.waitForFunction(() => { const fog = window.__SOARING__.snapshot().fog; return !fog.readPending && fog.samples > 0; }, undefined, { timeout: 30_000 });
       const settled = await page.evaluate(() => window.__SOARING__.snapshot().renderedFrames);
       await page.waitForFunction((frame) => window.__SOARING__.snapshot().renderedFrames >= frame + 60, settled, { timeout: 120_000 });
-      const screenshot = await page.locator('canvas').screenshot();
+      }
+      // A page capture avoids locator stability checks waiting for a paused RAF.
+      const screenshot = fixedClock
+        ? await page.screenshot({ style: 'body *:not(#app):not(canvas) { visibility: hidden !important; }' })
+        : await page.locator('canvas').screenshot();
       const capture = await page.evaluate(async (png) => {
         const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob());
         const canvas = document.createElement('canvas');
@@ -82,10 +116,14 @@ test('capture and compare finished pictures at the performance bench vantages', 
   }
 
   const existing = reference ? path.resolve(reference) : undefined;
+  if (existing) {
+    const previous = JSON.parse(await readFile(path.join(existing, 'parity.json'), 'utf8'));
+    expect(previous.parameters.fixedClock ?? false, 'Reference clock mode must match').toBe(fixedClock);
+  }
   await mkdir(path.dirname(output), { recursive: true });
   await mkdir(output);
   const result: Record<string, unknown> = { generated: new Date().toISOString(), build, environment: environmentBase,
-    parameters: { seed: Number(process.env.PARITY_SEED ?? 5), repeats, deviceScaleFactor: Number(process.env.PARITY_DPR ?? 2), vantages: selectedVantages.map(({ name }) => name) }, vantages: {} };
+    parameters: { fixedClock, seed: Number(process.env.PARITY_SEED ?? 5), repeats, deviceScaleFactor: Number(process.env.PARITY_DPR ?? 2), vantages: selectedVantages.map(({ name }) => name) }, vantages: {} };
   for (const [name, pictures] of Object.entries(captures)) {
     const [baseline, repeated] = pictures;
     const noiseFloor = comparePictures(baseline!, repeated!);
