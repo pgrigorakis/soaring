@@ -95,6 +95,24 @@ export function ridgeClimb(slope: number, upslopeAngle: number, wind: Wind): num
   return Math.min(RIDGE.maxClimb, wind.speed * Math.sin(slope) * facing * RIDGE.liftScale);
 }
 
+/**
+ * Look-ahead climb after fly-with-me `climbAhead` (#88). Summits rise faster than the
+ * bird climbs, so in Highlands it flaps for the height it needs now to clear the path
+ * ahead at four fifths of its flapping climb. If even a full climb cannot clear a heading,
+ * the bird steers to the nearest heading it can clear, and returns once the way is open.
+ */
+const CLIMB_AHEAD = {
+  reach: 2200,
+  step: 60,
+  climbShare: 0.8,
+  /** Look this far past a target: a summit behind it is the next leg's concern. */
+  pastTarget: 300,
+  seconds: 0.5,
+  detours: [20, 40, 60, 90, 120].map((degrees) => degrees * DEGREE),
+  /** Height the bird must have spare before it leaves a detour, so it does not dither. */
+  resume: 30,
+} as const;
+
 /** Shore legs trace up to half a lake, then the compass takes over again. */
 const SHORE = { reach: 700, odds: 0.6, offset: 60, leg: 300, arc: Math.PI, revisitSeconds: 600 } as const;
 
@@ -183,6 +201,9 @@ export class EagleNavigator {
   private ridgeLeadUntil = 0;
   private glideStart = 0;
   private shore: ShoreTrace | null = null;
+  private aheadAge: number = CLIMB_AHEAD.seconds;
+  private climbNeed = -Infinity;
+  private detour: number | null = null;
   private lastShore: { x: number; z: number; time: number } | null = null;
 
   constructor(world: WorldModel, start: { x: number; z: number; heading: number }, heightRange = DEFAULT_FLIGHT_HEIGHT) {
@@ -310,7 +331,17 @@ export class EagleNavigator {
 
   private flyTowardTarget(dt: number, ground: number): void {
     const desiredHeading = Math.atan2(this.target.x - this.state.x, this.target.z - this.state.z);
-    const headingError = wrapAngle(desiredHeading - this.state.heading);
+    if (highlandWeight(this.world.sample(this.state.x, this.state.z).mountainRegion) > 0) {
+      this.aheadAge += dt;
+      if (this.aheadAge >= CLIMB_AHEAD.seconds) {
+        this.aheadAge = 0;
+        this.planAhead(desiredHeading);
+      }
+    } else {
+      this.detour = null;
+      this.climbNeed = -Infinity;
+    }
+    const headingError = wrapAngle((this.detour ?? desiredHeading) - this.state.heading);
     this.steer(headingError, dt);
 
     const aheadX = Math.sin(this.state.heading);
@@ -331,6 +362,53 @@ export class EagleNavigator {
     if (this.state.behavior !== 'thermal-seeking' && Math.hypot(this.target.x - this.state.x, this.target.z - this.state.z) < 150) {
       this.chooseScenicTarget();
     }
+  }
+
+  /**
+   * Height needed now to clear the path along a heading: at a share of the flapping climb
+   * (`need`) and at the full climb (`full`). Both keep the flap floor over each point.
+   */
+  private climbAlong(heading: number, reach: number): { need: number; full: number } {
+    const span = this.heightRange.max - this.heightRange.min;
+    const floor = this.heightRange.min + Math.max(10, span * 0.15);
+    const dx = Math.sin(heading);
+    const dz = Math.cos(heading);
+    let need = -Infinity;
+    let full = -Infinity;
+    for (let along = CLIMB_AHEAD.step; along <= reach; along += CLIMB_AHEAD.step) {
+      const clear = this.world.sample(this.state.x + dx * along, this.state.z + dz * along).height + floor;
+      const climb = along / CRUISE_SPEED * FLAP_CLIMB_RATE;
+      need = Math.max(need, clear - climb * CLIMB_AHEAD.climbShare);
+      full = Math.max(full, clear - climb);
+    }
+    return { need, full };
+  }
+
+  /** Hold the look-ahead climb for the way ahead, or steer round ground the bird cannot out-climb. */
+  private planAhead(desiredHeading: number): void {
+    const reach = Math.min(CLIMB_AHEAD.reach,
+      Math.hypot(this.target.x - this.state.x, this.target.z - this.state.z) + CLIMB_AHEAD.pastTarget);
+    const y = this.state.y;
+    const direct = this.climbAlong(desiredHeading, reach);
+    if (direct.full <= y - (this.detour === null ? 0 : CLIMB_AHEAD.resume)) {
+      this.detour = null;
+      this.climbNeed = direct.need;
+      return;
+    }
+    // Try the side of the current detour first, so the bird does not swap sides around a summit.
+    const side = this.detour === null ? 1 : Math.sign(wrapAngle(this.detour - desiredHeading)) || 1;
+    let best = { heading: desiredHeading, ...direct };
+    for (const offset of CLIMB_AHEAD.detours) {
+      for (const sign of [side, -side]) {
+        const heading = wrapAngle(desiredHeading + sign * offset);
+        const path = this.climbAlong(heading, reach);
+        if (path.full < best.full) best = { heading, ...path };
+        if (path.full <= y) break;
+      }
+      if (best.full <= y) break;
+    }
+    this.detour = best.heading === desiredHeading ? null : best.heading;
+    this.climbNeed = best.need;
   }
 
   private steer(headingError: number, dt: number): void {
@@ -612,7 +690,7 @@ export class EagleNavigator {
     const floorTrigger = this.heightRange.min + Math.max(10, span * 0.15);
     const clearance = this.state.y - ground;
     const aheadClearance = this.state.y - lookAheadGround;
-    if (!this.state.flapping && (clearance < floorTrigger || aheadClearance < floorTrigger)) {
+    if (!this.state.flapping && (clearance < floorTrigger || aheadClearance < floorTrigger || this.state.y < this.climbNeed)) {
       this.state.flapping = true;
       this.flapTimer = FLAP_BURST_SECONDS;
     }
@@ -720,6 +798,10 @@ export class EagleNavigator {
     else if (previous !== 'gliding') this.glideStart = this.totalTime;
     if (behavior !== 'ridge-soaring') this.ridge = null;
     this.ridgeGate = 0;
+    // A new leg plans its own way ahead on its first tick.
+    this.aheadAge = CLIMB_AHEAD.seconds;
+    this.climbNeed = -Infinity;
+    this.detour = null;
     if (behavior === 'thermal-riding') this.beginRide();
   }
 

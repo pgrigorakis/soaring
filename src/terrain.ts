@@ -47,7 +47,8 @@ export function terrainColor(sample: LandscapeSample, x: number, z: number, seed
   scratch.copy(palettes.moor[index]!).lerp(palettes.moor[index + 1]!, patch - index).multiplyScalar(biome.moor);
   target.add(scratch);
   scratch.copy(highlandPalette[0]!);
-  if (sample.forest > 0.55) scratch.copy(highlandPalette[1]!);
+  // Forest ground ends at the tree line, as the trees do; above it, a summit face is scree or rock.
+  if (sample.forest > 0.55 && sample.temperature > CLIMATE_LINES.treeLine[1]) scratch.copy(highlandPalette[1]!);
   else if (sample.temperature < CLIMATE_LINES.scree[1] || slope > 0.5) scratch.copy(highlandPalette[2]!).lerp(highlandPalette[3]!, THREE.MathUtils.clamp(normalY - 0.3, 0, 1));
   else if (sample.temperature < CLIMATE_LINES.scree[0]) scratch.lerp(highlandPalette[4]!, 1 - THREE.MathUtils.smoothstep(sample.temperature, CLIMATE_LINES.scree[1], CLIMATE_LINES.scree[0]));
   const snow = biome.highlands > 0 ? snowCover(sample, slope, x, z, seed) / biome.highlands : 0;

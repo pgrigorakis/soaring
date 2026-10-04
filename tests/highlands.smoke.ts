@@ -6,6 +6,8 @@ import { expect, test } from '@playwright/test';
 // steep rock or water. Keep #57's clearance and vertical-speed checks. Total flap
 // time is recorded, not capped. Reference: seed 57, (-24000, 3750), 3600 s at 10 Hz.
 // #93 and merged #86 hills change thermal choices; start 500 m west of the original fixture.
+// #88 summits and the look-ahead climb change the route again; start another 500 m west.
+// That hour passes three summits and keeps two ridge episodes.
 // #60 adds ridge-soaring: it must occur, climb without flapping, never pass the
 // flight-height ceiling, and no behaviour episode may exceed four minutes.
 const baseline = { commit: '184df89de4f05087194fdc25e36ddd83a7ba0181', start: { x: -24000, z: 3750 }, peakVerticalSpeed: 511.63911809568475, flappingSeconds: 164.8 };
@@ -19,7 +21,7 @@ test('one hour through Highlands keeps clearance and climb behavior safe', async
     const { WorldModel } = await import(/* @vite-ignore */ worldPath) as typeof import('../src/world');
     const { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, TERRAIN_SAFETY_MARGIN } = await import(/* @vite-ignore */ eaglePath) as typeof import('../src/eagle');
     const world = new WorldModel(57);
-    const nav = new EagleNavigator(world, { x: -84500, z: 122000, heading: 0 });
+    const nav = new EagleNavigator(world, { x: -85000, z: 122000, heading: 0 });
     let episode = { behavior: nav.state.behavior as string, seconds: 0 };
     const longestEpisode: Record<string, number> = {};
     let ridgeEpisodes = 0;
@@ -60,7 +62,7 @@ test('one hour through Highlands keeps clearance and climb behavior safe', async
     }
     longestEpisode[episode.behavior] = Math.max(longestEpisode[episode.behavior] ?? 0, episode.seconds);
     return {
-      seed: 57, start: { x: -84500, z: 122000, heading: 0 }, seconds: 3600, minClearance, peakVerticalSpeed, flappingSeconds, safetyCorrections, highlandSeconds,
+      seed: 57, start: { x: -85000, z: 122000, heading: 0 }, seconds: 3600, minClearance, peakVerticalSpeed, flappingSeconds, safetyCorrections, highlandSeconds,
       ridgeEpisodes, ridgeSeconds, ridgeMeanClimb: ridgeSeconds > 0 ? ridgeClimb / ridgeSeconds : 0, ridgeFlappingTicks, ridgeCeilingBreaches, ridgeMinClearance, longestEpisode,
     };
   });

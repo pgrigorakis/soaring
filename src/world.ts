@@ -51,7 +51,7 @@ const MAX_TREE_SLOPE = 0.6;
 const TREE_BANK_CLEARANCE = 18;
 /**
  * Captain decision on #85: the world top is about 1,050 m, fly-with-me scale.
- * #87 keeps this top. #88 shares it when pyramid summits arrive.
+ * #87 keeps this top. #88 pyramid summits reach it.
  * Snow and the tree line follow temperature (#93).
  */
 export const WORLD_TOP = 1050;
@@ -69,6 +69,33 @@ const MASSIF_WAVELENGTH = 1600;
 /** Second warp, on the already continentally warped coordinates: 260 m at 900 m. */
 const MASSIF_WARP = 260;
 const MASSIF_WARP_WAVELENGTH = 900;
+/**
+ * Pyramid summits after fly-with-me `pyramidPeaks`: one candidate per 2.4 km cell, 850 m
+ * radius, profile power 1.7. Captain decisions on #88: a few summits per Highlands core,
+ * each reaching about WORLD_TOP. A candidate stands only where the mountain region at its
+ * apex is at least `core`, and only `odds` of those cells carry one. Each summit lifts its
+ * apex to `top` ± `topSpread / 2` above the massif and lowland beneath it.
+ */
+export const SUMMIT = {
+  cell: 2400,
+  radius: 850,
+  power: 1.7,
+  core: 0.8,
+  odds: 0.3,
+  top: WORLD_TOP,
+  topSpread: 100,
+  /** A summit on an already tall crest still rises this much. */
+  minLift: 300,
+  /** fly-with-me's 0.06 soft-maximum width, at its 900 m lift. */
+  blend: 54,
+  /** Under a summit the massif drops by up to 45%, so the pyramid faces stay clean. */
+  massifDrop: 0.45,
+  /** Valley cones flatten ground within about a kilometre of a river; a summit keeps its own height from this bank. */
+  bank: 600,
+  /** Barely warped coordinates: the continental warp would bend the faces into loaves. */
+  warp: 90,
+  warpWavelength: 700,
+} as const;
 /** Continental warp, matching fly-with-me: about 700 m at a 2.2 km scale. */
 const LANDFORM_WARP = 700;
 const LANDFORM_WARP_WAVELENGTH = 2200;
@@ -394,7 +421,7 @@ export class WorldModel {
   }
 
   sample(x: number, z: number): LandscapeSample {
-    const { mountainRegion, elevation, biome, hills, seaTemperature } = this.relief(x, z);
+    const { mountainRegion, elevation, biome, hills, seaTemperature, summitCover } = this.relief(x, z);
     const highland = biome.highlands;
     // The drainage lattice reads the landform without the 520 m hills; the rendered ground adds them.
     // None of the landform terms is blended through the 500 m lattice.
@@ -491,6 +518,9 @@ export class WorldModel {
         height = Math.max(height + valleyHills, mix(nearest.surface, height, 0.4));
       }
       height = mix(height, bare, land);
+      // Drainage already routes rivers round a summit; the cone would still cut its top
+      // down. Away from the bank the upper summit keeps the landform height.
+      if (summitCover > 0) height = mix(height, bare, smootherstep(0.05, 0.5, summitCover) * smootherstep(SHELF, SUMMIT.bank, nearest.shoreDist));
     }
     let river = false;
     let lake = false;
@@ -571,7 +601,7 @@ export class WorldModel {
    */
   private relief(x: number, z: number) {
     // Highlands and Lakeland stay on their unwarped value-noise fields (#93 decisions).
-    const mountainRegion = smootherstep(0.04, 0.48, fbm(x / BIOME_SELECTION.reliefWavelength, z / BIOME_SELECTION.reliefWavelength, this.seed + 61, 3));
+    const mountainRegion = this.mountainRegion(x, z);
     const lakeField = clamp01(0.5 + fbm(x / BIOME_SELECTION.lakeWavelength, z / BIOME_SELECTION.lakeWavelength, this.seed + 131, 4));
     const { seaTemperature, moisture, region } = this.climate(x, z);
     // Temperature reads the height, and the lowland height reads the biome. One pass at
@@ -581,7 +611,9 @@ export class WorldModel {
     // Exclude the ground-only 520 m hills from selection too: otherwise their
     // cooling would change the broad profile height and feed hills back into drainage.
     const estimate = biomeWeights(mountainRegion, seaTemperature, moisture, region);
-    const mountains = this.massifTerm(warped.x, warped.z, estimate, mountainRegion) + this.summitTerm(x, z, estimate);
+    const summit = this.summitTerm(x, z, estimate);
+    const massif = this.massifTerm(warped.x, warped.z, estimate, mountainRegion);
+    const mountains = massif * (1 - SUMMIT.massifDrop * smootherstep(0.05, 0.5, summit.cover)) + summit.height;
     const temperature = seaTemperature - Math.max(0, this.lowlandTerm(warped.x, warped.z, estimate) + mountains) / CLIMATE.lapse;
     // Lakeland replaces appearance and basin water, not the accepted drainage
     // landform. Both allocations use the same biome rules; the landform
@@ -590,7 +622,7 @@ export class WorldModel {
     const biome = biomeWeights(mountainRegion, temperature, moisture, region, lakeField);
     const elevation = this.lowlandTerm(warped.x, warped.z, landform) + mountains;
     const hills = this.peatShelf(x, z, landform, this.lowlandHills(warped.x, warped.z, landform));
-    return { elevation, mountainRegion, biome, landform, hills, seaTemperature };
+    return { elevation, mountainRegion, biome, landform, hills, seaTemperature, summitCover: summit.cover };
   }
 
   /**
@@ -667,12 +699,76 @@ export class WorldModel {
     return landform.highlands * mountainRegion * ridge * MASSIF_LIFT;
   }
 
+  /** Highlands and Lakeland stay on this unwarped value-noise field (#93 decisions). */
+  private mountainRegion(x: number, z: number): number {
+    return smootherstep(0.04, 0.48, fbm(x / BIOME_SELECTION.reliefWavelength, z / BIOME_SELECTION.reliefWavelength, this.seed + 61, 3));
+  }
+
   /**
-   * #88 seam. Pyramid summits use barely warped coordinates, so this term receives
-   * the raw point rather than the 700 m landform warp. It is zero until #88.
+   * Pyramid summits, after fly-with-me `pyramidPeaks`, in barely warped coordinates.
+   * Each summit has three or four planar faces, so its ridges are sharp creases from
+   * the apex down. Neighbours join through a soft maximum, so two summits share a ridge.
+   * `cover` is the summit profile, 0 to 1, that lowers the massif beneath it.
    */
-  private summitTerm(_x: number, _z: number, _landform: BiomeWeights): number {
-    return 0;
+  private summitTerm(x: number, z: number, landform: BiomeWeights): { height: number; cover: number } {
+    if (landform.highlands === 0) return { height: 0, cover: 0 };
+    const px = x + SUMMIT.warp * gradientFbm(x / SUMMIT.warpWavelength + 1.3, z / SUMMIT.warpWavelength + 2.1, this.seed + 63, 2);
+    const pz = z + SUMMIT.warp * gradientFbm(x / SUMMIT.warpWavelength - 3.7, z / SUMMIT.warpWavelength + 0.4, this.seed + 67, 2);
+    const cx = Math.floor(px / SUMMIT.cell);
+    const cz = Math.floor(pz / SUMMIT.cell);
+    const reach = SUMMIT.radius * 1.5;
+    let height = 0;
+    let cover = 0;
+    for (let j = -1; j <= 1; j += 1) {
+      for (let i = -1; i <= 1; i += 1) {
+        const gx = cx + i;
+        const gz = cz + j;
+        const u = (k: number) => hash2(gx, gz, this.seed + 47 + k);
+        const dx = px - (gx + 0.25 + 0.5 * u(0)) * SUMMIT.cell;
+        const dz = pz - (gz + 0.25 + 0.5 * u(1)) * SUMMIT.cell;
+        const distance = Math.hypot(dx, dz);
+        if (distance >= reach || u(13) >= SUMMIT.odds) continue;
+        const lift = this.summitLift(gx, gz, u);
+        if (lift === 0) continue;
+        const faces = u(2) < 0.45 ? 3 : 4;
+        const spin = u(3) * Math.PI * 2;
+        const size = 0.55 + 0.45 * u(4);
+        let de = 0;
+        for (let face = 0; face < faces; face += 1) {
+          const angle = spin + (face + 0.3 * (u(5 + face) - 0.5)) * (Math.PI * 2 / faces);
+          const faceReach = SUMMIT.radius * (0.7 + 0.6 * u(9 + face)) * (0.6 + 0.4 * size);
+          de = Math.max(de, (dx * Math.cos(angle) + dz * Math.sin(angle)) / faceReach);
+        }
+        // fly-with-me cuts a candidate off at 1.5 radii, where a long crease can still
+        // stand tens of metres high. Fade it out first, so the ground has no step.
+        const profile = Math.max(0, 1 - de) ** SUMMIT.power * (1 - smootherstep(SUMMIT.radius, reach, distance));
+        const summit = profile * lift;
+        // fly-with-me's soft maximum adds a quarter of its width even between two bare
+        // feet, a step at the cut-off. Here it rises only where both summits stand.
+        const blend = Math.max(SUMMIT.blend - Math.abs(height - summit), 0) / SUMMIT.blend;
+        height = Math.max(height, summit) + blend * blend * SUMMIT.blend * 0.25 * clamp01(Math.min(height, summit) / SUMMIT.blend);
+        cover = Math.max(cover, profile);
+      }
+    }
+    return { height: height * landform.highlands, cover: cover * landform.highlands };
+  }
+
+  /**
+   * Lift for the summit in cell (gx, gz), or 0 outside a Highlands core. The lift brings
+   * the apex to about WORLD_TOP over the lowered massif and the lowland beneath it.
+   */
+  private summitLift(gx: number, gz: number, u: (k: number) => number): number {
+    const x = (gx + 0.25 + 0.5 * u(0)) * SUMMIT.cell;
+    const z = (gz + 0.25 + 0.5 * u(1)) * SUMMIT.cell;
+    const mountainRegion = this.mountainRegion(x, z);
+    if (mountainRegion < SUMMIT.core) return 0;
+    // A core is full Highlands, so the landform there is Highlands alone.
+    const landform: BiomeWeights = { hills: 0, woodland: 0, moor: 0, highlands: 1, lakeland: 0 };
+    const warped = warpLandform(x, z, this.seed);
+    const base = this.lowlandTerm(warped.x, warped.z, landform)
+      + this.massifTerm(warped.x, warped.z, landform, mountainRegion) * (1 - SUMMIT.massifDrop);
+    const top = SUMMIT.top + (u(14) - 0.5) * SUMMIT.topSpread;
+    return Math.max(SUMMIT.minLift, top - base);
   }
 
   /** Small dark pools on genuinely flat, high Moor tops, separate from drainage lakes. */
