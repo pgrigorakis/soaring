@@ -37,6 +37,7 @@ export class ThermalMarker {
         ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
         time: this.time,
         markerOpacity: { value: THERMAL_MARKER_OPACITY },
+        cloudWhiteout: { value: 0 },
       },
       fog: true,
       transparent: true,
@@ -65,6 +66,7 @@ export class ThermalMarker {
         #include <fog_pars_fragment>
         uniform float time;
         uniform float markerOpacity;
+        uniform float cloudWhiteout;
         varying vec2 vUv;
         varying float vFacing;
         varying float vActive;
@@ -82,7 +84,7 @@ export class ThermalMarker {
           float spark = near * 0.1 * pow(shimmer, 8.0);
           float base = mix(0.2, 0.05, near);
           float alpha = markerOpacity * vFade * rise * facing * (base + spark + near * 0.015 * shimmer);
-          alpha *= mix(0.72, 1.0, vActive);
+          alpha *= mix(0.72, 1.0, vActive) * (1.0 - cloudWhiteout);
           vec3 calm = vec3(1.0, 0.46, 0.05);
           vec3 hot = mix(vec3(1.0, 0.12, 0.0), vec3(1.0, 0.32, 0.02), shimmer * near);
           gl_FragColor = vec4(mix(calm, hot, vActive), alpha);
@@ -108,6 +110,10 @@ export class ThermalMarker {
     this.mesh.castShadow = false;
     this.mesh.receiveShadow = false;
     scene.add(this.mesh);
+  }
+
+  setWhiteout(amount: number): void {
+    this.mesh.material.uniforms.cloudWhiteout!.value = amount;
   }
 
   get count(): number {

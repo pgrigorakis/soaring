@@ -1,0 +1,70 @@
+
+Running 2 tests using 1 worker
+
+  ✘  1 tests/cloud-layer.smoke.ts:14:1 › cloud deck hides low ground above and whites out the chase bird inside (17.8s)
+  ✘  2 tests/cloud-layer.smoke.ts:97:1 › scheduled lowland flight crosses the cloud deck without collision-floor jumps (990ms)
+
+
+  1) tests/cloud-layer.smoke.ts:14:1 › cloud deck hides low ground above and whites out the chase bird inside 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: undefined
+
+      82 |   const above = shots[2]!.state as ReturnType<typeof window.__SOARING__.snapshot>;
+      83 |   const layer = (s: typeof below) => (s as typeof s & { cloudLayer?: { above: number; whiteout: number; opacity: number; visible: boolean } }).cloudLayer;
+    > 84 |   expect(layer(below)?.visible).toBe(false);
+         |                                 ^
+      85 |   expect(layer(inside)?.whiteout).toBeCloseTo(0.996, 5);
+      86 |   expect(layer(above)?.opacity).toBe(0.94);
+      87 |   const belowPixels = shots[0]!.pixels as { darkFraction: number; shadedFraction: number; variance: number };
+        at /Users/pgrigorakis/.treehouse/soaring-b45a19/9/soaring/tests/cloud-layer.smoke.ts:84:33
+
+    attachment #4: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/cloud-layer.smoke.ts-cloud-a3805-s-out-the-chase-bird-inside/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/cloud-layer.smoke.ts-cloud-a3805-s-out-the-chase-bird-inside/error-context.md
+
+    attachment #6: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/cloud-layer.smoke.ts-cloud-a3805-s-out-the-chase-bird-inside/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/cloud-layer.smoke.ts-cloud-a3805-s-out-the-chase-bird-inside/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) tests/cloud-layer.smoke.ts:97:1 › scheduled lowland flight crosses the cloud deck without collision-floor jumps 
+
+    Error: expect(received).toBeGreaterThan(expected)
+
+    Expected: > 761.5384615384614
+    Received:   389.8999999999889
+
+      131 |   const y = metrics.trace.map((point) => point.y as number);
+      132 |   expect(Math.min(...y)).toBeLessThan(430 * HEIGHT_SCALE);
+    > 133 |   expect(Math.max(...y)).toBeGreaterThan(660 * HEIGHT_SCALE);
+          |                          ^
+      134 |   expect(Math.max(...metrics.trace.filter((point) => (point.t as number) < 300).map((point) => point.y as number))).toBeGreaterThan(660 * HEIGHT_SCALE);
+      135 |   expect(Math.max(...metrics.trace.filter((point) => (point.t as number) > 500).map((point) => point.y as number))).toBeGreaterThan(660 * HEIGHT_SCALE);
+      136 |   expect(y.some((h) => Math.abs(h + 178 * 0.31 / 3 - 500 * HEIGHT_SCALE) < 5)).toBe(true);
+        at /Users/pgrigorakis/.treehouse/soaring-b45a19/9/soaring/tests/cloud-layer.smoke.ts:133:26
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/cloud-layer.smoke.ts-sched-40be8-thout-collision-floor-jumps/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/cloud-layer.smoke.ts-sched-40be8-thout-collision-floor-jumps/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/cloud-layer.smoke.ts-sched-40be8-thout-collision-floor-jumps/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/cloud-layer.smoke.ts-sched-40be8-thout-collision-floor-jumps/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2 failed
+    tests/cloud-layer.smoke.ts:14:1 › cloud deck hides low ground above and whites out the chase bird inside 
+    tests/cloud-layer.smoke.ts:97:1 › scheduled lowland flight crosses the cloud deck without collision-floor jumps 

@@ -94,6 +94,7 @@ export class PuffClouds {
   private readonly horizonColor = { value: new THREE.Color(0x8faeb8) };
   private readonly skyLight = { value: new THREE.Color(1, 1, 1) };
   private readonly lastEagle: { x: number; z: number };
+  private enabled = true;
   private readonly shown: PuffCloudPlacement[] = Array.from({ length: PUFF_CLOUD_COUNT }, () => ({ x: 0, y: 0, z: 0, opacity: 0 }));
 
   constructor(scene: THREE.Object3D, seed: number, origin: EaglePosition) {
@@ -103,7 +104,9 @@ export class PuffClouds {
       uniforms: {
         horizonColor: this.horizonColor,
         skyLight: this.skyLight,
-        puffOpacity: { value: 0.68 },
+        puffOpacity: { value: 0.8 },
+        cloudBodies: { value: 0 },
+        cloudWhiteout: { value: 0 },
       },
       transparent: true,
       depthWrite: false,
@@ -128,6 +131,8 @@ export class PuffClouds {
         uniform vec3 horizonColor;
         uniform vec3 skyLight;
         uniform float puffOpacity;
+        uniform float cloudBodies;
+        uniform float cloudWhiteout;
         varying vec3 vWorldNormal;
         varying float vViewDistance;
         varying float vPuffOpacity;
@@ -138,7 +143,9 @@ export class PuffClouds {
           float facingWhite = smoothstep(-0.65, 0.45, vWorldNormal.y);
           vec3 cloudFace = skyLight * mix(0.86, 1.0, vWhiteness);
           vec3 cloudColor = mix(horizonColor, cloudFace, facingWhite);
-          float alpha = puffOpacity * vPuffOpacity * distanceFade * closeFade;
+          // Inside the deck, whiteout hides puffs as it hides the ground and markers.
+          float alpha = puffOpacity * cloudBodies * (1.0 - cloudWhiteout) * vPuffOpacity * distanceFade * closeFade;
+          cloudColor = mix(cloudColor, horizonColor, cloudWhiteout);
           gl_FragColor = vec4(cloudColor, alpha);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
@@ -182,12 +189,16 @@ export class PuffClouds {
   }
 
   setVisible(visible: boolean): void {
-    this.mesh.visible = visible;
+    this.enabled = visible;
   }
 
-  update(eagle: EaglePosition, wind: Wind, delta: number, camera: EaglePosition, horizon: THREE.Color, skyLight: THREE.Color): void {
+  update(eagle: EaglePosition, wind: Wind, delta: number, camera: EaglePosition, horizon: THREE.Color, skyLight: THREE.Color,
+    bodies = 1, whiteout = 0): void {
     this.horizonColor.value.copy(horizon);
     this.skyLight.value.copy(skyLight);
+    this.mesh.material.uniforms.cloudBodies!.value = bodies;
+    this.mesh.material.uniforms.cloudWhiteout!.value = whiteout;
+    this.mesh.visible = this.enabled && bodies > 0.001;
     const birdDeltaX = eagle.x - this.lastEagle.x;
     const birdDeltaZ = eagle.z - this.lastEagle.z;
     for (let index = 0; index < this.puffs.length; index += 1) {
@@ -199,11 +210,11 @@ export class PuffClouds {
       const worldZ = eagle.z + puff.z;
       const worldY = puff.height;
       const cameraDistance = Math.hypot(camera.x - worldX, camera.y - worldY, camera.z - worldZ);
-      const closeScale = 0.46 + 0.54 * smoothstep(120, 500, cameraDistance);
-      puff.opacity = smoothstep(55, 175, cameraDistance) * (1 - smoothstep(2300, 2900, cameraDistance));
+      const closeScale = smoothstep(puff.width * 1.6, puff.width * 3.6, cameraDistance);
+      puff.opacity = bodies * smoothstep(55, 175, cameraDistance) * (1 - smoothstep(2300, 2900, cameraDistance));
       scratchPosition.set(worldX, worldY, worldZ);
       scratchRotation.setFromAxisAngle(worldUp, puff.turn);
-      scratchScale.setScalar(puff.width * closeScale);
+      scratchScale.set(puff.width * closeScale, puff.width * closeScale * 0.6, puff.width * closeScale);
       scratchMatrix.compose(scratchPosition, scratchRotation, scratchScale);
       this.mesh.setMatrixAt(index, scratchMatrix);
       const shown = this.shown[index]!;

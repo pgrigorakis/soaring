@@ -856,7 +856,8 @@ test('captures painted clouds from one seed and viewpoint across the day', async
   expect(dawn.cloudCoverage).toBeGreaterThan(noon.cloudCoverage + 0.3);
   expect(dusk.cloudCoverage).toBeGreaterThan(noon.cloudCoverage + 0.3);
   expect(night.cloudCoverage).toBeGreaterThan(noon.cloudCoverage + 0.3);
-  expect(captures.at(-1)!.cloudTime).toBeGreaterThan(captures[0]!.cloudTime);
+  // FWM cloud motion uses flight time and must stop on a held review flight.
+  expect(captures.at(-1)!.cloudTime).toBe(captures[0]!.cloudTime);
   for (const capture of captures) {
     expect(capture.position).toEqual(initial.position);
     expect(capture.heading).toBe(initial.heading);

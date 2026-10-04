@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ChunkBuffers } from './chunk-buffers';
-import { bindMistHeightFog, type MistUniforms } from './cloud-sea';
+import { bindCloudFog, type CloudFogUniforms } from './cloud-sea';
 import { InstancePool } from './instance-pool';
 import { WaterPool } from './water-pool';
 import { fbm, hash2, type LandscapeSample, type Tree, WorldModel } from './world';
@@ -515,9 +515,9 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     this.centerZ = Number.NaN;
   }
 
-  bindMist(uniforms: MistUniforms): void {
-    // Terrain and water carry the valley veil. Trees stay unfogged so a morning sheet does not tax every crown.
-    for (const material of [this.terrainMaterial, this.waterMaterial]) bindMistHeightFog(material, uniforms);
+  bindCloudFog(uniforms: CloudFogUniforms): void {
+    for (const material of [this.terrainMaterial, this.waterMaterial, this.trunkMaterial,
+      this.rockMaterial, this.hedgeMaterial, this.farFoliageMaterial, ...this.foliageMaterials]) bindCloudFog(material, uniforms);
   }
 
   dispose(): void {

@@ -39,14 +39,14 @@ test('a painted twilight gradient keeps the dusk sky lit and fades out without a
     schedule[elevation] = await page.evaluate(() => window.__SOARING__.snapshot().twilightAmount);
   }
 
-  // Hold the camera 900 m over the ground, pitched 20 degrees up, toward or away from the sun.
+  // Hold the camera below the cloud deck gates, pitched 20 degrees up, toward or away from the sun.
   async function view(name: string, elevation: number, side: 1 | -1) {
     const frame = await page.evaluate(({ phase, side }) => {
       const api = window.__SOARING__;
       api.setTimeOfDay(phase);
       const sun = api.snapshot().sunDirection;
       const flat = Math.hypot(sun[0]!, sun[2]!);
-      const y = api.sample(0, 0).height + 900;
+      const y = 360;
       const pitch = 20 * Math.PI / 180;
       api.setViewpoint({ x: 0, y, z: 0,
         lookX: side * sun[0]! / flat * Math.cos(pitch) * 1000, lookY: y + Math.sin(pitch) * 1000, lookZ: side * sun[2]! / flat * Math.cos(pitch) * 1000 });

@@ -57,7 +57,8 @@ test('the moon glows with a face and stars appear with the afterglow', async ({ 
   await page.goto('/?smoke&profile');
   await page.evaluate(() => {
     const api = window.__SOARING__;
-    api.reviewFlight!({ x: 0, z: 0, heading: 0 });
+    // Hold the camera below the cloud deck gates, so the clear-sky rules are measured.
+    api.reviewFlight!({ x: 0, y: 360, z: 0, heading: 0 });
     api.setCapturePixelRatio(1);
     api.setPuffCloudsVisible(false);
     // Clear painted clouds so the disc, halo and stars are measured, not cloud cover.

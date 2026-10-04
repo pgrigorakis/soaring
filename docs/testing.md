@@ -28,14 +28,14 @@ The development-only `?smoke` URL loads the real scene, shaders, terrain budgets
 
 Terrain streaming uses a 4 ms CPU budget per update, or 2 ms in Low power. Partial builds remain invisible. Diagnostics report maximum step/update time and allocated/reused buffer pairs. Coverage checks hold their camera pose so a slow software renderer does not add work faster than this budget can drain it. `playwright.chunk-ci.config.ts` reproduces one-worker SwiftShader rendering on a private port.
 
-Development builds also expose `reviewFlight({ x, z, heading })` to freeze navigation at a repeatable start with the default chase camera. Call `reviewFlight(null)` to resume flight. Use `window.__SOARING__.setTimeScale(n)` in the browser console for accelerated resource and stability checks. The scale is capped at 12×; simulation advances in bounded 0.1-second steps, and slow rendering can reduce effective simulation speed.
+Development builds also expose `reviewFlight({ x, y?, z, heading })` to freeze navigation at a repeatable start with the default chase camera. Call `reviewFlight(null)` to resume flight. Use `window.__SOARING__.setTimeScale(n)` in the browser console for accelerated resource and stability checks. The scale is capped at 12×; simulation advances in bounded 0.1-second steps, and slow rendering can reduce effective simulation speed.
 
 Relevant browser checks include:
 
 - `tests/app.smoke.ts` checks rendering, streaming, controls, and app behavior.
 - `tests/highlands.smoke.ts` records a one-hour Highlands flight with terrain clearance, climb limits, and behavior-duration checks. Total flap time is recorded, not limited.
 - `tests/highlands-cover.smoke.ts` captures noon and golden-hour snow cover from the default chase camera.
-- `tests/cloud-sea.smoke.ts` captures morning mist over a lake at dawn, during its fade, and after it, plus the same times over dry ground.
+- `tests/cloud-layer.smoke.ts` captures matched below/inside/above views from the default chase camera, checks rendered whiteout, and records a safe opening and scheduled crossing. Evidence and baseline failure proof live in `evidence/fwm-cloud-layer/`.
 - `tests/continental.smoke.ts` checks hashed continental fields, common sea level, height independent of biome profiles, continuous shelves, and dry trees/thermals. It writes repeatable JSON evidence.
 - `tests/lakeland.smoke.ts` checks signed water depths on actual terrain triangles and shared water edges across mesh tiers. Run `node scripts/calibrate-lakeland.mjs` to measure biome territory, or `node scripts/audit-lakeland.mjs` to record a repeatable one-hour sea-level navigation trace. The [earlier Lakeland measurements](diagnostics/issue-59-lakeland.md) describe the retired drainage lakes.
 - `tests/biomes.smoke.ts` checks deterministic biome samples and shared mesh edges. Its `biome-parity.json` artifact excludes timing and app animation state, so exact samples, ground RGB, mesh hashes, and tree placement/tints can be compared between builds. See [data-driven profiles](design/biome-profiles.md). `tests/climate.smoke.ts` checks climate selection, altitude cooling, snow and the tree line. See [current biome measurements and captures](diagnostics/issue-93-biomes/README.md) and the [earlier span decision](diagnostics/issue-58-biome-spans.md).
