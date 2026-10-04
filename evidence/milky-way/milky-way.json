@@ -1,0 +1,54 @@
+{
+  "onBand": {
+    "elevation": 32.73719575089709,
+    "azimuth": 2.1547512805236964
+  },
+  "offBand": {
+    "elevation": 32.73719575089709,
+    "azimuth": 50.85616386664368
+  },
+  "dark": {
+    "name": "dark",
+    "sunElevation": -0.788010753606722,
+    "moonElevation": -0.7771551281722477,
+    "moonLit": 0.009607359798384785,
+    "milkyWayAmount": 1,
+    "auroraAmount": 1,
+    "band": 22.885734290616657,
+    "beside": 15.618377782746657,
+    "contrast": 7.26735650787
+  },
+  "deepDusk": {
+    "name": "dusk-18",
+    "sunElevation": -0.3090169943749469,
+    "moonElevation": -0.27274421778341085,
+    "moonLit": 0.00048796709429366203,
+    "milkyWayAmount": 1,
+    "auroraAmount": 0.2990357566424147,
+    "band": 22.885734290616657,
+    "beside": 15.618377782746657,
+    "contrast": 7.26735650787
+  },
+  "dusk": {
+    "name": "dusk-6",
+    "sunElevation": -0.10452846326765423,
+    "moonElevation": -0.09154933402875937,
+    "moonLit": 0.00005223782744800953,
+    "milkyWayAmount": 0.0015148071915626708,
+    "auroraAmount": 0,
+    "band": 36.793501030175946,
+    "beside": 36.557589114063205,
+    "contrast": 0.23591191611274098
+  },
+  "fullMoon": {
+    "name": "full-moon",
+    "sunElevation": -0.788010753606722,
+    "moonElevation": 0.7771551281722477,
+    "moonLit": 0.9903926402016152,
+    "milkyWayAmount": 1,
+    "auroraAmount": 0,
+    "band": 16.027128779917305,
+    "beside": 15.520571845061818,
+    "contrast": 0.506556934855487
+  }
+}

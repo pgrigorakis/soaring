@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
 import { Sky } from 'three/addons/objects/Sky.js';
+import { milkyWayComposite, milkyWayDeclarations, milkyWayFunctions, milkyWayUniforms } from './milky-way';
 import './style.css';
 import { Soundscape } from './audio';
 import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS, normalizeFlightHeight } from './eagle';
@@ -168,6 +169,7 @@ sky.material.uniforms.twilightUpper = { value: new THREE.Color() };
 sky.material.uniforms.twilightUpperWarm = { value: new THREE.Color() };
 sky.material.uniforms.twilightHorizon = { value: new THREE.Color() };
 sky.material.uniforms.twilightHorizonWarm = { value: new THREE.Color() };
+Object.assign(sky.material.uniforms, milkyWayUniforms);
 sky.material.fragmentShader = sky.material.fragmentShader
   .replace(
     'uniform float mieDirectionalG;',
@@ -321,7 +323,10 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			float deckHorizon = 1.0 - smoothstep(0.0, 0.32, direction.y);
 			retColor = mix(retColor, deckWhite, cloudAbove * 0.4 * deckHorizon);
 			retColor = mix(retColor, deckWhite, cloudWhiteout * mix(1.0, 0.82, zenith));`,
-  );
+  )
+  .replace('uniform float mieDirectionalG;', `uniform float mieDirectionalG;\n${milkyWayDeclarations}`)
+  .replace('void main() {', `${milkyWayFunctions}\n\t\tvoid main() {`)
+  .replace('retColor += vec3(0.82, 0.88, 1.0) * stars * starAmount;', `retColor += vec3(0.82, 0.88, 1.0) * stars * starAmount;${milkyWayComposite}`);
 scene.add(sky);
 
 // three.js always renders offscreen targets with NoToneMapping, so reproduce the on-screen Neutral curve here.
@@ -350,10 +355,11 @@ function neutralToneMap(color: THREE.Color, exposure: number): THREE.Color {
 const fogProbeScene = new THREE.Scene();
 // Probe ordinary air only. Apply the live cloud gate after readback, so crossing
 // the deck cannot feed an already-whitened horizon back into the night palette.
+// Leave out the Milky Way too, so its low core never tints the fog.
 const fogProbeMaterial = new THREE.ShaderMaterial({
   vertexShader: sky.material.vertexShader, fragmentShader: sky.material.fragmentShader,
   side: sky.material.side,
-  uniforms: { ...sky.material.uniforms, cloudAbove: { value: 0 }, cloudWhiteout: { value: 0 } },
+  uniforms: { ...sky.material.uniforms, cloudAbove: { value: 0 }, cloudWhiteout: { value: 0 }, milkyWayAmount: { value: 0 } },
 });
 const fogProbe = new THREE.Mesh(sky.geometry, fogProbeMaterial);
 fogProbeScene.add(fogProbe);
@@ -964,6 +970,9 @@ function applyDaylight(body: Daylight, delta: number): void {
   // Stars fade in from about -2 degrees and are full by -6 degrees, while the afterglow is still bright.
   sky.material.uniforms.starAmount!.value = smooth01(-0.035, -0.105, body.sun.y)
     * (1 - cloudSea.fogUniforms.whiteout.value);
+  // The Milky Way needs a darker sky: it starts near -6 degrees and is full by -17 degrees.
+  sky.material.uniforms.milkyWayAmount!.value = smooth01(-0.1, -0.3, body.sun.y)
+    * (1 - cloudSea.fogUniforms.whiteout.value);
   sky.material.uniforms.auroraAmount!.value = auroraAmount(body,
     auroraSchedule.hasAurora(nightCycle(skySeconds)));
   // Keep the sky box around the camera. The sun uniform is a direction, so moving the mesh
@@ -1186,7 +1195,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; ground: string; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; moonLit: number; moonIntensity: number; dominant: 'sun' | 'moon'; starAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; cloudLayer: ReturnType<CloudSea['snapshot']> };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; ground: string; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; moonLit: number; moonIntensity: number; dominant: 'sun' | 'moon'; starAmount: number; milkyWayAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; cloudLayer: ReturnType<CloudSea['snapshot']> };
       puffCloudSnapshot: () => PuffCloudSnapshot;
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
@@ -1292,6 +1301,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       moonIntensity: body.moonIntensity,
       dominant: body.dominant,
       starAmount: sky.material.uniforms.starAmount!.value,
+      milkyWayAmount: sky.material.uniforms.milkyWayAmount!.value,
       twilightAmount: sky.material.uniforms.twilightAmount!.value,
       auroraAmount: auroraAmount(body, auroraSchedule.hasAurora(nightCycle(skySeconds))),
       exposure: renderer.toneMappingExposure,
