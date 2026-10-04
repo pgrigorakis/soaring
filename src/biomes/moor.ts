@@ -2,16 +2,16 @@ import { Color } from 'three';
 import { colors, DEFAULT_CROWNS } from './shared';
 import type { ClimateBiomeProfile } from './types';
 
-const palette = [0x8a5a8c, 0xb06fa6, 0xb0763a, 0xa6a25a];
+const palette = [0xa6849a, 0x93a76c, 0xa4b37f, 0xbfa35a];
 const ground = colors(palette);
-const gorse = new Color(0xe1b93a);
+const gorse = new Color(0xd2b149);
 
 export const moor: ClimateBiomeProfile = {
   selection: 'climate', climate: [0.24, 0.4, 0.4],
   forestDensity: 0.02,
   forest(_, weight) { return weight * this.forestDensity; },
   treeDensity: 1, treeChance: ({ moorGrove }, weight) => weight * (0.004 + moorGrove * 0.3),
-  crownScale: 0.85, rockBias: 0.12, localRock: 0.7, rockTint: 0x857e72,
+  crownScale: 0.85, rockBias: 0.12, localRock: 0.7, rockTint: 0x899b98,
   palette,
   ground: ({ sample }, target) => {
     const patch = sample.moorPatch * 3;

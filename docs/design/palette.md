@@ -1,108 +1,111 @@
 # Palette
 
-These hex values are the source of truth for the colour pass and the biome work. The board images in `boards/` are flat 2D mood references: implement these values, never colours sampled from the PNGs.
+This file is the source of truth for Soaring's current terrain and foliage colours. Values are sRGB hex. The code keeps them in the biome profiles in `src/biomes/` and in `src/terrain.ts`. The review images are evidence, not colour values to sample. See [the Matched palette captures](biome-palette-evidence/README.md).
 
-All values are sRGB hex, the same convention `THREE.Color` already uses in `src/terrain.ts` and `src/main.ts`.
+## Matched V2 rule
 
-## Colour pass
+The Matched (V2) ground palette starts from the closest Fly-with-me (FWM) swatch. Convert that swatch to sRGB HSL, keep its hue, add `0.12` to saturation and `0.06` to lightness, then convert back to sRGB hex.
 
-Today's terrain and lighting colours, and what they become. Board: `boards/00-colour-pass.png`.
+Every V2 terrain and foliage swatch must stay inside FWM's sRGB HSL envelope:
 
-| Target | Location (today) | Now | New |
-| --- | --- | --- | --- |
-| Meadow, moist | terrain.ts:281 | `#718258` | `#6FA03C` |
-| Meadow, dry | terrain.ts:281 | `#8C925F` | `#B3B04A` |
-| Forest floor | terrain.ts:280 | `#456345` | `#2F6B3A` |
-| River bed | terrain.ts:278 | `#586957` | `#2F6E6A` |
-| Rock ground | terrain.ts:279 | `#77766C` | `#8A8174` |
-| Rock, high | terrain.ts:279 | `#8A8374` | `#AFA28A` |
-| Water surface | terrain.ts:40 | `#477D8B` | `#2A8FA8` |
-| Trunks | terrain.ts:48 | `#584634` | `#6B4A2E` |
-| Canopy, dark | terrain.ts:50 | `#31563B` | `#1F5A34` |
-| Canopy, mid | terrain.ts:51 | `#426846` | `#2E7A3E` |
-| Canopy, light | terrain.ts:52 | `#56734A` | `#5C9443` |
-| Boulders | terrain.ts:54 | `#77776D` | `#857E72` |
-| Hemisphere sky | main.ts:89 | `#D9E6E1` | `#CFE3F0` |
-| Hemisphere ground | main.ts:89 | `#596448` | `#5E7A3A` |
+- Saturation: at most `0.62`.
+- Lightness: `0.18` to `0.93`, inclusive.
 
-Renderer settings that go with it:
+Apply the envelope after the V2 lift. Rock and stone use a smaller saturation lift of `0.02`, because a larger lift makes grey rock look khaki. The Moor heather starts from its V2 value `#a28895`; golden-hour captures showed that swatch was too muted, so its saturation gets a further `0.05` lift to `#a6849a`. The heather remains inside the envelope. Flower flecks use the report's envelope-safe values instead of the lift formula.
 
-| Setting | Location (today) | Now | New |
-| --- | --- | --- | --- |
-| Tone mapping | main.ts:82 | `ACESFilmicToneMapping` | `NeutralToneMapping` |
-| Exposure | main.ts:83 | 1.08 | 1.00 |
-| Haze tone map | main.ts:178, `sampleHorizonColor()` | hand-written ACES | matching Neutral function |
-| Per-vertex jitter | terrain.ts:282 | lightness ±2.75% | hue ±1.5%, saturation ±6%, lightness ±3% |
+The envelope applies to V2 terrain and foliage hex values, including the listed flower accents. Unchanged water, lighting and trunk colours do not use this cap. Existing terrain vertex jitter remains unchanged: hue ±1.5%, saturation ±6%, and lightness ±3%. Jitter can move an individual vertex slightly outside the envelope.
 
-The noon haze on the board (`#8FAEB8` → `#9CC3DA`) is the expected result of these changes, not a constant to set: the haze is sampled from the sky every 0.35 s.
+## Biome ground palettes
 
-Water surface `#2A8FA8` is the vertex tint, not the full rendered colour. The shared water shader mixes 65% depth colour with 35% of that tint on every water surface. Depth colour runs from shallow `#78B4A3` to deep `#2B6C73` between 0.7 m and 3.2 m. Before that mix, sea-level water in a mountain region tints the vertex colour toward `#2A7FA0` by Highlands weight, and toward the same shallow/deep pair between 2 m and 18 m by Lakeland weight. The former peat-water tint `#2E4A4A` is retired with elevated peat pools. Sun and moon glint colours are in the Lakeland table and apply to all water.
+### Hills
 
-The time-of-day strip on the colour-pass board is illustrative. The real sky comes from the Preetham `Sky` addon and the day cycle in `src/main.ts`.
-
-## Biome palettes
-
-Each biome's terrain colour is a weighted blend of its palette (see the biome weight system issue). Boards: `boards/biome-0*.png`.
-
-### Rolling Hills (`boards/biome-01-rolling-hills.png`)
-
-| Role | Hex |
+| Role | sRGB hex |
 | --- | --- |
-| Meadow | `#6FA03C` |
-| Fresh pasture | `#86B83F` |
-| Hay field | `#B3B04A` |
-| Hedgerow | `#2E6B34` |
-| Chalk track | `#E3D9B8` |
-| Buttercup fleck | `#E6C43A` |
-| Poppy fleck (sparse) | `#D2553F` |
+| Meadow | `#8cc74a` |
+| Fresh pasture | `#afcc71` |
+| Hay field | `#b0be5e` |
 
-### Woodland (`boards/biome-02-woodland.png`)
+### Woodland
 
-| Role | Hex |
+Ground colours and foliage tints are separate. In `src/biomes/woodland.ts`, `palette` holds the ground colours in this order, and `crowns.species` holds the three Woodland broadleaf crown shades.
+
+| Role | sRGB hex |
 | --- | --- |
-| Canopy, deep | `#1F5A34` |
-| Canopy, mid | `#2E7A3E` |
-| Canopy, sunlit | `#5C9443` |
-| Birch | `#9DBF4E` |
-| Glade grass | `#7FAE45` |
-| Autumn accent | `#C9772E` |
-| Autumn gold (sparse) | `#D9A441` |
+| Deep ground | `#579b3b` |
+| Sunlit ground | `#6dad3f` |
+| Glade grass | `#8cc74a` |
 
-### Lakeland (`boards/biome-03-lakeland.png`)
+### Moor
 
-| Role | Hex |
+Sage is the dominant ground look. Heather remains a localized patch accent, with sage and pale sage through the central patch range.
+
+| Role | sRGB hex |
 | --- | --- |
-| Deep water | `#2B6C73` |
-| Shallows | `#78B4A3` |
-| Beach | `#E3CD8B` |
-| Reeds | `#9FB65A` |
-| Lake cliff | `#8A8174` |
-| Sun glint | `#FFF1C2` |
-| Moon glint | `#DDE7F0` |
+| Heather patch | `#a6849a` |
+| Moor sage | `#93a76c` |
+| Pale sage | `#a4b37f` |
+| Bracken | `#bfa35a` |
 
-### Highlands (`boards/biome-04-highlands.png`)
+### Highlands
 
-| Role | Hex |
+| Role | sRGB hex |
 | --- | --- |
-| Granite, shade | `#6E685E` |
-| Granite, sunlit | `#AFA28A` |
-| Snow cap | `#F2F4F7` |
-| Snow shadow | `#B9CDE3` |
-| Scree | `#9A9489` |
-| Valley meadow | `#7DA548` |
-| Conifer | `#1E4E3A` |
-| Cirque lake | `#2A7FA0` |
+| Valley meadow | `#8cc74a` |
+| Conifer ground | `#2c6b49` |
+| Granite, shade | `#828070` |
+| Granite, sunlit | `#9aa188` |
+| Scree | `#9ea59a` |
+| Snow | `#e4e9d1` |
 
-Snow shadow is the look to aim for on shaded snow; it should come from the hemisphere sky light on `#F2F4F7`, not from painting faces blue.
+Snow remains a warm white. Lighting provides the blue shade on snow; terrain does not paint blue faces.
 
-### Heath & Moorland (`boards/biome-05-heath-moorland.png`)
+### Lakeland
 
-| Role | Hex |
+| Role | sRGB hex |
 | --- | --- |
-| Heather | `#8A5A8C` |
-| Heather bloom | `#B06FA6` |
-| Bracken | `#B0763A` |
-| Moor grass | `#A6A25A` |
-| Gorse | `#E1B93A` |
-| Peat pool | `#2E4A4A` |
-| Tor granite | `#857E72` |
+| Meadow | `#8cc74a` |
+| Shore forest ground | `#579b3b` |
+| Beach | `#d8ce91` |
+| Reeds | `#b0be5e` |
+| Lake cliff | `#9aa188` |
+
+## Shared terrain and foliage colours
+
+| Role | sRGB hex | Use |
+| --- | --- | --- |
+| Hedgerow ground and shrubs | `#518628` | Hills hedges, hill tree tinting, broadleaf fallback and hedge material |
+| Woodland crown, dark | `#316e30` | Woodland crown tint selection |
+| Woodland crown, mid | `#53973e` | Woodland crown tint selection |
+| Woodland crown, light | `#8dbd6a` | Woodland crown tint selection |
+| Conifer crown | `#2c6b49` | Conifers, including Highlands |
+| Birch crown | `#9bc558` | Birch trees |
+| Autumn crown | `#c88a3a` | Common autumn tint |
+| Autumn gold crown | `#d1a249` | Sparse autumn tint |
+| Buttercup fleck | `#d3b84d` | Hills and glades |
+| Poppy fleck | `#d05741` | Hills and glades |
+| Gorse fleck | `#d2b149` | Moor |
+| Heather glade fleck | `#a6849a` | Woodland glades |
+| Granite ground and boulders | `#899b98` | Lowland rock blend, boulders and tors |
+
+## Unchanged water, tree and lighting colours
+
+Water depth colours and the rest of the renderer stay unchanged in this palette pass. Water's on-screen difference from FWM needs a shader change, not a palette change.
+
+The water vertex tint is not the full rendered colour. The shared water shader mixes 65% depth colour with 35% of that tint on every water surface. Depth colour runs from shallow to deep between 0.7 m and 3.2 m. Before that mix, sea-level water in a mountain region tints the vertex colour toward the Highlands water tint by Highlands weight. Lakeland water tints toward the same shallow and deep pair between 2 m and 18 m by Lakeland weight.
+
+The former peat-water tint `#2e4a4a` is retired with elevated peat pools. The ground under sea-level water keeps its dark teal, because the water surface is 78% opaque. A light bed shows through and exposes terrain tile edges in far water.
+
+| Role | sRGB hex |
+| --- | --- |
+| Shallow water | `#78b4a3` |
+| Deep water | `#2b6c73` |
+| Water bed | `#2f6e6a` |
+| Water vertex tint | `#2a8fa8` |
+| Highlands water tint | `#2a7fa0` |
+| Sun glint | `#fff1c2` |
+| Moon glint | `#dde7f0` |
+| Tree trunks | `#6b4a2e` |
+| Hemisphere sky | `#cfe3f0` |
+| Hemisphere ground | `#5e7a3a` |
+
+This palette pass does not change tone mapping or exposure in `src/main.ts`, and it adds no colour grade. This keeps palette changes local to ground, rock and foliage.

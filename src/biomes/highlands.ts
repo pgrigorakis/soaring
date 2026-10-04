@@ -3,7 +3,7 @@ import { CLIMATE_LINES } from './climate';
 import { colors, DEFAULT_CROWNS } from './shared';
 import type { BiomeProfile } from './types';
 
-const palette = [0x7da548, 0x1e4e3a, 0x6e685e, 0xafa28a, 0x9a9489, 0xf2f4f7];
+const palette = [0x8cc74a, 0x2c6b49, 0x828070, 0x9aa188, 0x9ea59a, 0xe4e9d1];
 const ground = colors(palette);
 const water = new Color(0x2a7fa0);
 
@@ -23,7 +23,7 @@ export const highlands: BiomeProfile = {
     const snow = weight > 0 ? snowCover(sample, slope, x, z, seed) / weight : 0;
     return target.lerp(ground[5]!, snow);
   },
-  crowns: { ...DEFAULT_CROWNS, fixed: 0x1e4e3a }, species: [1, 0, 0], canopySuppress: 0,
+  crowns: { ...DEFAULT_CROWNS, fixed: 0x2c6b49 }, species: [1, 0, 0], canopySuppress: 0,
   waterTint: (_, target) => target.copy(water),
   thermalOdds: 1, scenicBonus: 0, gladeEdgeScenic: 0, torScenic: 0,
   audio: { order: 3, beat: 0.50, register: 0, mood: 'modal', filter: 'highpass', cutoff: 1250, reverb: true,

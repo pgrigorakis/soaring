@@ -2,11 +2,11 @@ import { Color, MathUtils } from 'three';
 import { colors, DEFAULT_CROWNS } from './shared';
 import type { BiomeProfile } from './types';
 
-const palette = [0x6fa03c, 0x2f6b3a];
+const palette = [0x8cc74a, 0x579b3b];
 const ground = colors(palette);
-const beach = new Color(0xe3cd8b);
-const reeds = new Color(0x9fb65a);
-const cliff = new Color(0x8a8174);
+const beach = new Color(0xd8ce91);
+const reeds = new Color(0xb0be5e);
+const cliff = new Color(0x9aa188);
 const shallowWater = new Color(0x78b4a3);
 const deepWater = new Color(0x2b6c73);
 

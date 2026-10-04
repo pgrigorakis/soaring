@@ -3,7 +3,7 @@ import type { CrownTints } from './types';
 
 export const colors = (palette: readonly number[]) => palette.map((hex) => new Color(hex));
 export const DEFAULT_CROWNS: CrownTints = {
-  species: [[0x1f5a34], [0x2e7a3e], [0x9dbf4e]],
+  species: [[0x2c6b49], [0x518628], [0x9bc558]],
   autumnOdds: 0,
-  autumn: [0xd9a441, 0xc9772e],
+  autumn: [0xd1a249, 0xc88a3a],
 };

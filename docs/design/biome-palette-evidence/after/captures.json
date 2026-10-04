@@ -1,0 +1,725 @@
+{
+  "stage": "after",
+  "commit": "bb69148106ecc3e306a3f9e155933d602d7f23e1",
+  "sourceChanges": "",
+  "origin": "http://127.0.0.1:4468",
+  "seed": 5,
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "visibility": 5000,
+  "phases": [
+    {
+      "name": "noon",
+      "phase": 0.5
+    },
+    {
+      "name": "golden-hour",
+      "phase": 0.72
+    },
+    {
+      "name": "dusk",
+      "phase": 0.75
+    },
+    {
+      "name": "moonlight",
+      "phase": 0
+    }
+  ],
+  "vantages": [
+    {
+      "name": "hills",
+      "x": -6950,
+      "z": -1000,
+      "heading": 0
+    },
+    {
+      "name": "woodland",
+      "x": 8500,
+      "z": -6500,
+      "heading": 0
+    },
+    {
+      "name": "moor",
+      "x": -6000,
+      "z": 4000,
+      "heading": 0
+    },
+    {
+      "name": "highlands",
+      "x": 4250,
+      "z": 1000,
+      "heading": 0
+    },
+    {
+      "name": "lakeland",
+      "x": -11000,
+      "z": 500,
+      "heading": 0
+    }
+  ],
+  "captures": {
+    "hills-noon": {
+      "file": "docs/design/biome-palette-evidence/after/hills-noon.png",
+      "vantage": {
+        "name": "hills",
+        "x": -6950,
+        "z": -1000,
+        "heading": 0
+      },
+      "phase": {
+        "name": "noon",
+        "phase": 0.5
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -6950,
+          221.24255537567254,
+          -1000
+        ],
+        "pending": 0,
+        "chunks": 601,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.5
+      }
+    },
+    "hills-golden-hour": {
+      "file": "docs/design/biome-palette-evidence/after/hills-golden-hour.png",
+      "vantage": {
+        "name": "hills",
+        "x": -6950,
+        "z": -1000,
+        "heading": 0
+      },
+      "phase": {
+        "name": "golden-hour",
+        "phase": 0.72
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -6950,
+          221.24255537567254,
+          -1000
+        ],
+        "pending": 0,
+        "chunks": 601,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.72
+      }
+    },
+    "hills-dusk": {
+      "file": "docs/design/biome-palette-evidence/after/hills-dusk.png",
+      "vantage": {
+        "name": "hills",
+        "x": -6950,
+        "z": -1000,
+        "heading": 0
+      },
+      "phase": {
+        "name": "dusk",
+        "phase": 0.75
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -6950,
+          221.24255537567254,
+          -1000
+        ],
+        "pending": 0,
+        "chunks": 601,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.75
+      }
+    },
+    "hills-moonlight": {
+      "file": "docs/design/biome-palette-evidence/after/hills-moonlight.png",
+      "vantage": {
+        "name": "hills",
+        "x": -6950,
+        "z": -1000,
+        "heading": 0
+      },
+      "phase": {
+        "name": "moonlight",
+        "phase": 0
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -6950,
+          221.24255537567254,
+          -1000
+        ],
+        "pending": 0,
+        "chunks": 601,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0
+      }
+    },
+    "woodland-noon": {
+      "file": "docs/design/biome-palette-evidence/after/woodland-noon.png",
+      "vantage": {
+        "name": "woodland",
+        "x": 8500,
+        "z": -6500,
+        "heading": 0
+      },
+      "phase": {
+        "name": "noon",
+        "phase": 0.5
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          8500,
+          128.34442179613742,
+          -6500
+        ],
+        "pending": 0,
+        "chunks": 598,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.5
+      }
+    },
+    "woodland-golden-hour": {
+      "file": "docs/design/biome-palette-evidence/after/woodland-golden-hour.png",
+      "vantage": {
+        "name": "woodland",
+        "x": 8500,
+        "z": -6500,
+        "heading": 0
+      },
+      "phase": {
+        "name": "golden-hour",
+        "phase": 0.72
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          8500,
+          128.34442179613742,
+          -6500
+        ],
+        "pending": 0,
+        "chunks": 598,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.72
+      }
+    },
+    "woodland-dusk": {
+      "file": "docs/design/biome-palette-evidence/after/woodland-dusk.png",
+      "vantage": {
+        "name": "woodland",
+        "x": 8500,
+        "z": -6500,
+        "heading": 0
+      },
+      "phase": {
+        "name": "dusk",
+        "phase": 0.75
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          8500,
+          128.34442179613742,
+          -6500
+        ],
+        "pending": 0,
+        "chunks": 598,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.75
+      }
+    },
+    "woodland-moonlight": {
+      "file": "docs/design/biome-palette-evidence/after/woodland-moonlight.png",
+      "vantage": {
+        "name": "woodland",
+        "x": 8500,
+        "z": -6500,
+        "heading": 0
+      },
+      "phase": {
+        "name": "moonlight",
+        "phase": 0
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          8500,
+          128.34442179613742,
+          -6500
+        ],
+        "pending": 0,
+        "chunks": 598,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0
+      }
+    },
+    "moor-noon": {
+      "file": "docs/design/biome-palette-evidence/after/moor-noon.png",
+      "vantage": {
+        "name": "moor",
+        "x": -6000,
+        "z": 4000,
+        "heading": 0
+      },
+      "phase": {
+        "name": "noon",
+        "phase": 0.5
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -6000,
+          219.99731018553115,
+          4000
+        ],
+        "pending": 0,
+        "chunks": 599,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.5
+      }
+    },
+    "moor-golden-hour": {
+      "file": "docs/design/biome-palette-evidence/after/moor-golden-hour.png",
+      "vantage": {
+        "name": "moor",
+        "x": -6000,
+        "z": 4000,
+        "heading": 0
+      },
+      "phase": {
+        "name": "golden-hour",
+        "phase": 0.72
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -6000,
+          219.99731018553115,
+          4000
+        ],
+        "pending": 0,
+        "chunks": 599,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.72
+      }
+    },
+    "moor-dusk": {
+      "file": "docs/design/biome-palette-evidence/after/moor-dusk.png",
+      "vantage": {
+        "name": "moor",
+        "x": -6000,
+        "z": 4000,
+        "heading": 0
+      },
+      "phase": {
+        "name": "dusk",
+        "phase": 0.75
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -6000,
+          219.99731018553115,
+          4000
+        ],
+        "pending": 0,
+        "chunks": 599,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.75
+      }
+    },
+    "moor-moonlight": {
+      "file": "docs/design/biome-palette-evidence/after/moor-moonlight.png",
+      "vantage": {
+        "name": "moor",
+        "x": -6000,
+        "z": 4000,
+        "heading": 0
+      },
+      "phase": {
+        "name": "moonlight",
+        "phase": 0
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -6000,
+          219.99731018553115,
+          4000
+        ],
+        "pending": 0,
+        "chunks": 599,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0
+      }
+    },
+    "highlands-noon": {
+      "file": "docs/design/biome-palette-evidence/after/highlands-noon.png",
+      "vantage": {
+        "name": "highlands",
+        "x": 4250,
+        "z": 1000,
+        "heading": 0
+      },
+      "phase": {
+        "name": "noon",
+        "phase": 0.5
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          4250,
+          506.40747075009926,
+          1000
+        ],
+        "pending": 0,
+        "chunks": 600,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.5
+      }
+    },
+    "highlands-golden-hour": {
+      "file": "docs/design/biome-palette-evidence/after/highlands-golden-hour.png",
+      "vantage": {
+        "name": "highlands",
+        "x": 4250,
+        "z": 1000,
+        "heading": 0
+      },
+      "phase": {
+        "name": "golden-hour",
+        "phase": 0.72
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          4250,
+          506.40747075009926,
+          1000
+        ],
+        "pending": 0,
+        "chunks": 600,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.72
+      }
+    },
+    "highlands-dusk": {
+      "file": "docs/design/biome-palette-evidence/after/highlands-dusk.png",
+      "vantage": {
+        "name": "highlands",
+        "x": 4250,
+        "z": 1000,
+        "heading": 0
+      },
+      "phase": {
+        "name": "dusk",
+        "phase": 0.75
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          4250,
+          506.40747075009926,
+          1000
+        ],
+        "pending": 0,
+        "chunks": 600,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.75
+      }
+    },
+    "highlands-moonlight": {
+      "file": "docs/design/biome-palette-evidence/after/highlands-moonlight.png",
+      "vantage": {
+        "name": "highlands",
+        "x": 4250,
+        "z": 1000,
+        "heading": 0
+      },
+      "phase": {
+        "name": "moonlight",
+        "phase": 0
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          4250,
+          506.40747075009926,
+          1000
+        ],
+        "pending": 0,
+        "chunks": 600,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0
+      }
+    },
+    "lakeland-noon": {
+      "file": "docs/design/biome-palette-evidence/after/lakeland-noon.png",
+      "vantage": {
+        "name": "lakeland",
+        "x": -11000,
+        "z": 500,
+        "heading": 0
+      },
+      "phase": {
+        "name": "noon",
+        "phase": 0.5
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -11000,
+          132.68493388941738,
+          500
+        ],
+        "pending": 0,
+        "chunks": 597,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.5
+      }
+    },
+    "lakeland-golden-hour": {
+      "file": "docs/design/biome-palette-evidence/after/lakeland-golden-hour.png",
+      "vantage": {
+        "name": "lakeland",
+        "x": -11000,
+        "z": 500,
+        "heading": 0
+      },
+      "phase": {
+        "name": "golden-hour",
+        "phase": 0.72
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -11000,
+          132.68493388941738,
+          500
+        ],
+        "pending": 0,
+        "chunks": 597,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.72
+      }
+    },
+    "lakeland-dusk": {
+      "file": "docs/design/biome-palette-evidence/after/lakeland-dusk.png",
+      "vantage": {
+        "name": "lakeland",
+        "x": -11000,
+        "z": 500,
+        "heading": 0
+      },
+      "phase": {
+        "name": "dusk",
+        "phase": 0.75
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -11000,
+          132.68493388941738,
+          500
+        ],
+        "pending": 0,
+        "chunks": 597,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.75
+      }
+    },
+    "lakeland-moonlight": {
+      "file": "docs/design/biome-palette-evidence/after/lakeland-moonlight.png",
+      "vantage": {
+        "name": "lakeland",
+        "x": -11000,
+        "z": 500,
+        "heading": 0
+      },
+      "phase": {
+        "name": "moonlight",
+        "phase": 0
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -11000,
+          132.68493388941738,
+          500
+        ],
+        "pending": 0,
+        "chunks": 597,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0
+      }
+    }
+  },
+  "completed": "2026-10-04T16:11:07.794Z"
+}
