@@ -1,0 +1,27 @@
+{
+  "timing": [
+    {
+      "elevation": -1,
+      "starAmount": 0
+    },
+    {
+      "elevation": -2,
+      "starAmount": 0
+    },
+    {
+      "elevation": -4,
+      "starAmount": 0.49478166444311567
+    },
+    {
+      "elevation": -6,
+      "starAmount": 0.9998644805905597
+    }
+  ],
+  "moon": {
+    "centre": 233.94379999999998,
+    "discSpread": 14.136400000000009,
+    "halo": 95.77459375000005,
+    "far": 11.842099999999999,
+    "stars": 184
+  }
+}

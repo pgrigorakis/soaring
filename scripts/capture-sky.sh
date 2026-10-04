@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
+# Matched sky captures for one step: same seed, chase camera and exact sun elevations.
 # Start Vite on SKY_URL's port first. Browser operations use an isolated axi session.
 set -euo pipefail
 export CHROME_DEVTOOLS_AXI_SESSION=soaring-sky-bodies-look
-stage=${1:?Usage: bash scripts/capture-sky-step1.sh before-or-after}
-out="evidence/sky-step1/$stage"
+step=${1:?Usage: bash scripts/capture-sky.sh step-name before-or-after}
+stage=${2:?Usage: bash scripts/capture-sky.sh step-name before-or-after}
+out="evidence/$step/$stage"
 mkdir -p "$out"
 chrome-devtools-axi open "${SKY_URL:-http://127.0.0.1:4378}/?smoke&profile"
 chrome-devtools-axi resize 1280 800
@@ -14,13 +16,20 @@ chrome-devtools-axi eval '() => {
   location.reload(); return "seed and settings restored";
 }'
 sleep 1
-for elevation in 3 -6 -12 -52; do
+# name, sun elevation in degrees, view: sun or moon heads the chase camera at that body; look aims the camera at the moon.
+for shot in sun3:3:sun sun-6:-6:sun sun-12:-12:sun sun-52:-52:sun moon-6:-6:moon moon-12:-12:moon moon-52:-52:look; do
+  IFS=: read -r name elevation view <<< "$shot"
   chrome-devtools-axi eval "async () => {
     const api = window.__SOARING__;
     // Inverse of the scout tools/phases.mjs Soaring arc, without rounding.
     const phase = Math.acos(-($elevation) / 52) / (2 * Math.PI);
     api.setTimeOfDay(phase);
-    api.reviewFlight({x:0,z:0,heading:phase * 2 * Math.PI});
+    const body = api.snapshot();
+    // Older builds have no body directions in the snapshot; their moon is opposite the sun.
+    const target = '$view' === 'moon' ? body.moonDirection : body.sunDirection;
+    const heading = target ? Math.atan2(target[0], target[2]) : phase * 2 * Math.PI + ('$view' === 'moon' ? Math.PI : 0);
+    api.reviewFlight({x:0,z:0,heading});
+    api.lookAtBody('$view' === 'look' ? 'moon' : 'chase');
     api.setCapturePixelRatio(1);
     document.querySelector('#intro')?.remove();
     document.querySelector('#controls').style.visibility = 'hidden';
@@ -31,6 +40,6 @@ for elevation in 3 -6 -12 -52; do
       await new Promise(resolve => setTimeout(resolve,100));
     }
     return {snapshot:api.snapshot(),clouds:api.puffCloudSnapshot(),sunDegrees:Math.asin(api.snapshot().sunElevation)*180/Math.PI};
-  }" > "$out/sun${elevation}.txt"
-  chrome-devtools-axi screenshot "$PWD/$out/sun${elevation}.png"
+  }" > "$out/$name.txt"
+  chrome-devtools-axi screenshot "$PWD/$out/$name.png"
 done
