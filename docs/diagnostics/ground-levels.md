@@ -27,6 +27,8 @@ The reference is MIT licensed, copyright 2026 Kun Chen. `THIRD_PARTY_NOTICES.md`
 - **Fog.** Coverage comes only from displayed levels. Pending water and tree tiles no longer limit it. A level is shown only when it is valid at the published centre and every finer level is complete.
 - **Culled tiles.** Unlike the reference, each level is split into square tiles (40, 50 and 40 cells: 360 m, 900 m and 3.6 km). Each tile gets a bounding sphere from its displayed heights, so three.js culls tiles outside the view and the shadow camera. Tiles fully inside a hole are not built. Without culling, CI's software renderer drew about 1M triangles per frame and smoke tests timed out. In the chase view under SwiftShader at 5 km, 100-cell 18 m tiles still drew 1.9M triangles; these sizes draw 529k against 723k on `main`, and the load finished in 46 s against 66 s.
 - **Placement tiles.** The existing tiles still place water, trees, rocks, tors and hedgerows. Mid and far tiles no longer build ground meshes. Near tiles keep a hidden ground mesh because hedgerow placement needs its full-density samples.
+- **Water.** Sea-level water uses a 9 m, 18 m or 90 m grid for near, mid and far tiles. These are the vertices and the diagonal of the level that usually draws the tile, so the shoreline follows the drawn triangles. Mid and far water reads heights from the level texels.
+- **Memory.** A level keeps only the height, normal and colour of each texel, not the world sample object. Keeping the objects held about 125 MB of extra live heap at 5 km. Under CI's software renderer, garbage collection then slowed every load, and smoke tests timed out. The live heap after a 5 km load is now 12 MB, against 11 MB on `main`.
 
 ## Failure modes covered
 

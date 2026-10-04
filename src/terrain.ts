@@ -4,7 +4,7 @@ import { bindCloudFog, type CloudFogUniforms } from './cloud-sea';
 import { GroundLevels } from './ground-levels';
 import { InstancePool } from './instance-pool';
 import { WaterPool } from './water-pool';
-import { fbm, hash2, type LandscapeSample, type Tree, WorldModel } from './world';
+import { fbm, hash2, type LandscapeSample, SEA_LEVEL, type Tree, WorldModel } from './world';
 
 /** Snow stays white; lighting supplies the blue shade. Steep faces remain granite. Snow follows temperature. */
 export function snowCover(sample: LandscapeSample, slope: number, x: number, z: number, seed: number): number {
@@ -599,8 +599,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
           for (let xIndex = -1; xIndex <= segments + 1; xIndex += 1) {
             const x = originX + xIndex * step;
             const z = originZ + zIndex * step;
-            // The finest ground level usually sampled this point already.
-            samples.push(this.ground.sampleAt(x, z) ?? this.world.sample(x, z));
+            samples.push(this.world.sample(x, z));
             if ((xIndex + 1) % 8 === 0) yield;
           }
         }
@@ -660,10 +659,12 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       let waterVertex = 0;
       for (let iz = 0; iz <= waterSegments; iz++) {
         for (let ix = 0; ix <= waterSegments; ix++) {
-          const sample = detailed ? sampleAt(ix, iz) : this.world.sample(originX + ix * waterStep, originZ + iz * waterStep);
-          wet[waterVertex] = Number(sample.water);
-          levels[waterVertex] = sample.surface;
-          waterDepth[waterVertex++] = sample.surface - sample.height;
+          const x = originX + ix * waterStep;
+          const z = originZ + iz * waterStep;
+          const height = detailed ? sampleAt(ix, iz).height : this.ground.heightAt(x, z) ?? this.world.sample(x, z).height;
+          wet[waterVertex] = Number(height < SEA_LEVEL);
+          levels[waterVertex] = SEA_LEVEL;
+          waterDepth[waterVertex++] = SEA_LEVEL - height;
           if (ix % 8 === 0) yield;
         }
       }

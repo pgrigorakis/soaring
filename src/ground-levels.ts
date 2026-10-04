@@ -121,8 +121,8 @@ class Level {
   wanted = 0;
   private job: Generator<void> | null = null;
   private ahead: Line | null = null;
-  // The world sample behind each texel, and its cell, so placement tiles can reuse it.
-  private readonly samples: (LandscapeSample | undefined)[];
+  // The cell behind each texel, so placement tiles can reuse its height. Whole samples
+  // are not kept: hundreds of thousands of live objects slow every garbage collection.
   private readonly sampleX: Int32Array;
   private readonly sampleZ: Int32Array;
   private dirty = false;
@@ -140,7 +140,6 @@ class Level {
     const cells = level.extent * 2 / level.step;
     this.size = cells + 2 * (MAX_MOVE / level.step + 1);
     this.ground = new Float32Array(this.size * this.size * 4);
-    this.samples = new Array(this.size * this.size);
     this.sampleX = new Int32Array(this.size * this.size).fill(2 ** 31 - 1);
     this.sampleZ = new Int32Array(this.size * this.size);
     this.clearGround();
@@ -280,10 +279,10 @@ vGroundColor = mix( groundSRGB / 12.92, pow( ( groundSRGB + 0.055 ) / 1.055, vec
     return this.filled && Math.abs(this.centerX - x / this.step) <= margin && Math.abs(this.centerZ - z / this.step) <= margin;
   }
 
-  /** The world sample this level holds for cell (x, z), if any. Samples are deterministic, so an old window's sample is still exact. */
-  sampleAt(x: number, z: number): LandscapeSample | undefined {
+  /** The height this level holds for cell (x, z), if any. Samples are deterministic, so an old window's height is still exact. */
+  heightAt(x: number, z: number): number | undefined {
     const cell = this.wrap(z) * this.size + this.wrap(x);
-    return this.sampleX[cell] === x && this.sampleZ[cell] === z ? this.samples[cell] : undefined;
+    return this.sampleX[cell] === x && this.sampleZ[cell] === z ? this.ground[cell * 4] : undefined;
   }
 
   private wrap(value: number): number { return ((value % this.size) + this.size) % this.size; }
@@ -333,7 +332,6 @@ vGroundColor = mix( groundSRGB / 12.92, pow( ( groundSRGB + 0.055 ) / 1.055, vec
       const sample = own[i]!;
       this.paint(sample, x * this.step, z * this.step, this.normal, this.color);
       const cell = this.wrap(z) * this.size + this.wrap(x);
-      this.samples[cell] = sample;
       this.sampleX[cell] = x;
       this.sampleZ[cell] = z;
       const texel = cell * 4;
@@ -545,11 +543,13 @@ export class GroundLevels {
     return THREE.MathUtils.clamp(covered, 0, reach);
   }
 
-  /** The finest level's world sample at (x, z), when it holds one; placement tiles then skip sampling it again. */
-  sampleAt(x: number, z: number): LandscapeSample | undefined {
-    const finest = this.levels[0];
-    const step = LEVELS[0].step;
-    return finest && x % step === 0 && z % step === 0 ? finest.sampleAt(x / step, z / step) : undefined;
+  /** A level's terrain height at (x, z), when one holds it; placement tiles then skip sampling it again. */
+  heightAt(x: number, z: number): number | undefined {
+    for (const level of this.levels) {
+      const height = x % level.step === 0 && z % level.step === 0 ? level.heightAt(x / level.step, z / level.step) : undefined;
+      if (height !== undefined) return height;
+    }
+    return undefined;
   }
 
   /** Levels the reach needs that are not yet displayed in full. A displayed level that is only recentring is loaded. */
