@@ -1,6 +1,6 @@
 # Palette
 
-This file is the source of truth for Soaring's current terrain and foliage colours. Values are sRGB hex. The review images are evidence, not colour values to sample. See [the Matched palette captures](biome-palette-evidence/README.md).
+This file is the source of truth for Soaring's current terrain and foliage colours. Values are sRGB hex. The code keeps them in the biome profiles in `src/biomes/` and in `src/terrain.ts`. The review images are evidence, not colour values to sample. See [the Matched palette captures](biome-palette-evidence/README.md).
 
 ## Matched V2 rule
 
@@ -27,7 +27,7 @@ The envelope applies to V2 terrain and foliage hex values, including the listed 
 
 ### Woodland
 
-Ground colours and foliage tints are separate. `BIOME_PROFILES.woodland.palette` holds ground colours in this order; `crowns` holds the three Woodland crown shades.
+Ground colours and foliage tints are separate. In `src/biomes/woodland.ts`, `palette` holds the ground colours in this order, and `crowns.species` holds the three Woodland broadleaf crown shades.
 
 | Role | sRGB hex |
 | --- | --- |
