@@ -86,18 +86,20 @@ Snow remains a warm white. Lighting provides the blue shade on snow; terrain doe
 | Gorse fleck | `#d2b149` | Moor |
 | Heather glade fleck | `#a6849a` | Woodland glades |
 | Granite ground and boulders | `#899b98` | Lowland rock blend, boulders and tors |
-| Water bed | `#6eb99d` | Ground under sea-level water |
 
 ## Unchanged water, tree and lighting colours
 
 Water depth colours and the rest of the renderer stay unchanged in this palette pass. Water's on-screen difference from FWM needs a shader change, not a palette change.
 
-The water vertex tint is not the full rendered colour. The shared water shader mixes 65% depth colour with 35% of that tint on every water surface. Depth colour runs from shallow to deep between 0.7 m and 3.2 m. Before that mix, sea-level water in a mountain region tints the vertex colour toward the Highlands water tint by Highlands weight. Lakeland water tints toward the same shallow and deep pair between 2 m and 18 m by Lakeland weight. The former peat-water tint `#2e4a4a` is retired with elevated peat pools.
+The water vertex tint is not the full rendered colour. The shared water shader mixes 65% depth colour with 35% of that tint on every water surface. Depth colour runs from shallow to deep between 0.7 m and 3.2 m. Before that mix, sea-level water in a mountain region tints the vertex colour toward the Highlands water tint by Highlands weight. Lakeland water tints toward the same shallow and deep pair between 2 m and 18 m by Lakeland weight.
+
+The former peat-water tint `#2e4a4a` is retired with elevated peat pools. The ground under sea-level water keeps its dark teal, because the water surface is 78% opaque. A light bed shows through and exposes terrain tile edges in far water.
 
 | Role | sRGB hex |
 | --- | --- |
 | Shallow water | `#78b4a3` |
 | Deep water | `#2b6c73` |
+| Water bed | `#2f6e6a` |
 | Water vertex tint | `#2a8fa8` |
 | Highlands water tint | `#2a7fa0` |
 | Sun glint | `#fff1c2` |
