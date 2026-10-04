@@ -25,7 +25,7 @@ Near the eagle, the landscape shows individual trees and rocks. Farther away, it
 
 ## Day and night
 
-The sky shifts from blue at noon to golden dawn and dusk, then to a dark blue, starry night. Horizon fog follows the sky colour.
+The sky shifts from blue at noon to golden dawn and dusk, then to a dark blue, starry night. Horizon fog follows the sky colour. From dawn until a few minutes after sunrise, low mist lies over lakes and wet ground, then fades. It does not cover dry ground, and the eagle stays above it.
 
 ## More information
 

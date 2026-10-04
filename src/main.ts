@@ -6,6 +6,7 @@ import { Soundscape } from './audio';
 import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS, normalizeFlightHeight } from './eagle';
 import { DEFAULT_VISIBILITY, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
 import { THERMAL_MARKER_RANGE, ThermalMarker } from './thermal-marker';
+import { CloudSea, mistCover } from './cloud-sea';
 import { AuroraSchedule, auroraAmount, DAY_SECONDS, daylight, nightCycle, type Daylight } from './sky-cycle';
 import { FrameProfiler, type ProfileReport } from './profile';
 import { WORLD_CACHE_LIMIT, WorldModel } from './world';
@@ -375,6 +376,8 @@ function terrainReach(): number {
   return effectiveTerrainVisibility() / depthPerDistance(Math.min(camera.aspect, MAX_REACH_ASPECT));
 }
 const terrain = new TerrainStream(worldRoot, world, terrainReach());
+const cloudSea = new CloudSea(worldRoot);
+terrain.bindMist(cloudSea.heightFogUniforms);
 const thermalMarker = new ThermalMarker(worldRoot, world);
 function applyRenderQuality(): void {
   const pixelRatio = pixelRatioForStep();
@@ -942,6 +945,7 @@ function frame(now: number): void {
   const body = currentDaylight();
   applyDaylight(body, rawDelta);
   puffClouds.update(state, navigator.wind, delta, cameraPosition, fogGoal);
+  cloudSea.update(cameraPosition.x, cameraPosition.z, cameraPosition.y, body.phase, skySeconds, fog, sunDir, body.sunColor, renderOrigin, world);
 
   keyLight.target.position.set(cameraPosition.x, world.sample(cameraPosition.x, cameraPosition.z).height, cameraPosition.z);
   updateShadowBasis(keyDir);
@@ -1018,13 +1022,14 @@ window.addEventListener('beforeunload', () => {
   fogTarget.dispose();
   thermalMarker.dispose();
   puffClouds.dispose();
+  cloudSea.dispose();
   terrain.dispose();
 });
 
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number } };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; morningMist: number; mistReady: boolean };
       puffCloudSnapshot: () => PuffCloudSnapshot;
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
@@ -1042,6 +1047,8 @@ declare global {
       setPuffCloudsVisible: (visible: boolean) => void;
       setCaptureClear: (on: boolean) => void;
       setVisibility: (meters: number) => void;
+      mistAt: (x: number, z: number) => { cover: number; water: boolean; moisture: number; bank: number; height: number; surface: number };
+      fillMist: (budgetMs: number) => void;
       reviewSpots: () => { confluence: { x: number; z: number; surface: number }; lake: { x: number; z: number; surface: number }; run: { x: number; z: number; surface: number; heading: number }; network: { x: number; z: number; surface: number } };
     };
   }
@@ -1131,6 +1138,8 @@ if (import.meta.env.DEV) window.__SOARING__ = {
         samples: fogSampleCount,
         failures: fogReadbackFailures,
       },
+      morningMist: cloudSea.morningAmount,
+      mistReady: cloudSea.ready,
     };
   },
   puffCloudSnapshot: () => puffClouds.snapshot(),
@@ -1158,6 +1167,14 @@ if (import.meta.env.DEV) window.__SOARING__ = {
   setVisibility: (meters: number) => {
     settings.terrainVisibility = meters;
     terrain.setReach(terrainReach());
+  },
+  mistAt: (x: number, z: number) => {
+    const sample = world.sample(x, z);
+    return { cover: mistCover(sample), water: sample.water, moisture: sample.moisture, bank: sample.bank, height: sample.height, surface: sample.surface };
+  },
+  fillMist: (budgetMs: number) => {
+    if (!Number.isFinite(budgetMs) || budgetMs < 0 || budgetMs > 30_000) throw new RangeError('Expected 0–30000 ms');
+    cloudSea.fillNow(world, budgetMs);
   },
   reviewSpots: () => world.reviewSpots(),
 };
