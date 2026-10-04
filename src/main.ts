@@ -214,23 +214,29 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			float sunSide = dot(direction.xz / max(length(direction.xz), 0.0001), flatSun);
 			float align = max(sunSide, 0.0);
 			float anti = max(-sunSide, 0.0);
+			// Powers by multiplication: software WebGL in CI pays for every pow and acos on every sky pixel.
+			float align3 = align * align * align;
 			// Warmth leans toward the sun's azimuth, with a little left on the far side.
 			vec3 warmBand = vec3(0.78, 0.4, 0.22);
-			dayColor = mix(dayColor, warmBand, clamp(goldenAmount, 0.0, 1.0) * lowSky * mix(0.25, 0.7, pow(align, 3.0)));
+			dayColor = mix(dayColor, warmBand, clamp(goldenAmount, 0.0, 1.0) * lowSky * mix(0.25, 0.7, align3));
 			// Twilight: a painted gradient keyed by sun elevation replaces the Preetham sky, which goes dark before sunset.
 			// Warmth climbs higher toward the sun's azimuth, as in FWM.
-			float skyHeight = max(direction.y, 0.0);
-			vec3 twilightSide = mix(twilightUpper, twilightUpperWarm, pow(align, 3.5) * 0.8 + pow(sunFacing, 5.0) * 0.2);
-			vec3 twilightSky = mix(twilightSide, twilightZenith, smoothstep(0.1, 0.85, skyHeight));
-			// A little warmth reaches the far side, so the single fog colour, read side-on to the sun, is not grey under an orange sky.
-			vec3 twilightLow = mix(twilightHorizon, twilightHorizonWarm, 0.2 + 0.8 * pow(align, 5.0));
-			dayColor = mix(dayColor, mix(twilightLow, twilightSky, smoothstep(0.0, 0.4, skyHeight)), twilightAmount);
+			if (twilightAmount > 0.0) {
+				float skyHeight = max(direction.y, 0.0);
+				float facing2 = sunFacing * sunFacing;
+				vec3 twilightSide = mix(twilightUpper, twilightUpperWarm, align3 * sqrt(align) * 0.8 + facing2 * facing2 * sunFacing * 0.2);
+				vec3 twilightSky = mix(twilightSide, twilightZenith, smoothstep(0.1, 0.85, skyHeight));
+				// A little warmth reaches the far side, so the single fog colour, read side-on to the sun, is not grey under an orange sky.
+				vec3 twilightLow = mix(twilightHorizon, twilightHorizonWarm, 0.2 + 0.8 * align3 * align * align);
+				dayColor = mix(dayColor, mix(twilightLow, twilightSky, smoothstep(0.0, 0.4, skyHeight)), twilightAmount);
+			}
 			// Dawn and dusk: a thin saturated glow along the sun-side horizon.
 			vec3 glowColor = vec3(1.0, 0.24, 0.06);
-			dayColor = mix(dayColor, glowColor, pow(align, 3.0) * exp(-abs(direction.y) / 0.07) * glowAmount * 0.8);
+			if (glowAmount > 0.0) dayColor = mix(dayColor, glowColor, align3 * exp(-abs(direction.y) / 0.07) * glowAmount * 0.8);
 			// The belt of Venus: a rose band opposite a low sun, over the earth's blue shadow.
 			vec3 venusColor = vec3(0.86, 0.46, 0.52);
-			float venusShape = exp(-pow((direction.y - 0.07) / 0.06, 2.0));
+			float venusHeight = (direction.y - 0.07) / 0.06;
+			float venusShape = exp(-venusHeight * venusHeight);
 			dayColor = mix(dayColor, venusColor, anti * anti * venusShape * venusAmount * 0.35);
 			float earthShadow = anti * anti * smoothstep(0.06, 0.0, direction.y) * venusAmount;
 			dayColor = mix(dayColor, dayColor * vec3(0.78, 0.84, 1.0), earthShadow * 0.5);
@@ -241,8 +247,12 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			// The disc stays pale yellow, so it reads against the orange glow near the horizon.
 			float sunLight = sunFacing * smoothstep(-0.14, 0.02, vSunDirection.y);
 			vec3 sunColor = mix(sunTint, glowColor, lowSun * 0.6);
-			float sunDisc = smoothstep(0.03, 0.024, acos(clamp(sunLight, 0.0, 1.0)));
-			float sunGlow = pow(sunLight, 30.0) * 0.12 + pow(sunLight, 500.0) * 0.6 + pow(sunLight, 4.0) * lowSun * 0.35;
+			// The disc edge runs from 0.03 to 0.024 radians from the sun's centre, as cosines.
+			float sunDisc = smoothstep(0.99955003, 0.99971201, sunLight);
+			float sunLight2 = sunLight * sunLight;
+			float sunLight4 = sunLight2 * sunLight2;
+			float sunLight15 = sunLight4 * sunLight4 * sunLight4 * sunLight2 * sunLight;
+			float sunGlow = sunLight15 * sunLight15 * 0.12 + pow(sunLight, 500.0) * 0.6 + sunLight4 * lowSun * 0.35;
 			// The glow fades softly below the horizon, so the haze under it shows no edge. The disc sets sharply.
 			dayColor += sunColor * sunGlow * smoothstep(-0.12, 0.02, direction.y) + (sunDisc * mix(1.4, 3.0, lowSun) * smoothstep(-0.02, 0.0, direction.y) * mix(sunTint, vec3(1.0, 0.9, 0.7), 0.5));
 			float skyHorizon = pow(1.0 - clamp(direction.y, 0.0, 1.0), 3.0);
@@ -284,9 +294,9 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			vec3 cloudLight = mix(vec3(0.76, 0.84, 0.94), vec3(0.98, 0.98, 1.0), sunUp);
 			cloudLight = mix(cloudLight, vec3(1.0, 0.49, 0.25), goldenAmount * 0.4);
 			// Lit toward the sun, on fire near a low sun, blushing opposite it.
-			cloudLight = mix(cloudLight, sunColor, pow(sunLight, 4.0) * 0.75);
-			cloudLight = mix(cloudLight, glowColor, lowSun * pow(align, 1.5) * 0.7);
-			cloudLight = mix(cloudLight, mix(cloudLight, venusColor, 0.5), venusAmount * pow(anti, 1.5) * 0.6);
+			cloudLight = mix(cloudLight, sunColor, sunLight4 * 0.75);
+			cloudLight = mix(cloudLight, glowColor, lowSun * align * sqrt(align) * 0.7);
+			cloudLight = mix(cloudLight, mix(cloudLight, venusColor, 0.5), venusAmount * anti * sqrt(anti) * 0.6);
 			vec3 cloudShade = mix(vec3(0.32, 0.39, 0.5), vec3(0.52, 0.36, 0.3), goldenAmount * 0.65);
 			vec3 dayCloud = mix(cloudShade, cloudLight, smoothstep(0.42, 1.0, cloudMass));
 			vec3 nightCloud = mix(vec3(0.012, 0.018, 0.04), vec3(0.06, 0.075, 0.12), smoothstep(0.35, 0.85, cloudMass));
@@ -294,7 +304,7 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			retColor = mix(retColor, cloudColor, cloudMask * mix(0.84, 0.96, nightAmount));
 			// Thin cloud edges near the sun catch a bright rim.
 			float cloudEdge = cloudMask * (1.0 - cloudMask) * 4.0;
-			retColor += sunColor * cloudEdge * pow(sunLight, 15.0) * 0.7 * (1.0 - nightAmount) * smoothstep(0.025, 0.12, direction.y);`,
+			retColor += sunColor * cloudEdge * sunLight15 * 0.7 * (1.0 - nightAmount) * smoothstep(0.025, 0.12, direction.y);`,
   );
 scene.add(sky);
 
