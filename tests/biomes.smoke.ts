@@ -5,9 +5,12 @@ import { writeFile } from 'node:fs/promises';
 // adjacent meshes disagree on colour/height, pool water floats above dry ground, or rendering fails.
 // Refactor parity also checks exact samples, ground RGB, tree placement/tints, and mesh bytes.
 test('renders blended biome terrain with deterministic shared chunk edges', async ({ page }, testInfo) => {
-  test.setTimeout(60_000);
+  // CI loads this terrain beside a long water test, so a full cold load takes 40 to 60 s there.
+  test.setTimeout(120_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  // The evidence world, not a random one, so every run loads the same start.
+  await page.addInitScript(() => localStorage.setItem('soaring.world-seed.v1', '80231'));
   await page.goto('/?smoke');
   await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0);
   const evidence = await page.evaluate(async () => {

@@ -10,18 +10,28 @@ const VIEWS = [
   { name: 'below-noon', cameraY: 480, phase: 0.5 },
 ] as const;
 
-async function capture(page: Page, place: { x: number; z: number }, view: typeof VIEWS[number], puffs: boolean): Promise<Buffer> {
-  const frame = await page.evaluate(({ place, view, puffs }) => {
+// Holding a pose clears the terrain, so hold each camera height once and let it load in full.
+async function hold(page: Page, place: { x: number; z: number }, cameraY: number): Promise<void> {
+  await page.evaluate(({ place, cameraY }) => {
+    window.__SOARING__.reviewFlight!({ x: place.x, z: place.z, heading: 0.4, y: cameraY - 178 * 0.31 / 3 });
+  }, { place, cameraY });
+  await page.waitForFunction(() => window.__SOARING__.snapshot().pending === 0, undefined, { timeout: 300_000 });
+}
+
+async function capture(page: Page, view: typeof VIEWS[number], puffs: boolean): Promise<Buffer> {
+  const previous = await page.evaluate(({ view, puffs }) => {
     const api = window.__SOARING__;
+    const { renderedFrames, fog } = api.snapshot();
     api.setTimeOfDay(view.phase);
     api.setPuffCloudsVisible(puffs);
-    api.reviewFlight!({ x: place.x, z: place.z, heading: 0.4, y: view.cameraY - 178 * 0.31 / 3 });
-    return api.snapshot().renderedFrames;
-  }, { place, view, puffs });
-  await page.waitForFunction((frame) => {
+    return { renderedFrames, fogSamples: fog.samples };
+  }, { view, puffs });
+  // Puffs are the only change between a pair, so the haze must have settled for this time of day.
+  await page.waitForFunction((previous) => {
     const s = window.__SOARING__.snapshot();
-    return s.pending === 0 && s.renderedFrames > frame;
-  }, frame, { timeout: 300_000 });
+    const fogGap = Math.hypot(...s.fog.color.map((value, index) => value - s.fog.targetColor[index]!));
+    return s.renderedFrames > previous.renderedFrames && s.fog.samples > previous.fogSamples && fogGap < 1e-4;
+  }, previous, { timeout: 120_000 });
   const captureFrame = await page.evaluate(() => {
     window.__SOARING__.setCapturePixelRatio(1);
     return window.__SOARING__.snapshot().renderedFrames;
@@ -51,13 +61,15 @@ test('puffs never show through the cloud deck from above, and still show below i
   });
   await mkdir('test-results/cloud-puff-deck', { recursive: true });
   const results: Array<Record<string, unknown>> = [];
+  let heldY: number | null = null;
   for (const view of VIEWS) {
-    const withPuffs = await capture(page, place, view, true);
+    if (view.cameraY !== heldY) await hold(page, place, heldY = view.cameraY);
+    const withPuffs = await capture(page, view, true);
     const state = await page.evaluate(() => ({
       layer: window.__SOARING__.snapshot().cloudLayer,
       placed: window.__SOARING__.puffCloudSnapshot().placements.filter((puff) => puff.opacity > 0.01).length,
     }));
-    const withoutPuffs = await capture(page, place, view, false);
+    const withoutPuffs = await capture(page, view, false);
     await testInfo.attach(view.name, { body: withPuffs, contentType: 'image/png' });
     // Compare the real browser screenshots. Outside the chase eagle, whose wings keep
     // beating, every changed pixel is a visible puff.
