@@ -126,3 +126,37 @@ body.cursor-hidden, body.cursor-hidden * { cursor: none !important; }
   .settings-toggle { right: 12px; top: 12px; }
   .settings-panel { width: min(245px, calc(100vw - 70px)); max-height: calc(100dvh - 24px); }
 }
+
+/* Minimap in the lower-right corner and the biome map that M opens. */
+.minimap {
+  position: fixed; right: 18px; bottom: 18px; z-index: 4;
+  width: 184px; height: 184px;
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.26), 0 10px 32px rgba(10, 23, 23, .3);
+  cursor: zoom-in;
+}
+.map-panel {
+  position: fixed; inset: 0; z-index: 8; display: none;
+  place-items: center; background: rgba(12, 20, 18, .55); backdrop-filter: blur(6px);
+}
+.map-panel.open { display: grid; }
+.map-card {
+  position: relative; width: min(92vw, calc(100dvh - 120px)); padding: 14px; border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.22); background: rgba(25, 39, 36, .86);
+  box-shadow: 0 18px 60px rgba(8, 18, 18, .4);
+}
+.map-card header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.map-card h1 { margin: 0 auto 0 4px; font: 500 19px Georgia, serif; letter-spacing: .025em; }
+.map-card canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 10px; cursor: default; }
+.map-card button {
+  color: #f7f3e7; border: 1px solid rgba(255,255,255,.22); border-radius: 7px;
+  background: rgba(255,255,255,.08); padding: 5px 9px; font: 12px Inter, ui-sans-serif, system-ui, sans-serif; cursor: pointer;
+}
+.map-card button[aria-pressed="true"] { background: rgba(215, 182, 107, .32); border-color: rgba(215, 182, 107, .7); }
+.map-extent { display: flex; gap: 4px; }
+.map-status {
+  position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); margin: 0; padding: 5px 11px;
+  border-radius: 999px; background: rgba(22, 32, 29, .78); font-size: 11px; color: rgba(255,255,255,.75);
+}
+.map-status:empty { display: none; }
+@media (max-width: 700px) { .minimap { width: 132px; height: 132px; right: 12px; bottom: 12px; } }

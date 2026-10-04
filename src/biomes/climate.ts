@@ -2,7 +2,7 @@
 export const BIOME_SELECTION = {
   reliefWavelength: 18000,
   lakeWavelength: 7000,
-  lakeThreshold: 0.75,
+  lakeThreshold: 0.8,
 } as const;
 
 /**

@@ -124,6 +124,7 @@ test('captures the puff deck from low, mid, and high chase flights at noon and g
         window.__SOARING__.setTimeOfDay(phase);
         document.querySelector('#intro')?.remove();
         document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
+        document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
       }, phase);
       await page.waitForFunction(({ phase, previousFrame }) => {
         const state = window.__SOARING__.snapshot();

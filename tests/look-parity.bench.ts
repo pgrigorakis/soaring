@@ -90,7 +90,7 @@ test('capture and compare finished pictures at the performance bench vantages', 
       // A page capture avoids locator stability checks waiting for a paused RAF.
       const screenshot = fixedClock
         ? await page.screenshot({ style: 'body *:not(#app):not(canvas) { visibility: hidden !important; }' })
-        : await page.locator('canvas').screenshot();
+        : await page.locator('canvas').first().screenshot();
       const capture = await page.evaluate(async (png) => {
         const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob());
         const canvas = document.createElement('canvas');

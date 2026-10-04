@@ -40,6 +40,7 @@ test('the Milky Way shows on a dark night and fades with dusk and moonlight', as
     api.setCloudCoverage(0);
     document.querySelector('#intro')?.remove();
     document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
+    document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
   });
 
   // Hold the camera 900 m over the ground, look straight at one sky direction, and read the frame's middle.
