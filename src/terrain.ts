@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ChunkBuffers } from './chunk-buffers';
 import { bindCloudFog, type CloudFogUniforms } from './cloud-sea';
+import { GroundLevels } from './ground-levels';
 import { InstancePool } from './instance-pool';
 import { WaterPool } from './water-pool';
 import { fbm, hash2, type LandscapeSample, type Tree, WorldModel } from './world';
@@ -62,6 +63,14 @@ export function terrainColor(sample: LandscapeSample, x: number, z: number, seed
   return target;
 }
 
+/** The palette colour plus a small per-point hue, saturation and lightness jitter. */
+function groundColor(sample: LandscapeSample, x: number, z: number, seed: number, normal: THREE.Vector3, target: THREE.Color): THREE.Color {
+  terrainColor(sample, x, z, seed, target, Math.hypot(normal.x, normal.z) / normal.y, normal.y);
+  return target.offsetHSL((hash2(Math.round(x), Math.round(z), seed + 311) - 0.5) * 0.03,
+    (hash2(Math.round(x), Math.round(z), seed + 312) - 0.5) * 0.12,
+    (hash2(Math.round(x), Math.round(z), seed + 313) - 0.5) * 0.06);
+}
+
 function treeColor(tree: Tree, target: THREE.Color): THREE.Color {
   const remainder = fixedCrownKeys.reduce((weight, key) => weight - tree.biome[key], 1);
   target.set(tree.tint).multiplyScalar(remainder);
@@ -78,13 +87,13 @@ export const DEFAULT_VISIBILITY = 5000;
 const NEAR_RADIUS = 3; // chunks (fine grid): individual trees, rocks, full-density mesh
 // Beyond this distance, forest reads as terrain color only - no per-tree geometry.
 const TREE_CUTOFF = 3000;
-// Mesh LOD switches to a coarser, larger-tile grid here. A multiple of both grid sizes so the
-// two grids' tile edges always coincide - the coarse grid never straddles a fine tile.
+// Water placement switches to larger tiles here. A multiple of both tile sizes so the
+// two grids' tile edges always coincide - a large tile never straddles a fine tile.
 const FAR_CHUNK_SIZE = CHUNK_SIZE * 4;
 const FAR_START = FAR_CHUNK_SIZE * 3;
 const DETAIL = { segments: 40, rocks: 10 };
-const MID = { segments: 20, rocks: 0 };
-const FAR = { segments: 16, rocks: 0 };
+// Water vertices sit on the ground level that usually draws the tile: 9 m near, 18 m mid, 90 m far.
+const WATER_SEGMENTS = { near: DETAIL.segments, mid: 20, far: 16 };
 const TREE_SPACING = 29;
 // Shared pool capacities fit the densest Woodland ring measured by scripts/audit-tree-pools.mjs,
 // including a one-chunk move before rebuilds finish, with headroom. A full pool grows rather than drop trees.
@@ -188,6 +197,7 @@ export class TerrainStream {
   // Conifers draw a lower and an upper cone from the same pool.
   private readonly crownPools: InstancePool[];
   private readonly waterPool: WaterPool;
+  private readonly ground: GroundLevels;
 
   // Reach is the horizontal distance from the camera's tile that must be loaded.
   constructor(scene: THREE.Object3D, world: WorldModel, reach = MIN_VISIBILITY) {
@@ -324,6 +334,8 @@ float waterShimmer = 1.0 + 0.12 * sin( waterTime * 0.55 );
 outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.6;`,
         );
     };
+    this.ground = new GroundLevels(scene, world,
+      (sample, x, z, normal, color) => groundColor(sample, x, z, world.seed, normal, color), this.terrainMaterial);
   }
 
   // Distance (from the camera) at which the fixed-range shadow starts, and finishes, fading to fully lit.
@@ -364,24 +376,18 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     if (Number.isFinite(this.centerX)) this.recenter(this.centerX, this.centerZ);
   }
 
-  // The nearest missing tile limits haze, including while a new ring streams in. Tiles outside
-  // the loaded disk are at least `reach` away from any point of the camera's tile.
+  // Haze covers only the displayed ground levels. Pending water and tree tiles never limit it,
+  // so a tile crossing cannot hide land that is already drawn.
   // Camera coordinates (not eagle coordinates) are used so orbit and distance cannot reveal an edge.
   coveredDistance(x: number, z: number): number {
-    let distance = Infinity;
-    for (const tile of this.pending) {
-      if (this.chunks.has(tile.key)) continue; // A coarse tile remains visible while it is upgraded.
-      const minX = tile.x * tile.chunkSize;
-      const minZ = tile.z * tile.chunkSize;
-      distance = Math.min(distance, Math.hypot(
-        Math.max(minX - x, 0, x - minX - tile.chunkSize),
-        Math.max(minZ - z, 0, z - minZ - tile.chunkSize),
-      ));
-    }
-    return Math.max(0, Math.min(this.reach, distance - 12));
+    return this.ground.coveredDistance(x, z, this.reach);
   }
 
-  get pendingCount(): number { return this.pending.length; }
+  /** Placement tiles still to build, plus ground levels still filling or moving. */
+  /** Ground level state, for diagnostics. */
+  get groundState(): string { return this.ground.state; }
+
+  get pendingCount(): number { return this.pending.length + this.ground.pending(this.reach); }
 
   update(x: number, z: number, buildBudgetMs = 4): number {
     const start = performance.now();
@@ -390,8 +396,14 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     const centerX = Math.floor(x / CHUNK_SIZE);
     const centerZ = Math.floor(z / CHUNK_SIZE);
     if (centerX !== this.centerX || centerZ !== this.centerZ) this.recenter(centerX, centerZ);
+    // Placement tiles and ground levels share one CPU budget. While both have work, each gets half.
+    // A ground level that trails the camera by more than one move takes the whole budget; tiles still get one slice.
+    const tileBudget = this.ground.lagging ? 0 : this.ground.working(this.reach) ? buildBudgetMs / 2 : buildBudgetMs;
     let built = 0;
-    while (this.pending.length > 0 && performance.now() - start < buildBudgetMs) {
+    // At least one slice per update: a coarse browser clock can otherwise report the budget spent at once.
+    let sliced = false;
+    while (this.pending.length > 0 && (!sliced || performance.now() - start < tileBudget)) {
+      sliced = true;
       // Finish already-started work if recenter still needs it. New jobs remain nearest first.
       const next = this.active?.tile ?? this.pending[0]!;
       this.active ??= { tile: next, job: this.createChunk(next), cpuMs: 0 };
@@ -413,6 +425,8 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       this.chunks.set(next.key, result.value);
       built += 1;
     }
+    // A long tile slice cannot starve the ground: it keeps its half of the budget.
+    this.ground.update(x, z, this.reach, Math.max(start + buildBudgetMs, performance.now() + buildBudgetMs - tileBudget));
     this.maxUpdateMs = Math.max(this.maxUpdateMs, performance.now() - start);
     return built;
   }
@@ -427,8 +441,8 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     const needed = new Set<string>();
     this.pending = [];
 
-    // Fine grid (near + mid tiers): full density near the eagle, thinning to mid density,
-    // covering the ground out to where the coarse far grid takes over.
+    // Fine grid (near + mid tiers): detailed trees, rocks and hedgerows near the eagle, then
+    // simplified trees, out to where the large far tiles take over. Every tier places water.
     const fineReach = Math.min(this.reach, FAR_START);
     const fineRadius = Math.ceil(fineReach / CHUNK_SIZE);
     for (let dz = -fineRadius; dz <= fineRadius; dz += 1) {
@@ -446,7 +460,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       }
     }
 
-    // Coarse far grid: lower mesh resolution, no trees, tiles are 4x the fine chunk size so
+    // Large far tiles: water only. They are 4x the fine chunk size so
     // their edges always land on fine-grid tile boundaries.
     if (this.reach > FAR_START) {
       const farCenterX = Math.floor(this.rawX / FAR_CHUNK_SIZE);
@@ -510,6 +524,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       chunk.dispose();
     }
     this.chunks.clear();
+    this.ground.reset();
     this.pending = [];
     this.centerX = Number.NaN;
     this.centerZ = Number.NaN;
@@ -525,6 +540,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     for (const buffers of Object.values(this.free).flat()) buffers.dispose();
     for (const pool of Object.values(this.free)) pool.length = 0;
     for (const pool of this.pools) pool.dispose();
+    this.ground.dispose();
     this.terrainMaterial.dispose();
     this.waterMaterial.dispose();
     this.trunkMaterial.dispose();
@@ -544,15 +560,14 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     const detailed = tier === 'near';
     const group = new THREE.Group();
     group.name = chunkSize === CHUNK_SIZE ? `land ${chunkX},${chunkZ}` : `land far ${chunkX},${chunkZ}`;
-    const config = tier === 'near' ? DETAIL : tier === 'mid' ? MID : FAR;
-    const segments = config.segments;
-    const step = chunkSize / segments;
+    const segments = detailed ? DETAIL.segments : 0;
+    const step = chunkSize / DETAIL.segments;
     const originX = chunkX * chunkSize;
     const originZ = chunkZ * chunkSize;
     group.position.set(originX, 0, originZ);
     let buffers = this.free[tier].pop();
     if (buffers) this.reused += 1;
-    else { buffers = new ChunkBuffers(segments, segments, !detailed); this.allocated += 1; }
+    else { buffers = new ChunkBuffers(segments, WATER_SEGMENTS[tier]); this.allocated += 1; }
     const owned = buffers;
     let complete = false;
     const pooled: InstancePool[] = [];
@@ -566,125 +581,99 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       waterBlocks.length = 0;
       this.release(tier, owned);
     };
+    const row = segments + 3;
+    const sampleAt = (xIndex: number, zIndex: number) => this.samples[(zIndex + 1) * row + xIndex + 1]!;
     try {
-      const geometry = buffers.geometry;
-      const { positions, normals, colors, indices } = buffers;
-      let vertex = 0;
-      let indexCount = 0;
-      const color = new THREE.Color();
-      const normal = new THREE.Vector3();
-      const row = segments + 3;
-      const samples = this.samples;
-      for (let zIndex = -1; zIndex <= segments + 1; zIndex += 1) {
-        for (let xIndex = -1; xIndex <= segments + 1; xIndex += 1) {
-          samples.push(this.world.sample(originX + xIndex * step, originZ + zIndex * step));
-          if ((xIndex + 1) % 8 === 0) yield;
-        }
-      }
-      const sampleAt = (xIndex: number, zIndex: number) => samples[(zIndex + 1) * row + xIndex + 1]!;
-      const heightAt = (xIndex: number, zIndex: number) => sampleAt(xIndex, zIndex).height;
-
       const hedgeBlocks: { x: number; y: number; z: number; turn: number; weight: number }[] = [];
-
-      for (let zIndex = 0; zIndex <= segments; zIndex += 1) {
-        for (let xIndex = 0; xIndex <= segments; xIndex += 1) {
-          const x = originX + xIndex * step;
-          const z = originZ + zIndex * step;
-          const sample = sampleAt(xIndex, zIndex);
-          const base = vertex++ * 3;
-          positions[base] = x - originX; positions[base + 1] = sample.height; positions[base + 2] = z - originZ;
-          normal.set(
-            heightAt(xIndex - 1, zIndex) - heightAt(xIndex + 1, zIndex),
-            step * 2,
-            heightAt(xIndex, zIndex - 1) - heightAt(xIndex, zIndex + 1),
-          ).normalize();
-          normals[base] = normal.x; normals[base + 1] = normal.y; normals[base + 2] = normal.z;
-          const slope = Math.hypot(normal.x, normal.z) / normal.y;
-          const edge = sample.fieldEdge;
-          if (detailed && edge && sample.biome.hills > 0 && !sample.water && sample.bank > 20 && slope < 0.45
-            && edge.x >= originX && edge.x < originX + chunkSize && edge.z >= originZ && edge.z < originZ + chunkSize) {
-            hedgeBlocks.push({
-              x: edge.x - originX, y: sample.height + 1.6 * sample.biome.hills,
-              z: edge.z - originZ, turn: edge.turn, weight: sample.biome.hills
-            });
+      // Hedgerows need full-density samples. A near tile keeps its mesh as a hidden CPU record
+      // of that ground; the ground levels draw the visible surface for every tier.
+      if (detailed) {
+        const geometry = buffers.geometry;
+        const { positions, normals, colors, indices } = buffers;
+        let vertex = 0;
+        let indexCount = 0;
+        const color = new THREE.Color();
+        const normal = new THREE.Vector3();
+        const samples = this.samples;
+        for (let zIndex = -1; zIndex <= segments + 1; zIndex += 1) {
+          for (let xIndex = -1; xIndex <= segments + 1; xIndex += 1) {
+            const x = originX + xIndex * step;
+            const z = originZ + zIndex * step;
+            // The finest ground level usually sampled this point already.
+            samples.push(this.ground.sampleAt(x, z) ?? this.world.sample(x, z));
+            if ((xIndex + 1) % 8 === 0) yield;
           }
-          terrainColor(sample, x, z, this.world.seed, color, slope, normal.y);
-          const hueJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 311) - 0.5) * 0.03;
-          const saturationJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 312) - 0.5) * 0.12;
-          const lightnessJitter = (hash2(Math.round(x), Math.round(z), this.world.seed + 313) - 0.5) * 0.06;
-          color.offsetHSL(hueJitter, saturationJitter, lightnessJitter);
-          colors[base] = color.r; colors[base + 1] = color.g; colors[base + 2] = color.b;
-          if (xIndex % 8 === 0) yield;
         }
-      }
-      for (let zIndex = 0; zIndex < segments; zIndex += 1) {
-        for (let xIndex = 0; xIndex < segments; xIndex += 1) {
-          const a = zIndex * (segments + 1) + xIndex;
-          const b = a + 1;
-          const c = a + segments + 1;
-          const d = c + 1;
-          indices[indexCount++] = a; indices[indexCount++] = c; indices[indexCount++] = b;
-          indices[indexCount++] = b; indices[indexCount++] = c; indices[indexCount++] = d;
-        }
-      }
-      if (!detailed) {
-        // High-detail neighbors have more edge vertices. A downward skirt hides
-        // interpolation cracks without multiplying the far-field mesh density.
-        const edge = (vertices: number[], outward: boolean) => {
-          for (let i = 0; i < vertices.length; i += 1) {
-            const top = vertices[i]!;
-            const base = top * 3;
-            const bottom = vertex++;
-            const dst = bottom * 3;
-            positions[dst] = positions[base]!; positions[dst + 1] = positions[base + 1]! - 140; positions[dst + 2] = positions[base + 2]!;
-            for (let j = 0; j < 3; j += 1) { normals[dst + j] = normals[base + j]!; colors[dst + j] = colors[base + j]!; }
-            if (i > 0) {
-              const prev = vertices[i - 1]!;
-              const prevBottom = bottom - 1;
-              indices[indexCount++] = prev;
-              indices[indexCount++] = outward ? top : prevBottom;
-              indices[indexCount++] = outward ? prevBottom : top;
-              indices[indexCount++] = top;
-              indices[indexCount++] = outward ? bottom : prevBottom;
-              indices[indexCount++] = outward ? prevBottom : bottom;
+        const heightAt = (xIndex: number, zIndex: number) => sampleAt(xIndex, zIndex).height;
+        for (let zIndex = 0; zIndex <= segments; zIndex += 1) {
+          for (let xIndex = 0; xIndex <= segments; xIndex += 1) {
+            const x = originX + xIndex * step;
+            const z = originZ + zIndex * step;
+            const sample = sampleAt(xIndex, zIndex);
+            const base = vertex++ * 3;
+            positions[base] = x - originX; positions[base + 1] = sample.height; positions[base + 2] = z - originZ;
+            normal.set(
+              heightAt(xIndex - 1, zIndex) - heightAt(xIndex + 1, zIndex),
+              step * 2,
+              heightAt(xIndex, zIndex - 1) - heightAt(xIndex, zIndex + 1),
+            ).normalize();
+            normals[base] = normal.x; normals[base + 1] = normal.y; normals[base + 2] = normal.z;
+            const slope = Math.hypot(normal.x, normal.z) / normal.y;
+            const edge = sample.fieldEdge;
+            if (edge && sample.biome.hills > 0 && !sample.water && sample.bank > 20 && slope < 0.45
+              && edge.x >= originX && edge.x < originX + chunkSize && edge.z >= originZ && edge.z < originZ + chunkSize) {
+              hedgeBlocks.push({
+                x: edge.x - originX, y: sample.height + 1.6 * sample.biome.hills,
+                z: edge.z - originZ, turn: edge.turn, weight: sample.biome.hills
+              });
             }
+            groundColor(sample, x, z, this.world.seed, normal, color);
+            colors[base] = color.r; colors[base + 1] = color.g; colors[base + 2] = color.b;
+            if (xIndex % 8 === 0) yield;
           }
-        };
-        edge(Array.from({ length: segments + 1 }, (_, i) => i), true);
-        edge(Array.from({ length: segments + 1 }, (_, i) => segments * (segments + 1) + i), false);
-        edge(Array.from({ length: segments + 1 }, (_, i) => i * (segments + 1)), false);
-        edge(Array.from({ length: segments + 1 }, (_, i) => i * (segments + 1) + segments), true);
+        }
+        for (let zIndex = 0; zIndex < segments; zIndex += 1) {
+          for (let xIndex = 0; xIndex < segments; xIndex += 1) {
+            const a = zIndex * (segments + 1) + xIndex;
+            const b = a + 1;
+            const c = a + segments + 1;
+            const d = c + 1;
+            indices[indexCount++] = a; indices[indexCount++] = c; indices[indexCount++] = b;
+            indices[indexCount++] = b; indices[indexCount++] = c; indices[indexCount++] = d;
+          }
+        }
+        for (const attribute of Object.values(geometry.attributes)) attribute.needsUpdate = true;
+        geometry.index!.needsUpdate = true;
+        geometry.computeBoundingSphere();
+        yield;
+        const terrain = new THREE.Mesh(geometry, this.terrainMaterial);
+        terrain.visible = false;
+        group.add(terrain);
       }
-      for (const attribute of Object.values(geometry.attributes)) attribute.needsUpdate = true;
-      geometry.index!.needsUpdate = true;
-      geometry.computeBoundingSphere();
-      yield;
-      const terrain = new THREE.Mesh(geometry, this.terrainMaterial);
-      terrain.receiveShadow = true;
-      terrain.castShadow = true;
-      group.add(terrain);
 
-      // Water uses the actual terrain vertices and diagonal. Signed depth then
+      // Water uses the ground level's vertices and diagonal. Signed depth then
       // interpolates on the same triangles; the shader clips at the zero crossing.
       // Sea level is identical across tiers, so there is no local-level water seam.
       const { wet, levels, waterDepth } = this;
+      const waterSegments = WATER_SEGMENTS[tier];
+      const waterStep = chunkSize / waterSegments;
       let waterVertex = 0;
-      for (let iz = 0; iz <= segments; iz++) {
-        for (let ix = 0; ix <= segments; ix++) {
-          const sample = sampleAt(ix, iz);
+      for (let iz = 0; iz <= waterSegments; iz++) {
+        for (let ix = 0; ix <= waterSegments; ix++) {
+          const sample = detailed ? sampleAt(ix, iz) : this.world.sample(originX + ix * waterStep, originZ + iz * waterStep);
           wet[waterVertex] = Number(sample.water);
           levels[waterVertex] = sample.surface;
           waterDepth[waterVertex++] = sample.surface - sample.height;
           if (ix % 8 === 0) yield;
         }
       }
-      const waterGeometry = yield* this.createWaterGeometry(originX, originZ, chunkSize, segments, wet, levels, waterDepth, buffers);
+      const waterGeometry = yield* this.createWaterGeometry(originX, originZ, chunkSize, waterSegments, wet, levels, waterDepth, buffers);
       // The shared water pool draws a copy; the tile keeps its built water as a hidden source mesh.
       const waterSource = waterGeometry ? new THREE.Mesh(waterGeometry, this.waterMaterial) : null;
       if (waterSource) { waterSource.visible = false; group.add(waterSource); }
 
       const trees = treeMode === 'none' ? [] : yield* this.world.buildTreesInArea(originX, originZ, CHUNK_SIZE, TREE_SPACING);
-      const rocks = this.createRocks(chunkX, chunkZ, config.rocks, originX, originZ);
+      const rocks = detailed ? this.createRocks(chunkX, chunkZ, DETAIL.rocks, originX, originZ) : null;
       if (rocks) group.add(rocks);
       const tors = detailed ? this.createTors(chunkX, chunkZ) : null;
       if (tors) group.add(tors);

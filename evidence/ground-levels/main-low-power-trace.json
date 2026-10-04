@@ -1,0 +1,3137 @@
+{
+  "lowPower": true,
+  "coldLoadMs": 203039,
+  "first": {
+    "start": {
+      "frame": 4491,
+      "visibleDistance": 3499.9999999999995,
+      "visibility": 3500,
+      "pending": 0,
+      "renderOrigin": [
+        -1983.4724844115544,
+        223.77196566320757,
+        -3435.9908513550254
+      ],
+      "green": 13440,
+      "drawCalls": 172,
+      "geometries": 170
+    },
+    "trace": [
+      {
+        "frame": 4492,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9788,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4493,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9788,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4495,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9789,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4496,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9789,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4497,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9789,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4498,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9788,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4499,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9789,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4500,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9789,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4501,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9789,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4503,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9789,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4504,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9791,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4505,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9792,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4506,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9794,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4507,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9796,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4508,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9795,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4509,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9795,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4511,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9801,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4512,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9803,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4513,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9803,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4514,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9804,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4515,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9805,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4516,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9820,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4517,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9820,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4518,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9835,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4520,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9832,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4521,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9846,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4522,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9868,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4523,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9866,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4524,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9872,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4525,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9881,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4526,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9887,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4527,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9892,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4529,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9894,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4530,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9893,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4531,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9892,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4532,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9893,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4533,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9889,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4534,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9889,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4535,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9890,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4536,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9870,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4538,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9841,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4539,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9836,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4540,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9835,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4541,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9831,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4542,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9823,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4543,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9817,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4544,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9815,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4545,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9816,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4547,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9819,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4548,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9809,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4549,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9808,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4550,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9805,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4551,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9805,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4552,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9805,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4553,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9798,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4555,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9796,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4556,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9796,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4557,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9795,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4558,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9792,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4559,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9791,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4560,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9791,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4561,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9791,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4563,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9790,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4564,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9789,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4565,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9788,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4566,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9788,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4567,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9788,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4568,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9788,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4569,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9788,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4571,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9787,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4572,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9787,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4573,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9787,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4574,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9787,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4575,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9787,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4576,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9787,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4577,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9787,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4579,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9787,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4580,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9787,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4581,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9787,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4582,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9787,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4583,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9787,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4584,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9787,
+        "drawCalls": 171,
+        "geometries": 170
+      },
+      {
+        "frame": 4585,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9791,
+        "drawCalls": 172,
+        "geometries": 171
+      },
+      {
+        "frame": 4586,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9792,
+        "drawCalls": 172,
+        "geometries": 171
+      },
+      {
+        "frame": 4588,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9792,
+        "drawCalls": 172,
+        "geometries": 171
+      },
+      {
+        "frame": 4589,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9793,
+        "drawCalls": 172,
+        "geometries": 171
+      },
+      {
+        "frame": 4590,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9793,
+        "drawCalls": 172,
+        "geometries": 171
+      },
+      {
+        "frame": 4591,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9793,
+        "drawCalls": 172,
+        "geometries": 171
+      },
+      {
+        "frame": 4592,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9793,
+        "drawCalls": 172,
+        "geometries": 171
+      },
+      {
+        "frame": 4593,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          -1983.4724844115544,
+          223.77196566320757,
+          -3435.9908513550254
+        ],
+        "green": 9793,
+        "drawCalls": 172,
+        "geometries": 171
+      }
+    ]
+  },
+  "jumpTrace": [
+    {
+      "frame": 4595,
+      "visibleDistance": 0,
+      "visibility": 3500,
+      "pending": 563,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 25,
+      "geometries": 72
+    },
+    {
+      "frame": 4719,
+      "visibleDistance": 266.714764083334,
+      "visibility": 3500,
+      "pending": 556,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 36,
+      "geometries": 75
+    },
+    {
+      "frame": 4750,
+      "visibleDistance": 268.25094829177283,
+      "visibility": 3500,
+      "pending": 554,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 39,
+      "geometries": 76
+    },
+    {
+      "frame": 4803,
+      "visibleDistance": 268.25201287056024,
+      "visibility": 3500,
+      "pending": 551,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 39,
+      "geometries": 76
+    },
+    {
+      "frame": 4867,
+      "visibleDistance": 382.0991462000776,
+      "visibility": 3500,
+      "pending": 546,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 41,
+      "geometries": 77
+    },
+    {
+      "frame": 4893,
+      "visibleDistance": 383.1846397117858,
+      "visibility": 3500,
+      "pending": 544,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 42,
+      "geometries": 77
+    },
+    {
+      "frame": 4965,
+      "visibleDistance": 544.95679753257,
+      "visibility": 3500,
+      "pending": 540,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 47,
+      "geometries": 77
+    },
+    {
+      "frame": 5044,
+      "visibleDistance": 544.9573305609954,
+      "visibility": 3500,
+      "pending": 535,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 51,
+      "geometries": 79
+    },
+    {
+      "frame": 5119,
+      "visibleDistance": 609.8541598447873,
+      "visibility": 3500,
+      "pending": 530,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 53,
+      "geometries": 80
+    },
+    {
+      "frame": 5160,
+      "visibleDistance": 610.5408775052812,
+      "visibility": 3500,
+      "pending": 528,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 53,
+      "geometries": 80
+    },
+    {
+      "frame": 5248,
+      "visibleDistance": 773.4195561235682,
+      "visibility": 3500,
+      "pending": 522,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 58,
+      "geometries": 82
+    },
+    {
+      "frame": 5268,
+      "visibleDistance": 774.5058044960862,
+      "visibility": 3500,
+      "pending": 520,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 59,
+      "geometries": 82
+    },
+    {
+      "frame": 5512,
+      "visibleDistance": 866.7695773187936,
+      "visibility": 3500,
+      "pending": 504,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 70,
+      "geometries": 83
+    },
+    {
+      "frame": 5567,
+      "visibleDistance": 988.6673474901235,
+      "visibility": 3500,
+      "pending": 498,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 75,
+      "geometries": 84
+    },
+    {
+      "frame": 5581,
+      "visibleDistance": 989.5195164688462,
+      "visibility": 3500,
+      "pending": 496,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 75,
+      "geometries": 84
+    },
+    {
+      "frame": 5622,
+      "visibleDistance": 1098.3684960141645,
+      "visibility": 3500,
+      "pending": 489,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 77,
+      "geometries": 86
+    },
+    {
+      "frame": 5631,
+      "visibleDistance": 1098.3687627134243,
+      "visibility": 3500,
+      "pending": 487,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 77,
+      "geometries": 86
+    },
+    {
+      "frame": 5664,
+      "visibleDistance": 1132.2235544610226,
+      "visibility": 3500,
+      "pending": 478,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 80,
+      "geometries": 86
+    },
+    {
+      "frame": 5671,
+      "visibleDistance": 1132.5961498839642,
+      "visibility": 3500,
+      "pending": 476,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 80,
+      "geometries": 86
+    },
+    {
+      "frame": 5696,
+      "visibleDistance": 1165.8269692803867,
+      "visibility": 3500,
+      "pending": 470,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 82,
+      "geometries": 88
+    },
+    {
+      "frame": 5720,
+      "visibleDistance": 1229.2739185568907,
+      "visibility": 3500,
+      "pending": 464,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 84,
+      "geometries": 90
+    },
+    {
+      "frame": 5746,
+      "visibleDistance": 1374.4598617961,
+      "visibility": 3500,
+      "pending": 458,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 85,
+      "geometries": 90
+    },
+    {
+      "frame": 5754,
+      "visibleDistance": 1375.0743452549616,
+      "visibility": 3500,
+      "pending": 456,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 85,
+      "geometries": 90
+    },
+    {
+      "frame": 5777,
+      "visibleDistance": 1375.0745586439955,
+      "visibility": 3500,
+      "pending": 451,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 87,
+      "geometries": 92
+    },
+    {
+      "frame": 5804,
+      "visibleDistance": 1375.381804732229,
+      "visibility": 3500,
+      "pending": 446,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 88,
+      "geometries": 93
+    },
+    {
+      "frame": 5884,
+      "visibleDistance": 1481.8822480538654,
+      "visibility": 3500,
+      "pending": 430,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 92,
+      "geometries": 97
+    },
+    {
+      "frame": 5923,
+      "visibleDistance": 1557.148134064687,
+      "visibility": 3500,
+      "pending": 422,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 94,
+      "geometries": 99
+    },
+    {
+      "frame": 5991,
+      "visibleDistance": 1605.2895371988463,
+      "visibility": 3500,
+      "pending": 410,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 97,
+      "geometries": 102
+    },
+    {
+      "frame": 6085,
+      "visibleDistance": 1674.797092804544,
+      "visibility": 3500,
+      "pending": 397,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 101,
+      "geometries": 106
+    },
+    {
+      "frame": 6130,
+      "visibleDistance": 1741.304315294538,
+      "visibility": 3500,
+      "pending": 389,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 103,
+      "geometries": 108
+    },
+    {
+      "frame": 6140,
+      "visibleDistance": 1741.7902354062467,
+      "visibility": 3500,
+      "pending": 387,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 103,
+      "geometries": 108
+    },
+    {
+      "frame": 6175,
+      "visibleDistance": 1761.4780508387062,
+      "visibility": 3500,
+      "pending": 381,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 105,
+      "geometries": 110
+    },
+    {
+      "frame": 6524,
+      "visibleDistance": 2099.1147323927057,
+      "visibility": 3500,
+      "pending": 320,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 121,
+      "geometries": 126
+    },
+    {
+      "frame": 6551,
+      "visibleDistance": 2153.0007824236436,
+      "visibility": 3500,
+      "pending": 316,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 121,
+      "geometries": 126
+    },
+    {
+      "frame": 6682,
+      "visibleDistance": 2203.6546382593488,
+      "visibility": 3500,
+      "pending": 294,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 127,
+      "geometries": 132
+    },
+    {
+      "frame": 7524,
+      "visibleDistance": 2221.9366046625696,
+      "visibility": 3500,
+      "pending": 131,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 0,
+      "drawCalls": 165,
+      "geometries": 170
+    },
+    {
+      "frame": 8093,
+      "visibleDistance": 2354.5026859587565,
+      "visibility": 3500,
+      "pending": 14,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 144,
+      "drawCalls": 192,
+      "geometries": 197
+    },
+    {
+      "frame": 8114,
+      "visibleDistance": 2932.1278899457984,
+      "visibility": 3500,
+      "pending": 13,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 5371,
+      "drawCalls": 192,
+      "geometries": 197
+    },
+    {
+      "frame": 8261,
+      "visibleDistance": 3229.995228234891,
+      "visibility": 3500,
+      "pending": 3,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 9900,
+      "drawCalls": 193,
+      "geometries": 198
+    },
+    {
+      "frame": 8310,
+      "visibleDistance": 3412.8796710196416,
+      "visibility": 3500,
+      "pending": 1,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 11297,
+      "drawCalls": 193,
+      "geometries": 198
+    },
+    {
+      "frame": 8337,
+      "visibleDistance": 3499.9999999999995,
+      "visibility": 3500,
+      "pending": 0,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 11921,
+      "drawCalls": 193,
+      "geometries": 198
+    }
+  ],
+  "second": {
+    "start": {
+      "frame": 8338,
+      "visibleDistance": 3499.9999999999995,
+      "visibility": 3500,
+      "pending": 0,
+      "renderOrigin": [
+        20159,
+        284.1729882058998,
+        -3089
+      ],
+      "green": 11921,
+      "drawCalls": 193,
+      "geometries": 198
+    },
+    "trace": [
+      {
+        "frame": 8340,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10564,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8341,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8342,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8343,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8344,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8345,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8346,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8348,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8349,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 81,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8350,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8351,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8352,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8353,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8354,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8356,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8357,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8358,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 80,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8359,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8360,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8361,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8362,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8364,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8365,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8366,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8367,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8368,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8369,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10566,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8370,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10573,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8372,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10582,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8373,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 79,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10585,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8374,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10582,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8375,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10582,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8376,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10582,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8377,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10591,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8378,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10600,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8380,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10626,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8381,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10624,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8382,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10622,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8383,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10620,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8384,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10656,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8385,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 78,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10678,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8386,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10687,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8388,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10665,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8389,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10669,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8390,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10687,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8391,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10684,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8392,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10674,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8393,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10673,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8394,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10677,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8395,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10679,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8397,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10662,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8398,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10651,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8399,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10624,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8400,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10598,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8401,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10575,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8402,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 77,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10567,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8403,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10567,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8404,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10566,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8406,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10561,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8407,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10557,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8408,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10555,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8409,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10554,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8410,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10554,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8411,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10554,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8412,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10555,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8414,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10555,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8415,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10555,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8416,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10555,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8417,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10555,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8418,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 76,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10558,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8419,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10562,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8420,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10564,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8421,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8423,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8424,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10564,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8425,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10564,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8426,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10564,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8427,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10564,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8428,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10564,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8429,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10564,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8430,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10564,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8432,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10564,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8433,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10564,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8434,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 75,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 190,
+        "geometries": 198
+      },
+      {
+        "frame": 8435,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 191,
+        "geometries": 199
+      },
+      {
+        "frame": 8436,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 191,
+        "geometries": 199
+      },
+      {
+        "frame": 8437,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 191,
+        "geometries": 199
+      },
+      {
+        "frame": 8438,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 191,
+        "geometries": 199
+      },
+      {
+        "frame": 8440,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 191,
+        "geometries": 199
+      },
+      {
+        "frame": 8441,
+        "visibleDistance": 3310.4780352225375,
+        "visibility": 3500,
+        "pending": 74,
+        "renderOrigin": [
+          20159,
+          284.1729882058998,
+          -3089
+        ],
+        "green": 10563,
+        "drawCalls": 191,
+        "geometries": 199
+      }
+    ]
+  },
+  "jumpFrames": 3296
+}

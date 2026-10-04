@@ -3,17 +3,18 @@ import { describe, expect, it } from 'vitest';
 import { CHUNK_SIZE, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from '../src/terrain';
 import { WorldModel } from '../src/world';
 
-const FAR_CHUNK_SIZE = CHUNK_SIZE * 4;
 
-function expectLoadedWithin(scene: THREE.Scene, terrain: TerrainStream, x: number, z: number): void {
+/** Every point the haze leaves clear lies on a displayed ground level. */
+function expectGroundWithin(scene: THREE.Scene, terrain: TerrainStream, x: number, z: number): void {
   const covered = terrain.coveredDistance(x, z);
+  if (covered <= 0) return;
+  const levels = scene.children.filter((child) => child.name.startsWith('ground ') && child.visible)
+    .map((level) => new THREE.Box3().setFromObject(level));
+  expect(levels.length).toBeGreaterThan(0);
   for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 90) {
-    const px = x + Math.cos(angle) * (covered - 1);
-    const pz = z + Math.sin(angle) * (covered - 1);
-    if (covered <= 0) return;
-    const fine = scene.getObjectByName(`land ${Math.floor(px / CHUNK_SIZE)},${Math.floor(pz / CHUNK_SIZE)}`);
-    const far = scene.getObjectByName(`land far ${Math.floor(px / FAR_CHUNK_SIZE)},${Math.floor(pz / FAR_CHUNK_SIZE)}`);
-    expect(fine ?? far).toBeDefined();
+    const px = x + Math.cos(angle) * covered;
+    const pz = z + Math.sin(angle) * covered;
+    expect(levels.some((box) => px >= box.min.x && px <= box.max.x && pz >= box.min.z && pz <= box.max.z)).toBe(true);
   }
 }
 
@@ -41,16 +42,16 @@ describe('terrain streaming', () => {
     terrain.update(x, z);
     expect(terrain.pendingCount).toBeGreaterThan(0);
     expect(terrain.coveredDistance(x, z)).toBeLessThan(MIN_VISIBILITY);
-    expectLoadedWithin(scene, terrain, x, z);
+    expectGroundWithin(scene, terrain, x, z);
     while (terrain.pendingCount) terrain.update(x, z);
     expect(terrain.chunkCount).toBe(25);
     expect(scene.children.find((child) => child.name.startsWith('land'))?.name).toBe('land 0,0');
     expect(terrain.coveredDistance(x, z)).toBe(MIN_VISIBILITY);
-    expectLoadedWithin(scene, terrain, x, z);
+    expectGroundWithin(scene, terrain, x, z);
     terrain.dispose();
   });
 
-  it('keeps haze on loaded tiles while extending the reach, including after recentering', () => {
+  it('keeps haze on displayed ground while extending the reach, including after recentering', () => {
     const scene = new THREE.Scene();
     const terrain = new TerrainStream(scene, new WorldModel(80231));
     const reach = MAX_VISIBILITY * 1.3;
@@ -67,14 +68,14 @@ describe('terrain streaming', () => {
     while (terrain.pendingCount) {
       terrain.update(x, z, testBuildBudget);
       iterations += 1;
-      if (iterations % 5 === 0) expectLoadedWithin(scene, terrain, x, z);
+      if (iterations % 5 === 0) expectGroundWithin(scene, terrain, x, z);
     }
     expect(terrain.chunkCount).toBeLessThan((2 * radius + 1) ** 2 * 0.9);
     expect(terrain.coveredDistance(x, z)).toBe(reach);
-    expectLoadedWithin(scene, terrain, x, z);
+    expectGroundWithin(scene, terrain, x, z);
     terrain.update(x + CHUNK_SIZE * 2, z);
     expect(terrain.coveredDistance(x + CHUNK_SIZE * 2, z)).toBeLessThan(reach);
-    expectLoadedWithin(scene, terrain, x + CHUNK_SIZE * 2, z);
+    expectGroundWithin(scene, terrain, x + CHUNK_SIZE * 2, z);
     terrain.setReach(MIN_VISIBILITY);
     expect(terrain.chunkCount).toBeLessThanOrEqual(25);
     terrain.dispose();

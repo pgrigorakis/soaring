@@ -5,6 +5,8 @@
 The coordinated cloud deck, fog transitions, painted surface lighting and flight
 schedule are adapted from [Fly With Me](https://github.com/kunchenguid/fly-with-me)
 by Kun Chen, at commit `aca247b487ffafa5696cce143f108a71a24a7950`.
+`src/ground-levels.ts` adapts the fixed terrain grid and incremental toroidal heightfield refill
+from the same commit.
 
 MIT License
 
