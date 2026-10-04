@@ -36,10 +36,13 @@ Relevant browser checks include:
 - `tests/highlands.smoke.ts` records a one-hour Highlands flight with terrain clearance, climb limits, and behavior-duration checks. Total flap time is recorded, not limited.
 - `tests/highlands-cover.smoke.ts` captures noon and golden-hour snow cover from the default chase camera.
 - `tests/cloud-sea.smoke.ts` captures morning mist over a lake at dawn, during its fade, and after it, plus the same times over dry ground.
-- `tests/lakeland.smoke.ts` checks a wooded lake island, dry banks, and water edges across mesh tiers. Run `node scripts/calibrate-lakeland.mjs` to measure territory across three large seed grids, or `node scripts/audit-lakeland.mjs` to record a repeatable one-hour lake-heavy navigation trace. See [Lakeland measurements](diagnostics/issue-59-lakeland.md).
+- `tests/continental.smoke.ts` checks hashed continental fields, common sea level, height independent of biome profiles, continuous shelves, and dry trees/thermals. It writes repeatable JSON evidence.
+- `tests/lakeland.smoke.ts` checks signed water depths on actual terrain triangles and shared water edges across mesh tiers. Run `node scripts/calibrate-lakeland.mjs` to measure biome territory, or `node scripts/audit-lakeland.mjs` to record a repeatable one-hour sea-level navigation trace. The [earlier Lakeland measurements](diagnostics/issue-59-lakeland.md) describe the retired drainage lakes.
 - `tests/biomes.smoke.ts` checks deterministic biome samples and shared mesh edges, and writes a repeatable JSON artifact. `tests/climate.smoke.ts` checks climate selection, altitude cooling, snow and the tree line. See [current biome measurements and captures](diagnostics/issue-93-biomes/README.md) and the [earlier span decision](diagnostics/issue-58-biome-spans.md).
 
 The product reliability target is one uninterrupted hour without intervention or obvious repetition. Automated navigation tests simulate one hour at 10 Hz across several flight-height ranges. Browser validation is shorter and accelerated; it is not a literal one-hour browser soak.
+
+The current generator and matched before/after evidence are in [continental terrain](design/continental-terrain.md). Run `node scripts/capture-terrain-map.mjs after` to reproduce its seed-42 top-down map.
 
 To capture repeatable browser evidence, use the `?smoke` mode and the test's fixed seed, start pose, and default chase camera where specified. Smoke tests save captures and JSON evidence in `test-results/`. Do not replace acceptance captures with an elevated or orbit camera.
 

@@ -8,7 +8,7 @@ This file holds the engine invariants established by #95 and points agents to re
 
 - Keep navigation and world placement in world coordinates; rebase only the rendered scene and camera, so long flights do not alter simulation positions or procedural terrain.
 - Derive terrain colour from world samples and coordinates, so adjacent chunks have matching shared edges.
-- Use blended biome-profile elevations, without the 520 m lowland hills, for drainage before river carving, so river paths follow the broad landform without feeding carved heights back into terrain selection.
+- Keep continental terrain height independent of biome profiles; sample water at common sea level and interpolate shore depth on the actual terrain triangles.
 - Align coarse terrain tiles to fine-grid boundaries and keep skirts on non-nearest tiles, so streamed mesh transitions do not expose gaps or seams.
 - Exclude water from thermal placement, so lift sites remain on land.
 - Keep thermal sun-facing placement on a fixed azimuth, so thermal sites do not drift as the sky sun moves.

@@ -17,7 +17,7 @@ const extent = 240000;
 const report = { ref: ref ?? 'working tree',
   metric: 'dominant-biome contiguous flight-line chord, excluding boundary-truncated runs',
   spanBiomes: 'hills, woodland, moor, highlands of the landform allocation (Lakeland excluded, as in #58)',
-  coverageMetric: 'mean pre-drainage biome weights (not dry-land-only vertex coverage)',
+  coverageMetric: 'mean biome weights (not dry-land-only vertex coverage)',
   stepMeters: 100, extentMeters: extent, options: [] };
 const source = (path) => ref ? execFileSync('git', ['show', `${ref}:${path}`], { encoding: 'utf8' }) : readFile(path, 'utf8');
 for (const scale of scales) {
@@ -31,13 +31,24 @@ for (const scale of scales) {
         if (ref && path.endsWith('world.ts')) contents = contents.replace(
           /return \{ elevation, mountainRegion, biome(, hills)? \};/,
           (_, hills = '') => `return { elevation, mountainRegion, biome${hills}, landform };`);
+        if (path.endsWith('world.ts')) contents += '\nexport { biomeWeights, BIOME_SELECTION, CLIMATE } from "./biome";\n';
         if (scale && path.endsWith('biome.ts')) contents = contents.replace(/scale: \d+/, `scale: ${scale}`);
         for (const [from, to] of (process.env.PATCH ? process.env.PATCH.split("||").map((pair) => pair.split("=>")) : [])) contents = contents.replace(from, to);
         return { contents, loader: 'ts' };
       });
     } }],
   });
-  const { WorldModel } = await import(`../${outfile}`);
+  const { WorldModel, biomeWeights, BIOME_SELECTION, CLIMATE, fbm } = await import(`../${outfile}`);
+  const fields = (world, x, z) => {
+    const relief = world.relief(x, z);
+    if (relief.biome) return relief; // Historical drainage generator.
+    const climate = world.climate(x, z), mountain = world.mountainRegion(x, z);
+    const temperature = climate.seaTemperature - Math.max(0, relief.height) / CLIMATE.lapse;
+    const lakeField = Math.max(0, Math.min(1, .5 + fbm(x / BIOME_SELECTION.lakeWavelength,
+      z / BIOME_SELECTION.lakeWavelength, world.seed + 131, 4)));
+    return { biome: biomeWeights(mountain, temperature, climate.moisture, climate.region, lakeField),
+      landform: biomeWeights(mountain, temperature, climate.moisture, climate.region) };
+  };
   const option = { climateScaleMeters: scale ?? 'default', seeds: [] };
   report.options.push(option);
   for (const seed of [80231, 42, 123456]) {
@@ -45,10 +56,10 @@ for (const scale of scales) {
     const sums = Object.fromEntries(names.map((name) => [name, 0]));
     const runs = Object.fromEntries(names.map((name) => [name, []]));
     let count = 0;
-    // Pre-drainage field audit avoids river lattice caching affecting measurement.
+    // Sample selection fields directly; exclude Lakeland only from chord classification.
     for (let z = -extent / 2; z < extent / 2; z += 500) {
       for (let x = -extent / 2; x < extent / 2; x += 500) {
-        const { biome } = world.relief(x, z);
+        const { biome } = fields(world, x, z);
         for (const name of names) sums[name] += biome[name];
         count += 1;
       }
@@ -57,7 +68,7 @@ for (const scale of scales) {
       let previous = '';
       let start = -extent / 2;
       for (let x = -extent / 2; x <= extent / 2; x += 100) {
-        const { biome, landform } = world.relief(x, z);
+        const { biome, landform } = fields(world, x, z);
         const land = landform ?? biome;
         const name = spanNames.reduce((best, next) => land[next] > land[best] ? next : best);
         if (name === previous) continue;

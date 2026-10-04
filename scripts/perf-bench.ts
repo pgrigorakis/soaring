@@ -8,17 +8,17 @@ import type { Browser } from '@playwright/test';
 
 export interface Vantage {
   name: string;
-  spot: 'lake' | 'confluence' | 'run' | 'network' | 'origin';
+  spot: 'lake' | 'coast' | 'basin' | 'islands' | 'origin';
   heading: number | 'spot';
   timeOfDay: number;
 }
 
-/** Five fixed views: water at noon, a river junction, a long run at golden hour, a wide network, open land at night. */
+/** Five sea-level views: basin, coast, golden-hour bay, islands and night land. */
 export const VANTAGES: readonly Vantage[] = [
   { name: 'lake-noon', spot: 'lake', heading: 0, timeOfDay: 0.5 },
-  { name: 'confluence-noon', spot: 'confluence', heading: Math.PI / 2, timeOfDay: 0.5 },
-  { name: 'river-run-golden-hour', spot: 'run', heading: 'spot', timeOfDay: 0.72 },
-  { name: 'network-noon', spot: 'network', heading: Math.PI, timeOfDay: 0.5 },
+  { name: 'coast-noon', spot: 'coast', heading: Math.PI / 2, timeOfDay: 0.5 },
+  { name: 'basin-golden-hour', spot: 'basin', heading: 'spot', timeOfDay: 0.72 },
+  { name: 'islands-noon', spot: 'islands', heading: Math.PI, timeOfDay: 0.5 },
   { name: 'origin-night', spot: 'origin', heading: 0, timeOfDay: 0 },
 ];
 
@@ -115,7 +115,7 @@ export async function runBenchRound(browser: Browser, options: BenchOptions): Pr
 
   for (const vantage of VANTAGES.slice(0, options.vantageLimit ?? VANTAGES.length)) {
     const spot = vantage.spot === 'origin' ? { x: 0, z: 0 } : spots[vantage.spot];
-    const heading = vantage.heading === 'spot' ? (spots.run.heading) : vantage.heading;
+    const heading = vantage.heading === 'spot' ? (spots.basin.heading) : vantage.heading;
     // Existing hooks only: reviewFlight places the bird and freezes navigation, setTimeOfDay freezes the sky.
     const camera = await page.evaluate(({ x, z, heading, timeOfDay, visibility }) => {
       const app = window.__SOARING__;

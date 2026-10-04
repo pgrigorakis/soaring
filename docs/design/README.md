@@ -4,6 +4,8 @@ Visual reference for the colour, biome and flight work tracked in GitHub issues.
 
 The boards are exports of a design canvas. If an issue and a board disagree, the issue wins.
 
+The current land-and-water generator is [continental terrain](continental-terrain.md). The boards' river valleys, elevated cirques, explicit lake islands and peat pools are historical references, not current geometry requirements.
+
 | Board | What it shows | Used by |
 | --- | --- | --- |
 | [00-colour-pass](boards/00-colour-pass.png) | The same valley in today's palette and the saturated one; old → new swatches; renderer settings; the saturated palette across the day | Colour pass |

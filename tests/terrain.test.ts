@@ -168,11 +168,11 @@ describe('terrain streaming', () => {
     terrain.dispose();
   });
 
-  it('matches terrain and river water across a chunk seam built by separate streams', () => {
+  it('matches terrain and sea-level water across a chunk seam built by separate streams', () => {
     const seam = 10 * CHUNK_SIZE;
     const probe = new WorldModel(448122);
     const chunkZ = Array.from({ length: 21 }, (_, i) => i - 10)
-      .find((z) => Array.from({ length: 41 }, (_, i) => probe.sample(seam, (z + i / 40) * CHUNK_SIZE).river).some(Boolean))!;
+      .find((z) => Array.from({ length: 41 }, (_, i) => probe.sample(seam, (z + i / 40) * CHUNK_SIZE).water).some(Boolean))!;
     expect(chunkZ).toBeDefined();
     // Each side comes from its own world and stream, built in a different order.
     const edge = (chunkX: number, x: number) => {

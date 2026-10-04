@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { globalWind, type Wind } from './wind';
-import { fbm, hash2, highlandWeight, lakeShorePoint, Reach, Thermal, WorldModel } from './world';
+import { fbm, hash2, highlandWeight, type Shore, Thermal, WorldModel } from './world';
 
 export type EagleBehavior = 'gliding' | 'thermal-seeking' | 'thermal-riding' | 'ridge-soaring';
 
@@ -113,8 +113,8 @@ const CLIMB_AHEAD = {
   resume: 30,
 } as const;
 
-/** Shore legs trace up to half a lake, then the compass takes over again. */
-const SHORE = { reach: 700, odds: 0.6, offset: 60, leg: 300, arc: Math.PI, revisitSeconds: 600 } as const;
+/** Four coast-following legs, then the compass takes over again. */
+const SHORE = { reach: 700, odds: 0.6, offset: 60, leg: 300, revisitSeconds: 600 } as const;
 
 type Face = { slope: number; angle: number };
 /** Sideways offsets, in metres right of the heading, where the gate looks for a face. A valley route flies beside its faces. */
@@ -146,7 +146,7 @@ type Ridge = {
   turnSign: number;
   weakTime: number;
 };
-type ShoreTrace = { lake: Reach; angle: number; sign: 1 | -1; arcLeft: number };
+type ShoreTrace = { point: Shore; sign: 1 | -1; legsLeft: number };
 
 // Positive bank is a positive local-Z rotation: it lowers the left wing. After the heading yaw,
 // the right wing (+X) points along (cos heading, -sin heading). The sign follows that wing and
@@ -298,7 +298,8 @@ export class EagleNavigator {
     for (let dz = -250; dz <= 250; dz += 125) {
       for (let dx = -250; dx <= 250; dx += 125) {
         if (dx * dx + dz * dz > 250 ** 2) continue;
-        highest = Math.max(highest, this.world.sample(x + dx, z + dz).height);
+        const sample = this.world.sample(x + dx, z + dz);
+        highest = Math.max(highest, sample.height, sample.surface);
       }
     }
     return highest;
@@ -306,14 +307,12 @@ export class EagleNavigator {
 
   /** Trade forward progress, not a vertical jump, when a face outruns climb lift. */
   private moveAboveTerrain(dx: number, dz: number): void {
-    const mountain = highlandWeight(this.world.sample(this.state.x, this.state.z).mountainRegion);
-    if (mountain === 0) {
-      this.state.x += dx;
-      this.state.z += dz;
-      return;
-    }
-    const clear = (fraction: number) => this.world.sample(this.state.x + dx * fraction, this.state.z + dz * fraction).height
-      + TERRAIN_SAFETY_MARGIN + 6 < this.state.y;
+    // Continental mountains can stand in any climate biome. Movement protection
+    // follows ground and sea level, never the Highlands appearance weight.
+    const clear = (fraction: number) => {
+      const sample = this.world.sample(this.state.x + dx * fraction, this.state.z + dz * fraction);
+      return Math.max(sample.height, sample.surface) + TERRAIN_SAFETY_MARGIN + 6 < this.state.y;
+    };
     let fraction = 1;
     if (!clear(1)) {
       let low = 0;
@@ -331,15 +330,11 @@ export class EagleNavigator {
 
   private flyTowardTarget(dt: number, ground: number): void {
     const desiredHeading = Math.atan2(this.target.x - this.state.x, this.target.z - this.state.z);
-    if (highlandWeight(this.world.sample(this.state.x, this.state.z).mountainRegion) > 0) {
-      this.aheadAge += dt;
-      if (this.aheadAge >= CLIMB_AHEAD.seconds) {
-        this.aheadAge = 0;
-        this.planAhead(desiredHeading);
-      }
-    } else {
-      this.detour = null;
-      this.climbNeed = -Infinity;
+    // Height is independent of biome selection now. Check every flight route.
+    this.aheadAge += dt;
+    if (this.aheadAge >= CLIMB_AHEAD.seconds) {
+      this.aheadAge = 0;
+      this.planAhead(desiredHeading);
     }
     const headingError = wrapAngle((this.detour ?? desiredHeading) - this.state.heading);
     this.steer(headingError, dt);
@@ -376,7 +371,8 @@ export class EagleNavigator {
     let need = -Infinity;
     let full = -Infinity;
     for (let along = CLIMB_AHEAD.step; along <= reach; along += CLIMB_AHEAD.step) {
-      const clear = this.world.sample(this.state.x + dx * along, this.state.z + dz * along).height + floor;
+      const sample = this.world.sample(this.state.x + dx * along, this.state.z + dz * along);
+      const clear = Math.max(sample.height, sample.surface) + floor;
       const climb = along / CRUISE_SPEED * FLAP_CLIMB_RATE;
       need = Math.max(need, clear - climb * CLIMB_AHEAD.climbShare);
       full = Math.max(full, clear - climb);
@@ -440,9 +436,9 @@ export class EagleNavigator {
     const sample = this.world.sample(x, z);
     if (highlandWeight(sample.mountainRegion) >= 0.5) return true;
     if (sample.water) return false;
-    const lake = this.world.nearestLake(x, z);
-    return !!lake && lake.shoreDist >= RIDGE.lakeBank.min && lake.shoreDist <= RIDGE.lakeBank.max
-      && Math.cos(face.angle) * (x - lake.reach.ax) + Math.sin(face.angle) * (z - lake.reach.az) > 0;
+    const shore = this.world.nearestShore(x, z, RIDGE.lakeBank.max + 80);
+    return !!shore && shore.distance >= RIDGE.lakeBank.min && shore.distance <= RIDGE.lakeBank.max
+      && Math.cos(face.angle) * shore.normalX + Math.sin(face.angle) * shore.normalZ > 0;
   }
 
   /** Walk upslope in 40 m steps, up to 400 m, until the slope eases below 8° or the ground falls. */
@@ -813,35 +809,33 @@ export class EagleNavigator {
     this.target = this.nextShoreTarget() ?? this.scenicCandidate();
   }
 
-  /**
-   * Near a lake shore, some targets trace up to half the shore, then the compass resumes.
-   * Keyed to lake discs, not to a biome weight, so any biome's lakes qualify.
-   */
+  /** Follow actual sea-level shore crossings for a few legs, then resume the compass. */
   private nextShoreTarget(): { x: number; z: number } | null {
     if (!this.shore) {
-      const near = this.world.nearestLake(this.state.x, this.state.z);
-      if (!near || near.shoreDist > SHORE.reach) return null;
-      const lake = near.reach;
+      const near = this.world.nearestShore(this.state.x, this.state.z, SHORE.reach + 80);
+      if (!near || near.distance > SHORE.reach) return null;
       if (this.lastShore && this.totalTime - this.lastShore.time < SHORE.revisitSeconds
-        && Math.hypot(lake.ax - this.lastShore.x, lake.az - this.lastShore.z) < 1) return null;
-      if (hash2(this.scenicIndex, Math.floor(lake.ax), this.world.seed + 433) > SHORE.odds) return null;
-      const angle = Math.atan2(this.state.z - lake.az, this.state.x - lake.ax);
-      const bearing = this.compassBearing;
-      // Go round the side whose tangent agrees with the route compass.
-      const sign = -Math.sin(angle) * Math.sin(bearing) + Math.cos(angle) * Math.cos(bearing) >= 0 ? 1 : -1;
-      this.shore = { lake, angle, sign, arcLeft: SHORE.arc };
-      this.lastShore = { x: lake.ax, z: lake.az, time: this.totalTime };
+        && Math.hypot(near.x - this.lastShore.x, near.z - this.lastShore.z) < SHORE.leg * 4) return null;
+      if (hash2(this.scenicIndex, Math.floor(near.x), this.world.seed + 433) > SHORE.odds) return null;
+      const sign = -near.normalZ * Math.sin(this.compassBearing) + near.normalX * Math.cos(this.compassBearing) >= 0 ? 1 : -1;
+      this.shore = { point: near, sign, legsLeft: 4 };
+      this.lastShore = { x: near.x, z: near.z, time: this.totalTime };
     }
-    const shore = this.shore;
-    if (shore.arcLeft <= 0) {
-      this.shore = null;
-      return null;
+    const trace = this.shore;
+    if (trace.legsLeft-- <= 0) { this.shore = null; return null; }
+    const point = trace.point;
+    const next = this.world.nearestShore(point.x - point.normalZ * trace.sign * SHORE.leg,
+      point.z + point.normalX * trace.sign * SHORE.leg, SHORE.leg * 2);
+    if (!next) { this.shore = null; return null; }
+    trace.point = next;
+    this.scenicIndex++;
+    // Walk outward until the target is genuinely dry, not just tangent-plane dry.
+    for (let offset = SHORE.offset; offset <= SHORE.leg; offset += 30) {
+      const target = { x: next.x + next.normalX * offset, z: next.z + next.normalZ * offset };
+      if (!this.world.sample(target.x, target.z).water) return target;
     }
-    const step = Math.min(shore.arcLeft, SHORE.leg / (shore.lake.aWidth / 2 + SHORE.offset));
-    shore.angle += shore.sign * step;
-    shore.arcLeft -= step;
-    this.scenicIndex += 1;
-    return lakeShorePoint(shore.lake, shore.angle, SHORE.offset);
+    this.shore = null;
+    return null;
   }
 
   private scenicCandidate(): { x: number; z: number } {

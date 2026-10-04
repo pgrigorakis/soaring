@@ -1,6 +1,6 @@
-# Highlands acceptance evidence
+# Historical Highlands acceptance evidence
 
-Issue #57, part of #45.
+Issue #57, part of #45. These captures and measurements predate the [continental generator](../continental-terrain.md). The current tests use new continental fixtures and retain the same safety requirements.
 
 - `navigation.json`: one simulated hour at 10 Hz through the real world model and navigator in Chrome. Seed 57, start `(-24000, 3750)`, heading 0. The baseline uses the same seed, start, cache-trim cadence and timestep on commit `184df89de4f05087194fdc25e36ddd83a7ba0181`.
 - Minimum clearance: **12.34 m**, above the 6 m safety margin. No safety-floor corrections.
@@ -22,4 +22,4 @@ To reproduce:
 4. Hide the intro and controls for capture. Wait until `snapshot().pending === 0` and `snapshot().visibleDistance === 5000`.
 5. Call `setTimeOfDay(0.5)` for noon and `setTimeOfDay(0.72)` for golden hour. Wait for a new rendered frame before each screenshot. Snow is white `#F2F4F7`; no face receives the board's blue shadow colour.
 
-`tests/highlands-cover.smoke.ts` also verifies a snow cap on a cold crest, bare faces above 40°, no snow on warm ground, and a small headwater cirque lake feeding a downhill river. Snow follows temperature.
+The original `tests/highlands-cover.smoke.ts` also verified a headwater cirque feeding a downhill river. Those water features are retired. The current test retains snow on a cold crest, bare faces above 40°, and no snow on warm ground.

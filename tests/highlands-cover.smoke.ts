@@ -9,7 +9,7 @@ test('Highlands snow caps remain visible from the default chase camera', async (
   });
   await page.goto('/?smoke');
   await page.evaluate(() => {
-    window.__SOARING__.reviewFlight!({ x: 158, z: 19842, heading: Math.atan2(-198, 198) });
+    window.__SOARING__.reviewFlight!({ x: 113000, z: 73100, heading: Math.PI / 4 });
     window.__SOARING__.setVisibility(1800);
     document.querySelector('#intro')?.classList.add('hidden');
     document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
@@ -21,18 +21,13 @@ test('Highlands snow caps remain visible from the default chase camera', async (
     const { snowCover } = await import(/* @vite-ignore */ terrainPath) as typeof import('../src/terrain');
     const { WorldModel } = await import(/* @vite-ignore */ worldPath) as typeof import('../src/world');
     const world = new WorldModel(57);
-    // The ridged massif moves the crest. Snow still follows temperature (#93).
-    const peak = world.sample(-40, 20040);
-    const cirque = world.reachesIn(13500, 28000, 20000, 35500).find((reach) => reach.lake
-      && world.drainageAt(Math.floor(reach.ax / 500), Math.floor(reach.az / 500)).downstreamI !== null);
-    return { cirque: cirque ? { water: world.sample(cirque.ax, cirque.az).water, radius: cirque.aWidth / 2 } : null,
-      height: peak.height, cap: snowCover(peak, 0.2, -40, 20040, 57),
-      cliff: snowCover(peak, 1, -40, 20040, 57),
-      below: snowCover({ ...peak, temperature: 0.5 }, 0.2, -40, 20040, 57) };
+    // FWM's continental mask moves mountains. Elevated drainage cirques are gone.
+    const peak = world.sample(113400, 73500);
+    return { height: peak.height, cap: snowCover(peak, 0.2, 113400, 73500, 57),
+      cliff: snowCover(peak, 1, 113400, 73500, 57),
+      below: snowCover({ ...peak, temperature: 0.5 }, 0.2, 113400, 73500, 57) };
   });
-  expect(cover.cirque?.water).toBe(true);
-  expect(cover.cirque?.radius).toBeLessThanOrEqual(200);
-  expect(cover.height).toBeGreaterThan(1000);
+  expect(cover.height).toBeGreaterThan(800);
   expect(cover.cap).toBe(1);
   expect(cover.cliff).toBe(0);
   expect(cover.below).toBe(0);
