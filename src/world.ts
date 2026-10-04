@@ -98,7 +98,8 @@ export class WorldModel {
       w = this.regionSeed;
     const wx = x + 700 * gradientFbm(x / 2200 + 31.7, z / 2200 - 12.3, w, 3);
     const wz = z + 700 * gradientFbm(x / 2200 - 54.1, z / 2200 + 77.9, w + 7, 3);
-    const continentalness = gradientFbm(wx / 3400, wz / 3400, s, 4) * 0.5 + 0.5;
+    // 7 km land masses: at 3.4 km, narrow sea channels split every biome into small patches.
+    const continentalness = gradientFbm(wx / 7000, wz / 7000, s, 4) * 0.5 + 0.5;
     const land = sstep(0.4, 0.6, continentalness);
     const hills = gradientFbm(wx / 520, wz / 520, s + 11, 4) * (10 + 38 * land);
     const mountainMask = sstep(0.56, 0.82, continentalness);
@@ -107,10 +108,11 @@ export class WorldModel {
     const ridge = mountainMask > 0 ? ridgedMulti(rx / 1600, rz / 1600, s + 23, 4) : 0;
     const peak = mountainMask > 0 ? this.summitTerm(x, z) : 0;
     const lift = (ridge * SUMMIT.massif * (1 - 0.45 * sstep(0.05, 0.5, peak)) + peak * SUMMIT.lift) * mountainMask;
-    const elevation = -70 + 150 * land + hills + lift;
+    const plate = -70 + 150 * land;
+    const elevation = plate + hills + lift;
     const shelf = sstep(-30, 30, elevation);
     const height = elevation * (0.55 + 0.45 * shelf) + (1 - shelf) * -6;
-    return { height, elevation, hills, continentalness, mountainMask };
+    return { height, elevation, plate, hills, continentalness, mountainMask };
   }
   private summitTerm(x: number, z: number): number {
     const s = this.landSeed;
@@ -167,14 +169,17 @@ export class WorldModel {
     );
   }
   sample(x: number, z: number): LandscapeSample {
-    const { height } = this.relief(x, z);
+    const { height, plate } = this.relief(x, z);
     const mountainRegion = this.mountainRegion(x, z);
     const climate = this.climate(x, z);
     const temperature = climate.seaTemperature - Math.max(0, height) / CLIMATE.lapse;
+    // Biomes are chosen on the broad continental plate, as #93 intended. Hills, ridges
+    // and summits still cool snow and the tree line, but no longer cut biomes into specks.
+    const selectionTemperature = climate.seaTemperature - Math.max(0, plate) / CLIMATE.lapse;
     const lakeField = clamp01(
-      0.5 + fbm(x / BIOME_SELECTION.lakeWavelength, z / BIOME_SELECTION.lakeWavelength, this.seed + 131, 4),
+      0.5 + fbm(x / BIOME_SELECTION.lakeWavelength, z / BIOME_SELECTION.lakeWavelength, this.seed + 131, 2),
     );
-    const biome = biomeWeights(mountainRegion, temperature, climate.moisture, climate.region, lakeField);
+    const biome = biomeWeights(mountainRegion, selectionTemperature, climate.moisture, climate.region, lakeField);
     const water = height < SEA_LEVEL;
     // A tangent-plane distance estimate is continuous and cheap. Navigation uses
     // actual zero crossings instead, so this estimate cannot invent a lake disc.

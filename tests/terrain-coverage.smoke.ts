@@ -5,9 +5,10 @@ import { expect, test } from '@playwright/test';
 // shows ground that is not built yet; a render-origin rebase moves or drops displayed ground.
 // The public capture pose and visible horizon are the seams, not private tile bookkeeping.
 const pose = (x: number) => ({ x, y: 350, z: -3239, lookX: x, lookY: 280, lookZ: -1439 });
-// x = -1440 is a fine and a coarse tile boundary. The jump of 15 coarse tiles keeps that alignment
-// and moves the eagle more than 10 km, so the render origin rebases.
-const JUMP = 15 * 1440;
+// x = -1440 is a fine and a coarse tile boundary. The jump of 17 coarse tiles keeps that alignment
+// and moves the eagle more than 10 km, so the render origin rebases. It lands where green land is
+// within Low power's 3.5 km haze.
+const JUMP = 17 * 1440;
 // CI's software renderer checks bounded work, not repeated full 5 km loads (see docs/testing.md):
 // there, one normal crossing runs in the reduced smoke renderer. Locally, ordinary rendering covers
 // both modes, the jump and the rebase.

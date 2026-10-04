@@ -114,28 +114,34 @@ test('captures the puff deck from low, mid, and high chase flights at noon and g
   });
 
   for (const flight of ['low', 'mid', 'high'] as const) {
-    // Both times of day share one held pose and its terrain, so load each flight once.
-    // A software renderer streams terrain slowly, and a reload per capture costs a full cold load.
+    // The paused flight keeps one view, so noon and golden hour share a load: the slow
+    // software renderer in CI spends most of this test streaming terrain.
     await page.goto(`/?smoke&profile&flight=${flight}`);
     await page.evaluate(() => window.__SOARING__.pauseFlight());
     await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0, undefined, { timeout: 120_000 });
-    await page.evaluate(() => window.__SOARING__.setCapturePixelRatio(1));
+    await page.evaluate(() => {
+      window.__SOARING__.setCapturePixelRatio(1);
+      document.querySelector('#intro')?.remove();
+      document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
+      document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
+    });
     for (const [phase, time] of [[0.5, 'noon'], [0.72, 'golden-hour']] as const) {
-      const previous = await page.evaluate((phase) => {
-        const { renderedFrames, fog } = window.__SOARING__.snapshot();
+      const start = await page.evaluate((phase) => {
+        const { samples } = window.__SOARING__.snapshot().fog;
+        const previousFrame = window.__SOARING__.snapshot().renderedFrames;
         window.__SOARING__.setTimeOfDay(phase);
-        document.querySelector('#intro')?.remove();
-        document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
-        return { renderedFrames, fogSamples: fog.samples };
+        return { samples, previousFrame, revision: window.__SOARING__.fogSamples!().revision };
       }, phase);
-      // The haze must match this time of day, not the one shown before it.
-      await page.waitForFunction(({ phase, previous }) => {
+      // Without a reload the haze eases from the last time of day, so wait until it reaches the new sky.
+      await page.waitForFunction(({ phase, previousFrame, samples, revision }) => {
         const state = window.__SOARING__.snapshot();
         const clouds = (window.__SOARING__ as unknown as CloudHarness).puffCloudSnapshot();
-        const fogGap = Math.hypot(...state.fog.color.map((value, index) => value - state.fog.targetColor[index]!));
-        return state.renderedFrames > previous.renderedFrames && Math.abs(state.timeOfDay - phase) < 0.001
-          && clouds.count === 40 && state.fog.samples > previous.fogSamples && fogGap < 0.01;
-      }, { phase, previous });
+        const completion = window.__SOARING__.fogSamples!().completion;
+        return state.renderedFrames > previousFrame && Math.abs(state.timeOfDay - phase) < 0.001
+          && state.pending === 0 && clouds.count === 40
+          && !!completion && completion.revision === revision && completion.samples > samples
+          && Math.hypot(...state.fog.color.map((value, index) => value - state.fog.targetColor[index]!)) < 0.01;
+      }, { phase, previousFrame: start.previousFrame, samples: start.samples, revision: start.revision });
       const sunElevation = await page.evaluate(() => window.__SOARING__.snapshot().sunElevation);
       expect(sunElevation).toBeGreaterThan(0);
       if (time === 'golden-hour') expect(sunElevation).toBeLessThan(0.3);

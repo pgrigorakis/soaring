@@ -65,6 +65,7 @@ test('the moon glows with a face and stars appear with the afterglow', async ({ 
     api.setCloudCoverage(0);
     document.querySelector('#intro')?.remove();
     document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
+    document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
   });
 
   async function showSun(elevation: number, look: 'moon' | 'chase') {

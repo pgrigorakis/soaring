@@ -112,13 +112,13 @@ test('renders varied farmland with physical hedgerows', async ({ page }, testInf
     }
     const scene = new THREE.Scene();
     const terrain = new TerrainStream(scene, new WorldModel(80231));
-    // The old fixture is flooded by the continental field. This dry Hills parcel retains hedges.
-    terrain.update(-6240, -37680, Infinity);
+    // The 7 km continental field floods the old fixture. This dry Hills parcel keeps its hedges.
+    terrain.update(-9600, -39600, Infinity);
     let hedgeInstances = 0;
     scene.traverse((object: any) => { if (object.name === 'hedgerows') hedgeInstances += object.count; });
     terrain.dispose();
     window.__SOARING__.setTimeOfDay(.5);
-    window.__SOARING__.setViewpoint({ x: -6440, y: 220, z: -37180, lookX: -6240, lookY: 80, lookZ: -37980 });
+    window.__SOARING__.setViewpoint({ x: -9800, y: 220, z: -39100, lookX: -9600, lookY: 50, lookZ: -39900 });
     return { fields: fields.size, angles: angles.size, deterministic, hedgeInstances };
   });
   expect(evidence.deterministic).toBe(true);

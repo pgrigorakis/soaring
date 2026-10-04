@@ -18,6 +18,8 @@ Highlands and Lakeland claim their existing territories first. The three climate
 
 Temperature falls by one every 2,600 m. Selection uses a single uncarved broad height estimate to avoid a cycle between biome profiles, height and drainage. It excludes #86's ground-only hills: cooling from those hills must not change the broad profile and feed the hill shape into drainage. The rendered ground still adds hills and peat shelves. Snow, scree and the tree line use temperature at the final ground height. Their thresholds retain the former height bands at sea-level temperature 0.5. Cold massifs can have snow much lower than warm massifs.
 
+Update on 2026-10-04: the continental terrain of #127 had made selection cool with the final ground height. Ridges and summits then cut biomes into specks. Selection now cools with the broad continental plate again, and only snow, scree and the tree line use the final height. The lake field has two octaves instead of four, and its threshold moved from 0.75 to 0.8, so Lakeland coverage stays as before. The coverage and span tables below predate this change.
+
 ## Coverage and median spans
 
 Reproduce from the repository root:

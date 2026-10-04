@@ -26,6 +26,7 @@ test('a painted twilight gradient keeps the dusk sky lit and fades out without a
     api.setCloudCoverage(0);
     document.querySelector('#intro')?.remove();
     document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
+    document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
   });
 
   // The gradient is full from sunset to nautical dusk and gone by +6 and -12 degrees.

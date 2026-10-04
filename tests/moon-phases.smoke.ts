@@ -26,6 +26,7 @@ test('the moon shows real phases, its light follows the lit fraction, and the sh
     api.lookAtBody('moon');
     document.querySelector('#intro')?.remove();
     document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
+    document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
   });
 
   async function settle(phase: number, day: number) {
