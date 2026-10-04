@@ -1,0 +1,97 @@
+{
+  "seed": 57,
+  "origin": "http://127.0.0.1:4291",
+  "viewport": {
+    "width": 1600,
+    "height": 1000
+  },
+  "shots": {
+    "chase-noon": {
+      "name": "chase-noon",
+      "mode": "chase",
+      "x": -12695,
+      "z": 18159,
+      "heading": 0.6,
+      "timeOfDay": 0.5,
+      "visibility": 3000,
+      "diagnostics": {
+        "seed": 57,
+        "position": [
+          -12695,
+          933.6063139535985,
+          18159
+        ],
+        "pending": 0,
+        "chunks": 461,
+        "visibleDistance": 3000,
+        "requestedDistance": 3000,
+        "cameraDistance": 100,
+        "timeOfDay": 0.5,
+        "tiers": {
+          "near": 61,
+          "mid": 400,
+          "far": 0
+        }
+      }
+    },
+    "chase-golden": {
+      "name": "chase-golden",
+      "mode": "chase",
+      "x": -12695,
+      "z": 18159,
+      "heading": 0.6,
+      "timeOfDay": 0.72,
+      "visibility": 3000,
+      "diagnostics": {
+        "seed": 57,
+        "position": [
+          -12695,
+          933.6063139535985,
+          18159
+        ],
+        "pending": 0,
+        "chunks": 461,
+        "visibleDistance": 3000,
+        "requestedDistance": 3000,
+        "cameraDistance": 100,
+        "timeOfDay": 0.72,
+        "tiers": {
+          "near": 61,
+          "mid": 400,
+          "far": 0
+        }
+      }
+    },
+    "summit-far": {
+      "name": "summit-far",
+      "mode": "view",
+      "x": -15840,
+      "y": 900,
+      "z": 17140,
+      "lookX": -11340,
+      "lookY": 950,
+      "lookZ": 20140,
+      "timeOfDay": 0.5,
+      "visibility": 6000,
+      "diagnostics": {
+        "seed": 57,
+        "position": [
+          -11340,
+          1231.9234839801748,
+          20140
+        ],
+        "pending": 0,
+        "chunks": 635,
+        "visibleDistance": 6800,
+        "requestedDistance": 6000,
+        "cameraDistance": 100,
+        "timeOfDay": 0.5,
+        "tiers": {
+          "near": 61,
+          "mid": 472,
+          "far": 102
+        }
+      }
+    }
+  }
+}
