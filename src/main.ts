@@ -181,6 +181,16 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			mass += cloudNoise(point * 15.0) * 0.06;
 			return mass;
 		}
+		float starLayer(vec3 direction, float grid, float density, float smallRadius, float largeRadius) {
+			// Each lit cell holds one star at its centre. Radii stay under half a cell, so no star is clipped.
+			vec3 scaled = direction * grid;
+			vec3 cell = floor(scaled);
+			float hash = fract(sin(dot(cell, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+			float vary = fract(sin(dot(cell, vec3(269.5, 183.3, 246.1))) * 12543.23);
+			float twinkle = 0.8 + 0.2 * sin(cloudTime * 1000.0 * mix(0.7, 1.6, vary) + hash * 60.0);
+			float star = step(density, hash) * smoothstep(mix(smallRadius, largeRadius, vary), 0.0, length(scaled - cell - 0.5));
+			return star * mix(0.45, 1.7, vary * vary) * twinkle;
+		}
 		void main() {`,
   )
   .replace(
@@ -207,24 +217,30 @@ sky.material.fragmentShader = sky.material.fragmentShader
 				vec3 auroraColor = mix(vec3(0.04, 0.58, 0.24), vec3(0.12, 0.55, 0.82), smoothstep(0.2, 0.34, direction.y));
 				retColor += auroraColor * auroraCurtain * auroraAmount;
 			}
-			float starGrid = 260.0;
-			vec3 starScaled = direction * starGrid;
-			vec3 starCell = floor(starScaled);
-			float starHash = fract(sin(dot(starCell, vec3(127.1, 311.7, 74.7))) * 43758.5453);
-			float starVary = fract(sin(dot(starCell, vec3(269.5, 183.3, 246.1))) * 12543.23);
-			float star = step(0.965, starHash) * smoothstep(mix(0.08, 0.2, starVary), 0.0, length(starScaled - starCell - 0.5));
-			star *= mix(0.22, 1.0, starVary * starVary) * smoothstep(0.02, 0.18, direction.y);
-			retColor += vec3(0.82, 0.88, 1.0) * star * starAmount * 1.6;
 			vec3 moonDir = normalize(moonPosition);
-			float moonDot = dot(direction, moonDir);
-			float moonDisc = smoothstep(0.99942, 0.9997, moonDot);
-			float moonLimb = smoothstep(0.9986, 0.99945, moonDot);
-			retColor += vec3(0.93, 0.95, 1.0) * (moonDisc * 4.5 + moonLimb * 0.12) * smoothstep(0.02, 0.08, moonDir.y);
+			float moonUp = smoothstep(0.02, 0.08, moonDir.y);
+			float moonLight = smoothstep(0.02, 0.3, moonDir.y) * nightAmount;
+			// The disc is about 3.4 degrees across. u and v run across it in units of its radius.
+			vec3 moonRight = normalize(cross(moonDir, vec3(0.0, 1.0, 0.0)));
+			vec2 moonUv = vec2(dot(direction, moonRight), dot(direction, cross(moonRight, moonDir))) / 0.0295;
+			float moonRadius = length(moonUv);
+			float moonDisc = smoothstep(1.06, 0.94, moonRadius) * step(0.0, dot(direction, moonDir)) * moonUp;
 			float cloudMass = paintedClouds(direction);
 			float cloudThreshold = mix(0.88, 0.52, clamp(cloudCoverage, 0.0, 1.0));
 			float nightOpening = smoothstep(0.045, 0.22, direction.y) * nightAmount * 0.3;
 			float cloudMask = smoothstep(cloudThreshold + nightOpening, cloudThreshold + 0.2 + nightOpening, cloudMass)
 				* smoothstep(0.014, 0.15, direction.y);
+			// Coarse stars at least 1.2 px across in the chase view, and a fine layer at half strength.
+			// Moonlight, the disc and painted clouds hide them. They fade out above the fog probe's horizon band.
+			float stars = starLayer(direction, 100.0, 0.955, 0.26, 0.4) + starLayer(direction, 220.0, 0.965, 0.3, 0.45) * 0.5;
+			stars *= smoothstep(0.08, 0.2, direction.y) * (1.0 - 0.45 * moonLight) * (1.0 - cloudMask) * (1.0 - moonDisc);
+			retColor += vec3(0.82, 0.88, 1.0) * stars * starAmount;
+			// A cool two-term halo out to about 12 degrees carries the moon's glow, so the disc can stay near 1.3.
+			float moonFacing = max(dot(direction, moonDir), 0.0);
+			retColor += vec3(0.62, 0.72, 1.0) * (pow(moonFacing, 250.0) * 0.35 + pow(moonFacing, 30.0) * 0.06) * moonUp * nightAmount;
+			float maria = cloudNoise(moonUv * 1.7 + 4.0) * 0.65 + cloudNoise(moonUv * 4.3 + 11.0) * 0.35;
+			float moonSurface = (1.0 - 0.38 * smoothstep(0.45, 0.72, maria)) * (1.0 - 0.25 * moonRadius * moonRadius);
+			retColor += vec3(0.95, 0.96, 1.0) * 1.35 * moonSurface * moonDisc;
 			vec3 cloudLight = mix(vec3(0.76, 0.84, 0.94), vec3(0.98, 0.98, 1.0), sunUp);
 			cloudLight = mix(cloudLight, vec3(1.0, 0.49, 0.25), goldenAmount * 0.72);
 			vec3 cloudShade = mix(vec3(0.32, 0.39, 0.5), vec3(0.52, 0.36, 0.3), goldenAmount * 0.65);
@@ -404,6 +420,7 @@ let orbitYaw = 0;
 let orbitPitch = 0;
 let heldViewpoint: { x: number; y: number; z: number; lookX: number; lookY: number; lookZ: number } | null = null;
 let captureClear = false;
+let cloudCoverageOverride: number | null = null;
 let reviewFlightPaused = false;
 let dragging = false;
 let dragTravel = 0;
@@ -818,10 +835,11 @@ function applyDaylight(body: Daylight, delta: number): void {
   sky.material.uniforms.goldenAmount!.value = 1 - high;
   sky.material.uniforms.blueAmount!.value = high;
   // Keep more clouds near dawn and dusk, and let the layer drift on real time.
-  sky.material.uniforms.cloudCoverage!.value = 0.22 + (1 - high) * 0.5;
+  sky.material.uniforms.cloudCoverage!.value = cloudCoverageOverride ?? 0.22 + (1 - high) * 0.5;
   sky.material.uniforms.cloudTime!.value += delta * 0.001;
   hazeStart = 0.4 + high * 0.5;
-  sky.material.uniforms.starAmount!.value = smooth01(0.0, -0.12, body.sun.y);
+  // Stars fade in from about -2 degrees and are full by -6 degrees, while the afterglow is still bright.
+  sky.material.uniforms.starAmount!.value = smooth01(-0.035, -0.105, body.sun.y);
   sky.material.uniforms.auroraAmount!.value = auroraAmount(body,
     auroraSchedule.hasAurora(nightCycle(skySeconds)));
   // Keep the sky box around the camera. The sun uniform is a direction, so moving the mesh
@@ -1035,7 +1053,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; morningMist: number; mistReady: boolean };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; starAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; morningMist: number; mistReady: boolean };
       puffCloudSnapshot: () => PuffCloudSnapshot;
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
@@ -1052,6 +1070,7 @@ declare global {
       clearViewpoint: () => void;
       setPuffCloudsVisible: (visible: boolean) => void;
       setCaptureClear: (on: boolean) => void;
+      setCloudCoverage: (coverage: number | null) => void;
       setVisibility: (meters: number) => void;
       mistAt: (x: number, z: number) => { cover: number; water: boolean; moisture: number; bank: number; height: number; surface: number };
       fillMist: (budgetMs: number) => void;
@@ -1134,6 +1153,9 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       timeOfDay: body.phase,
       sunElevation: body.sun.y,
       moonElevation: body.moon.y,
+      sunDirection: [body.sun.x, body.sun.y, body.sun.z],
+      moonDirection: [body.moon.x, body.moon.y, body.moon.z],
+      starAmount: sky.material.uniforms.starAmount!.value,
       auroraAmount: auroraAmount(body, auroraSchedule.hasAurora(nightCycle(skySeconds))),
       exposure: renderer.toneMappingExposure,
       hemisphereIntensity: hemisphere.intensity,
@@ -1172,6 +1194,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
   clearViewpoint: () => { heldViewpoint = null; },
   setPuffCloudsVisible: (visible: boolean) => puffClouds.setVisible(visible),
   setCaptureClear: (on: boolean) => { captureClear = on; },
+  setCloudCoverage: (coverage: number | null) => { cloudCoverageOverride = coverage; },
   setVisibility: (meters: number) => {
     settings.terrainVisibility = meters;
     terrain.setReach(terrainReach());

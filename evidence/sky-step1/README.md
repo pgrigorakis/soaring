@@ -9,7 +9,7 @@ Tone mapping stays Neutral. No global grade is added, so the later grade step (B
 
 ## Captures
 
-`bash scripts/capture-sky-step1.sh before|after`, with Vite on port 4378. Seed 1406157560, the default chase camera (100 m), 1280 × 800 at pixel ratio 1. Each pair uses the same sun elevation. The phase is the exact inverse of the Soaring arc in the scout's `tools/phases.mjs`. Each `.txt` file holds the snapshot for its image.
+`bash scripts/capture-sky.sh sky-step1 before|after`, with Vite on port 4378. Seed 1406157560, the default chase camera (100 m), 1280 × 800 at pixel ratio 1. Each pair uses the same sun elevation. The phase is the exact inverse of the Soaring arc in the scout's `tools/phases.mjs`. Each `.txt` file holds the snapshot for its image.
 
 | Sun elevation | Before | After |
 | --- | --- | --- |
