@@ -349,6 +349,9 @@ test('persists safe local-terrain height bounds across reloads', async ({ page }
 });
 
 test('visibility and camera distance persist independently', async ({ page }) => {
+  // Twenty cold 3600 m tiles share the frame budget with ground levels. CI's software renderer
+  // builds a tile in about 58 ms of CPU, so they take about 20 s there, not 3 s.
+  test.setTimeout(60_000);
   const errors = captureErrors(page);
   await page.addInitScript(() => {
     if (!localStorage.getItem('soaring.settings.v1')) localStorage.setItem('soaring.settings.v1', JSON.stringify({

@@ -114,23 +114,28 @@ test('captures the puff deck from low, mid, and high chase flights at noon and g
   });
 
   for (const flight of ['low', 'mid', 'high'] as const) {
+    // Both times of day share one held pose and its terrain, so load each flight once.
+    // A software renderer streams terrain slowly, and a reload per capture costs a full cold load.
+    await page.goto(`/?smoke&profile&flight=${flight}`);
+    await page.evaluate(() => window.__SOARING__.pauseFlight());
+    await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0, undefined, { timeout: 120_000 });
+    await page.evaluate(() => window.__SOARING__.setCapturePixelRatio(1));
     for (const [phase, time] of [[0.5, 'noon'], [0.72, 'golden-hour']] as const) {
-      await page.goto(`/?smoke&profile&flight=${flight}&phase=${time}`);
-      await page.evaluate(() => window.__SOARING__.pauseFlight());
-      await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0, undefined, { timeout: 120_000 });
-      await page.evaluate(() => window.__SOARING__.setCapturePixelRatio(1));
-      const previousFrame = await page.evaluate(() => window.__SOARING__.snapshot().renderedFrames);
-      await page.evaluate((phase) => {
+      const previous = await page.evaluate((phase) => {
+        const { renderedFrames, fog } = window.__SOARING__.snapshot();
         window.__SOARING__.setTimeOfDay(phase);
         document.querySelector('#intro')?.remove();
         document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
+        return { renderedFrames, fogSamples: fog.samples };
       }, phase);
-      await page.waitForFunction(({ phase, previousFrame }) => {
+      // The haze must match this time of day, not the one shown before it.
+      await page.waitForFunction(({ phase, previous }) => {
         const state = window.__SOARING__.snapshot();
         const clouds = (window.__SOARING__ as unknown as CloudHarness).puffCloudSnapshot();
-        return state.renderedFrames > previousFrame && Math.abs(state.timeOfDay - phase) < 0.001
-          && clouds.count === 40;
-      }, { phase, previousFrame });
+        const fogGap = Math.hypot(...state.fog.color.map((value, index) => value - state.fog.targetColor[index]!));
+        return state.renderedFrames > previous.renderedFrames && Math.abs(state.timeOfDay - phase) < 0.001
+          && clouds.count === 40 && state.fog.samples > previous.fogSamples && fogGap < 0.01;
+      }, { phase, previous });
       const sunElevation = await page.evaluate(() => window.__SOARING__.snapshot().sunElevation);
       expect(sunElevation).toBeGreaterThan(0);
       if (time === 'golden-hour') expect(sunElevation).toBeLessThan(0.3);
