@@ -8,7 +8,8 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  check:
+    name: Unit tests, build, and production smoke
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -26,15 +27,13 @@ jobs:
         run: npm run check
       - name: Install Chrome
         run: npx playwright install --with-deps chrome
-      - name: Run browser smoke checks
-        run: npm run test:smoke
       - name: Run production bundle smoke check
         run: npm run test:production-smoke
-      - name: Upload browser smoke evidence
+      - name: Upload production smoke evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-evidence
+          name: smoke-evidence-production
           path: test-results
           retention-days: 14
       - name: Upload Pages artifact
@@ -43,9 +42,40 @@ jobs:
         with:
           path: dist
 
+  smoke:
+    name: Browser smoke (shard ${{ matrix.shard }}/${{ strategy.job-total }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chrome
+        run: npx playwright install --with-deps chrome
+      - name: Run browser smoke checks
+        run: npm run test:smoke -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+      - name: Upload browser smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-evidence-shard-${{ matrix.shard }}
+          path: test-results
+          retention-days: 14
+
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: build
+    needs: [check, smoke]
     runs-on: ubuntu-latest
     permissions:
       pages: write

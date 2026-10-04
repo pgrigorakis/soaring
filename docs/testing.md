@@ -72,4 +72,4 @@ The approved-look inventory and its review links are in [approved-looks.md](desi
 
 ## Deployment
 
-`.github/workflows/deploy-pages.yml` runs `npm run check`, installs Chrome, and runs `npm run test:smoke` for pull requests and pushes to `main`. It uploads smoke evidence for 14 days. A push to `main` also uploads `dist` and deploys it to GitHub Pages using the official Pages actions. The repository's Pages source must be set to GitHub Actions.
+`.github/workflows/deploy-pages.yml` runs for pull requests and pushes to `main`. The `check` job runs `npm run check`, installs Chrome, and runs the production bundle smoke check. Six parallel `smoke` jobs each run one Playwright shard (`--shard=N/6`) of `npm run test:smoke`; CI sets `fullyParallel` so shards split single tests, while `describe.configure({ mode: 'serial' })` groups stay together. Every job uploads its `test-results` as an artifact (`smoke-evidence-production` and `smoke-evidence-shard-N`) for 14 days. A push to `main` also uploads `dist`, and the `deploy` job runs only after `check` and all six shards pass. The repository's Pages source must be set to GitHub Actions.
