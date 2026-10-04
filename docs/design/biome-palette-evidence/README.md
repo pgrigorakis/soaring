@@ -2,17 +2,17 @@
 
 These captures review the Matched (V2) palette against the previous palette. Every before-and-after noon pair uses seed **5**, the same start position and heading, and the default chase camera. The captures use the normal development renderer, full shadows, a 5,000 m terrain range, a 1440 × 900 viewport, and pixel ratio 1. Terrain had no pending chunks before each screenshot.
 
-The before images use clean source commit `d80b813` with no palette edits. The after images use the same source commit with the palette edits in the worktree. `captures.json` records the commit, working source changes, camera state and world position for each image.
+The before images use clean `main` commit `a8dcdb8`. It has the continental terrain from #127 and the biome profile files from #133. The after images use clean branch commit `bb69148`, which is `a8dcdb8` plus this palette. `captures.json` records the commit, working source changes, camera state and world position for each image. The puff clouds move with time, so their positions differ between a before image and its after image.
 
 ## Noon before and after
 
 | Biome | World position (x, z), heading | Before | After |
 | --- | --- | --- | --- |
 | Hills | −6950, −1000; 0 | [Before](before/hills-noon.png) | [After](after/hills-noon.png) |
-| Woodland | 7600, −7250; 0 | [Before](before/woodland-noon.png) | [After](after/woodland-noon.png) |
-| Moor | −6850, 1500; 0 | [Before](before/moor-noon.png) | [After](after/moor-noon.png) |
-| Highlands | 0, 0; 0 | [Before](before/highlands-noon.png) | [After](after/highlands-noon.png) |
-| Lakeland | −10950, 1050; 0 | [Before](before/lakeland-noon.png) | [After](after/lakeland-noon.png) |
+| Woodland | 8500, −6500; 0 | [Before](before/woodland-noon.png) | [After](after/woodland-noon.png) |
+| Moor | −6000, 4000; 0 | [Before](before/moor-noon.png) | [After](after/moor-noon.png) |
+| Highlands | 4250, 1000; 0 | [Before](before/highlands-noon.png) | [After](after/highlands-noon.png) |
+| Lakeland | −11000, 500; 0 | [Before](before/lakeland-noon.png) | [After](after/lakeland-noon.png) |
 
 ## After across the day
 
@@ -38,6 +38,6 @@ node scripts/capture-biome-palette.mjs before http://127.0.0.1:4173 docs/design/
 node scripts/capture-biome-palette.mjs after http://127.0.0.1:4173 docs/design/biome-palette-evidence/after
 ```
 
-Run the `before` capture at the unmodified source commit and `after` on the palette branch. The script fixes seed, settings, viewport and camera pose. It saves per-image diagnostics in `captures.json`.
+Run the `before` capture at the unmodified `main` commit and `after` on the palette branch. The script fixes seed, settings, viewport and camera pose. It saves per-image diagnostics in `captures.json`.
 
 The [Lavish review board](http://phantom.smelt-tyrannosaurus.ts.net:4387/session/61c7c668a1d753db) presents the same captures side by side.

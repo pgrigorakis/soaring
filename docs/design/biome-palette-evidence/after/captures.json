@@ -1,8 +1,8 @@
 {
   "stage": "after",
-  "commit": "d80b813c085447e4e9b236aa65b95e2092a79d71",
-  "sourceChanges": "M src/biome.ts\n M src/terrain.ts\n M src/world.ts",
-  "origin": "http://127.0.0.1:4173",
+  "commit": "bb69148106ecc3e306a3f9e155933d602d7f23e1",
+  "sourceChanges": "",
+  "origin": "http://127.0.0.1:4468",
   "seed": 5,
   "viewport": {
     "width": 1440,
@@ -36,26 +36,26 @@
     },
     {
       "name": "woodland",
-      "x": 7600,
-      "z": -7250,
+      "x": 8500,
+      "z": -6500,
       "heading": 0
     },
     {
       "name": "moor",
-      "x": -6850,
-      "z": 1500,
+      "x": -6000,
+      "z": 4000,
       "heading": 0
     },
     {
       "name": "highlands",
-      "x": 0,
-      "z": 0,
+      "x": 4250,
+      "z": 1000,
       "heading": 0
     },
     {
       "name": "lakeland",
-      "x": -10950,
-      "z": 1050,
+      "x": -11000,
+      "z": 500,
       "heading": 0
     }
   ],
@@ -76,7 +76,7 @@
         "seed": 5,
         "position": [
           -6950,
-          284.0465117653521,
+          221.24255537567254,
           -1000
         ],
         "pending": 0,
@@ -109,7 +109,7 @@
         "seed": 5,
         "position": [
           -6950,
-          284.0465117653521,
+          221.24255537567254,
           -1000
         ],
         "pending": 0,
@@ -142,7 +142,7 @@
         "seed": 5,
         "position": [
           -6950,
-          284.0465117653521,
+          221.24255537567254,
           -1000
         ],
         "pending": 0,
@@ -175,7 +175,7 @@
         "seed": 5,
         "position": [
           -6950,
-          284.0465117653521,
+          221.24255537567254,
           -1000
         ],
         "pending": 0,
@@ -196,8 +196,8 @@
       "file": "docs/design/biome-palette-evidence/after/woodland-noon.png",
       "vantage": {
         "name": "woodland",
-        "x": 7600,
-        "z": -7250,
+        "x": 8500,
+        "z": -6500,
         "heading": 0
       },
       "phase": {
@@ -207,12 +207,12 @@
       "state": {
         "seed": 5,
         "position": [
-          7600,
-          226.0656653240776,
-          -7250
+          8500,
+          128.34442179613742,
+          -6500
         ],
         "pending": 0,
-        "chunks": 600,
+        "chunks": 598,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -229,8 +229,8 @@
       "file": "docs/design/biome-palette-evidence/after/woodland-golden-hour.png",
       "vantage": {
         "name": "woodland",
-        "x": 7600,
-        "z": -7250,
+        "x": 8500,
+        "z": -6500,
         "heading": 0
       },
       "phase": {
@@ -240,12 +240,12 @@
       "state": {
         "seed": 5,
         "position": [
-          7600,
-          226.0656653240776,
-          -7250
+          8500,
+          128.34442179613742,
+          -6500
         ],
         "pending": 0,
-        "chunks": 600,
+        "chunks": 598,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -262,8 +262,8 @@
       "file": "docs/design/biome-palette-evidence/after/woodland-dusk.png",
       "vantage": {
         "name": "woodland",
-        "x": 7600,
-        "z": -7250,
+        "x": 8500,
+        "z": -6500,
         "heading": 0
       },
       "phase": {
@@ -273,12 +273,12 @@
       "state": {
         "seed": 5,
         "position": [
-          7600,
-          226.0656653240776,
-          -7250
+          8500,
+          128.34442179613742,
+          -6500
         ],
         "pending": 0,
-        "chunks": 600,
+        "chunks": 598,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -295,8 +295,8 @@
       "file": "docs/design/biome-palette-evidence/after/woodland-moonlight.png",
       "vantage": {
         "name": "woodland",
-        "x": 7600,
-        "z": -7250,
+        "x": 8500,
+        "z": -6500,
         "heading": 0
       },
       "phase": {
@@ -306,12 +306,12 @@
       "state": {
         "seed": 5,
         "position": [
-          7600,
-          226.0656653240776,
-          -7250
+          8500,
+          128.34442179613742,
+          -6500
         ],
         "pending": 0,
-        "chunks": 600,
+        "chunks": 598,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -328,8 +328,8 @@
       "file": "docs/design/biome-palette-evidence/after/moor-noon.png",
       "vantage": {
         "name": "moor",
-        "x": -6850,
-        "z": 1500,
+        "x": -6000,
+        "z": 4000,
         "heading": 0
       },
       "phase": {
@@ -339,12 +339,12 @@
       "state": {
         "seed": 5,
         "position": [
-          -6850,
-          264.6174817892406,
-          1500
+          -6000,
+          219.99731018553115,
+          4000
         ],
         "pending": 0,
-        "chunks": 600,
+        "chunks": 599,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -361,8 +361,8 @@
       "file": "docs/design/biome-palette-evidence/after/moor-golden-hour.png",
       "vantage": {
         "name": "moor",
-        "x": -6850,
-        "z": 1500,
+        "x": -6000,
+        "z": 4000,
         "heading": 0
       },
       "phase": {
@@ -372,12 +372,12 @@
       "state": {
         "seed": 5,
         "position": [
-          -6850,
-          264.6174817892406,
-          1500
+          -6000,
+          219.99731018553115,
+          4000
         ],
         "pending": 0,
-        "chunks": 600,
+        "chunks": 599,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -394,8 +394,8 @@
       "file": "docs/design/biome-palette-evidence/after/moor-dusk.png",
       "vantage": {
         "name": "moor",
-        "x": -6850,
-        "z": 1500,
+        "x": -6000,
+        "z": 4000,
         "heading": 0
       },
       "phase": {
@@ -405,12 +405,12 @@
       "state": {
         "seed": 5,
         "position": [
-          -6850,
-          264.6174817892406,
-          1500
+          -6000,
+          219.99731018553115,
+          4000
         ],
         "pending": 0,
-        "chunks": 600,
+        "chunks": 599,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -427,8 +427,8 @@
       "file": "docs/design/biome-palette-evidence/after/moor-moonlight.png",
       "vantage": {
         "name": "moor",
-        "x": -6850,
-        "z": 1500,
+        "x": -6000,
+        "z": 4000,
         "heading": 0
       },
       "phase": {
@@ -438,12 +438,12 @@
       "state": {
         "seed": 5,
         "position": [
-          -6850,
-          264.6174817892406,
-          1500
+          -6000,
+          219.99731018553115,
+          4000
         ],
         "pending": 0,
-        "chunks": 600,
+        "chunks": 599,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -460,8 +460,8 @@
       "file": "docs/design/biome-palette-evidence/after/highlands-noon.png",
       "vantage": {
         "name": "highlands",
-        "x": 0,
-        "z": 0,
+        "x": 4250,
+        "z": 1000,
         "heading": 0
       },
       "phase": {
@@ -471,12 +471,12 @@
       "state": {
         "seed": 5,
         "position": [
-          0,
-          421.7140536248486,
-          0
+          4250,
+          506.40747075009926,
+          1000
         ],
         "pending": 0,
-        "chunks": 605,
+        "chunks": 600,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -493,8 +493,8 @@
       "file": "docs/design/biome-palette-evidence/after/highlands-golden-hour.png",
       "vantage": {
         "name": "highlands",
-        "x": 0,
-        "z": 0,
+        "x": 4250,
+        "z": 1000,
         "heading": 0
       },
       "phase": {
@@ -504,12 +504,12 @@
       "state": {
         "seed": 5,
         "position": [
-          0,
-          421.7140536248486,
-          0
+          4250,
+          506.40747075009926,
+          1000
         ],
         "pending": 0,
-        "chunks": 605,
+        "chunks": 600,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -526,8 +526,8 @@
       "file": "docs/design/biome-palette-evidence/after/highlands-dusk.png",
       "vantage": {
         "name": "highlands",
-        "x": 0,
-        "z": 0,
+        "x": 4250,
+        "z": 1000,
         "heading": 0
       },
       "phase": {
@@ -537,12 +537,12 @@
       "state": {
         "seed": 5,
         "position": [
-          0,
-          421.7140536248486,
-          0
+          4250,
+          506.40747075009926,
+          1000
         ],
         "pending": 0,
-        "chunks": 605,
+        "chunks": 600,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -559,8 +559,8 @@
       "file": "docs/design/biome-palette-evidence/after/highlands-moonlight.png",
       "vantage": {
         "name": "highlands",
-        "x": 0,
-        "z": 0,
+        "x": 4250,
+        "z": 1000,
         "heading": 0
       },
       "phase": {
@@ -570,12 +570,12 @@
       "state": {
         "seed": 5,
         "position": [
-          0,
-          421.7140536248486,
-          0
+          4250,
+          506.40747075009926,
+          1000
         ],
         "pending": 0,
-        "chunks": 605,
+        "chunks": 600,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -592,8 +592,8 @@
       "file": "docs/design/biome-palette-evidence/after/lakeland-noon.png",
       "vantage": {
         "name": "lakeland",
-        "x": -10950,
-        "z": 1050,
+        "x": -11000,
+        "z": 500,
         "heading": 0
       },
       "phase": {
@@ -603,12 +603,12 @@
       "state": {
         "seed": 5,
         "position": [
-          -10950,
-          253.92278175618182,
-          1050
+          -11000,
+          132.68493388941738,
+          500
         ],
         "pending": 0,
-        "chunks": 598,
+        "chunks": 597,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -625,8 +625,8 @@
       "file": "docs/design/biome-palette-evidence/after/lakeland-golden-hour.png",
       "vantage": {
         "name": "lakeland",
-        "x": -10950,
-        "z": 1050,
+        "x": -11000,
+        "z": 500,
         "heading": 0
       },
       "phase": {
@@ -636,12 +636,12 @@
       "state": {
         "seed": 5,
         "position": [
-          -10950,
-          253.92278175618182,
-          1050
+          -11000,
+          132.68493388941738,
+          500
         ],
         "pending": 0,
-        "chunks": 598,
+        "chunks": 597,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -658,8 +658,8 @@
       "file": "docs/design/biome-palette-evidence/after/lakeland-dusk.png",
       "vantage": {
         "name": "lakeland",
-        "x": -10950,
-        "z": 1050,
+        "x": -11000,
+        "z": 500,
         "heading": 0
       },
       "phase": {
@@ -669,12 +669,12 @@
       "state": {
         "seed": 5,
         "position": [
-          -10950,
-          253.92278175618182,
-          1050
+          -11000,
+          132.68493388941738,
+          500
         ],
         "pending": 0,
-        "chunks": 598,
+        "chunks": 597,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -691,8 +691,8 @@
       "file": "docs/design/biome-palette-evidence/after/lakeland-moonlight.png",
       "vantage": {
         "name": "lakeland",
-        "x": -10950,
-        "z": 1050,
+        "x": -11000,
+        "z": 500,
         "heading": 0
       },
       "phase": {
@@ -702,12 +702,12 @@
       "state": {
         "seed": 5,
         "position": [
-          -10950,
-          253.92278175618182,
-          1050
+          -11000,
+          132.68493388941738,
+          500
         ],
         "pending": 0,
-        "chunks": 598,
+        "chunks": 597,
         "visibleDistance": 5000,
         "requestedDistance": 5000,
         "cameraDistance": 100,
@@ -721,5 +721,5 @@
       }
     }
   },
-  "completed": "2026-10-04T12:38:36.871Z"
+  "completed": "2026-10-04T16:11:07.794Z"
 }

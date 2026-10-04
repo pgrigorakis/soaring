@@ -17,10 +17,10 @@ const phases = stage === 'before'
   : [{ name: 'noon', phase: 0.5 }, { name: 'golden-hour', phase: 0.72 }, { name: 'dusk', phase: 0.75 }, { name: 'moonlight', phase: 0 }];
 const vantages = [
   { name: 'hills', x: -6950, z: -1000, heading: 0 },
-  { name: 'woodland', x: 7600, z: -7250, heading: 0 },
-  { name: 'moor', x: -6850, z: 1500, heading: 0 },
-  { name: 'highlands', x: 0, z: 0, heading: 0 },
-  { name: 'lakeland', x: -10950, z: 1050, heading: 0 },
+  { name: 'woodland', x: 8500, z: -6500, heading: 0 },
+  { name: 'moor', x: -6000, z: 4000, heading: 0 },
+  { name: 'highlands', x: 4250, z: 1000, heading: 0 },
+  { name: 'lakeland', x: -11000, z: 500, heading: 0 },
 ];
 const cli = async (...args) => {
   const { stdout } = await exec('chrome-devtools-axi', args, {
