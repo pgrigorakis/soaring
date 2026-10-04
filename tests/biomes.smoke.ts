@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises';
 
 // Failure modes: weights depend on cache/order, profile blending changes continental height,
 // adjacent meshes disagree on colour/height, pool water floats above dry ground, or rendering fails.
+// Refactor parity also checks exact samples, ground RGB, tree placement/tints, and mesh bytes.
 test('renders blended biome terrain with deterministic shared chunk edges', async ({ page }, testInfo) => {
   test.setTimeout(60_000);
   const errors: string[] = [];
@@ -14,7 +15,7 @@ test('renders blended biome terrain with deterministic shared chunk edges', asyn
     const terrainPath = '/src/terrain.ts';
     const threePath = '/node_modules/.vite/deps/three.js';
     const { WorldModel } = await import(worldPath);
-    const { TerrainStream, CHUNK_SIZE } = await import(terrainPath);
+    const { TerrainStream, CHUNK_SIZE, terrainColor } = await import(terrainPath);
     const THREE = await import(threePath);
     const first = new WorldModel(80231);
     const second = new WorldModel(80231);
@@ -24,7 +25,8 @@ test('renders blended biome terrain with deterministic shared chunk edges', asyn
       const z = Math.cos(index * 3.3) * 40000;
       const a = first.sample(x, z);
       const b = second.sample(x, z);
-      samples.push({ x, z, sample: a, deterministic: JSON.stringify(a) === JSON.stringify(b),
+      const colors = [0, 0.4, 0.7].map((slope) => terrainColor(a, x, z, 80231, new THREE.Color(), slope, 0.8).toArray());
+      samples.push({ x, z, sample: a, colors, deterministic: JSON.stringify(a) === JSON.stringify(b),
         sum: Object.values(a.biome).reduce((sum: number, weight) => sum + Number(weight), 0) });
     }
     const scene = new THREE.Scene();
@@ -49,9 +51,20 @@ test('renders blended biome terrain with deterministic shared chunk edges', asyn
         }
       }
     }
+    const meshes: Record<string, string> = {};
+    for (const [side, mesh] of [['left', left], ['right', right]] as const) {
+      for (const name of attributes) {
+        const bytes = mesh.getAttribute(name).array;
+        const digest = await crypto.subtle.digest('SHA-256', bytes);
+        meshes[`${side}-${name}`] = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+      }
+    }
+    const poses = [[-6950, -1000], [7600, -7250], [-6850, 1500], [0, 0], [-10950, 1050]];
+    const treeWorld = new WorldModel(5);
+    const trees = poses.map(([x, z]) => ({ x, z, trees: treeWorld.treesInArea(x, z, 360, 29) }));
     const timing = terrain.buildTiming;
     terrain.dispose();
-    return { samples, seamError, timing, app: window.__SOARING__.snapshot() };
+    return { samples, seamError, meshes, trees, timing, app: window.__SOARING__.snapshot() };
   });
   for (const entry of evidence.samples) {
     expect(entry.deterministic).toBe(true);
@@ -61,6 +74,10 @@ test('renders blended biome terrain with deterministic shared chunk edges', asyn
   expect(evidence.samples.some((entry) => entry.sample.biome.lakeland > 0.5)).toBe(true);
   expect(evidence.seamError).toBe(0);
   expect(errors).toEqual([]);
+  const parityPath = testInfo.outputPath('biome-parity.json');
+  const { samples, seamError, meshes, trees } = evidence;
+  await writeFile(parityPath, JSON.stringify({ samples, seamError, meshes, trees }, null, 2));
+  await testInfo.attach('biome-parity', { path: parityPath, contentType: 'application/json' });
   await testInfo.attach('biome-evidence', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' });
   await testInfo.attach('biome-render', { body: await page.screenshot(), contentType: 'image/png' });
 });

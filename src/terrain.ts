@@ -15,69 +15,59 @@ export function snowCover(sample: LandscapeSample, slope: number, x: number, z: 
   return sample.biome.highlands * THREE.MathUtils.smoothstep(altitude, patch * 0.65, patch * 0.65 + 0.35);
 }
 
-import { BIOME_PROFILES, CLIMATE_LINES } from './biome';
+import { BIOME_ENTRIES, BIOME_KEYS, BIOME_PROFILES, CLIMATE_LINES, type BiomeKey } from './biome';
+import type { GroundContext } from './biomes/types';
 
-const palettes = Object.fromEntries(Object.entries(BIOME_PROFILES).map(([key, profile]) =>
-  [key, profile.palette.map((hex) => new THREE.Color(hex))])) as Record<keyof typeof BIOME_PROFILES, THREE.Color[]>;
-const lakeMeadow = new THREE.Color(0x6fa03c);
-const lakeBeach = new THREE.Color(0xe3cd8b);
-const lakeReeds = new THREE.Color(0x9fb65a);
-const lakeCliff = new THREE.Color(0x8a8174);
-const shallowWater = new THREE.Color(0x78b4a3);
-const deepWater = new THREE.Color(0x2b6c73);
-const graniteGround = new THREE.Color(0x857e72);
-const hedgeGround = new THREE.Color(0x2e6b34);
-const gladeFlowers = [0xe6c43a, 0xd2553f, 0xb06fa6].map((hex) => new THREE.Color(hex));
-const flecks = [0xe6c43a, 0xd2553f, 0xe1b93a].map((hex) => new THREE.Color(hex));
+const beachGround = new THREE.Color(0xe3cd8b);
 const scratch = new THREE.Color();
-const highlandPalette = [0x7da548, 0x1e4e3a, 0x6e685e, 0xafa28a, 0x9a9489, 0xf2f4f7].map((hex) => new THREE.Color(hex));
+const extras = BIOME_ENTRIES.filter(([, profile]) => profile.groundExtras)
+  .sort(([, a], [, b]) => a.extrasOrder! - b.extrasOrder!);
+const fixedCrownKeys = BIOME_KEYS.filter((key) => BIOME_PROFILES[key].crowns.fixed !== undefined);
+const waterTintKeys = BIOME_KEYS.filter((key) => BIOME_PROFILES[key].waterTint);
+// Equal rock swatches share one overlay. This retains the old lowland sum and
+// lerp rather than changing it into three successive, non-equivalent lerps.
+const rockGroupMap = new Map<number, { color: THREE.Color; keys: BiomeKey[] }>();
+for (const key of BIOME_KEYS) {
+  const tint = BIOME_PROFILES[key].rockTint;
+  if (tint === undefined) continue;
+  if (!rockGroupMap.has(tint)) rockGroupMap.set(tint, { color: new THREE.Color(tint), keys: [] });
+  rockGroupMap.get(tint)!.keys.push(key);
+}
+const rockGroups = [...rockGroupMap.values()];
+// Chunk builds colour every vertex, so one context is reused rather than allocated per call.
+const groundContext: GroundContext = { sample: undefined!, x: 0, z: 0, seed: 0, slope: 0, normalY: 1, fbm, snowCover, jitter: 0 };
 
 /** All palette choices are world-sample based, including the shared vertices of adjacent chunks. */
 export function terrainColor(sample: LandscapeSample, x: number, z: number, seed: number, target: THREE.Color, slope = 0, normalY = 1): THREE.Color {
   const { biome } = sample;
-  const hill = palettes.hills[sample.field < 0.55 ? 2 : sample.field < 0.85 ? 0 : 1]!;
-  target.copy(hill).lerp(hedgeGround, sample.hedge).multiplyScalar(biome.hills);
-  const woodlandPatch = biome.woodland > 0 ? 0.5 + fbm(x / 180, z / 180, seed + 162, 2) * 0.5 : 0;
-  scratch.copy(palettes.woodland[0]!).lerp(palettes.woodland[2]!, woodlandPatch)
-    .lerp(palettes.woodland[3]!, sample.glade).multiplyScalar(biome.woodland);
-  target.add(scratch);
-  const patch = sample.moorPatch * 3;
-  const index = Math.min(2, Math.floor(patch));
-  scratch.copy(palettes.moor[index]!).lerp(palettes.moor[index + 1]!, patch - index).multiplyScalar(biome.moor);
-  target.add(scratch);
-  scratch.copy(highlandPalette[0]!);
-  // Forest ground ends at the tree line, as the trees do; above it, a summit face is scree or rock.
-  if (sample.forest > 0.55 && sample.temperature > CLIMATE_LINES.treeLine[1]) scratch.copy(highlandPalette[1]!);
-  else if (sample.temperature < CLIMATE_LINES.scree[1] || slope > 0.5) scratch.copy(highlandPalette[2]!).lerp(highlandPalette[3]!, THREE.MathUtils.clamp(normalY - 0.3, 0, 1));
-  else if (sample.temperature < CLIMATE_LINES.scree[0]) scratch.lerp(highlandPalette[4]!, 1 - THREE.MathUtils.smoothstep(sample.temperature, CLIMATE_LINES.scree[1], CLIMATE_LINES.scree[0]));
-  const snow = biome.highlands > 0 ? snowCover(sample, slope, x, z, seed) / biome.highlands : 0;
-  scratch.lerp(highlandPalette[5]!, snow).multiplyScalar(biome.highlands);
-  target.add(scratch);
-  scratch.copy(lakeMeadow).lerp(palettes.lakeland[1]!, sample.forest);
-  if (sample.bank > 0 && sample.bank < 100) {
-    if (slope > 0.45) scratch.copy(lakeCliff);
-    else if (sample.height - sample.surface <= 3) scratch.copy(lakeBeach);
-    else if (sample.height - sample.surface < 5) scratch.copy(lakeReeds);
+  const context = groundContext;
+  context.sample = sample; context.x = x; context.z = z; context.seed = seed;
+  context.slope = slope; context.normalY = normalY; context.jitter = hash2(Math.round(x), Math.round(z), seed + 310);
+  const [firstKey, firstProfile] = BIOME_ENTRIES[0]!;
+  firstProfile.ground(context, target).multiplyScalar(biome[firstKey]);
+  for (let index = 1; index < BIOME_ENTRIES.length; index += 1) {
+    const [key, profile] = BIOME_ENTRIES[index]!;
+    profile.ground(context, scratch).multiplyScalar(biome[key]);
+    target.add(scratch);
   }
-  scratch.multiplyScalar(biome.lakeland);
-  target.add(scratch).lerp(graniteGround, sample.rock * (biome.hills + biome.woodland + biome.moor));
-  const jitter = hash2(Math.round(x), Math.round(z), seed + 310);
-  if (jitter < 0.012) target.lerp(flecks[jitter < 0.002 ? 1 : 0]!, biome.hills * 0.65);
-  if (jitter > 0.985) target.lerp(flecks[2]!, biome.moor * 0.7);
-  if (biome.woodland * sample.glade > 0.1 && jitter < 0.2
-    && fbm(x / 65, z / 65, seed + 163, 2) > 0.22) {
-    target.lerp(gladeFlowers[Math.floor(jitter * 15)]!, biome.woodland * sample.glade * 0.7);
+  for (const { color, keys } of rockGroups) {
+    let weight = 0;
+    for (const key of keys) weight += biome[key];
+    target.lerp(color, sample.rock * weight);
   }
+  for (const [key, profile] of extras) profile.groundExtras!(context, target, biome[key]);
   // FWM's height-relative beach fade applies to every biome, not only Lakeland.
-  if (!sample.water) target.lerp(lakeBeach, 1 - THREE.MathUtils.smoothstep(sample.height, 1.5, 7.5));
+  if (!sample.water) target.lerp(beachGround, 1 - THREE.MathUtils.smoothstep(sample.height, 1.5, 7.5));
   if (sample.water) target.set(0x2f6e6a);
   return target;
 }
 
 function treeColor(tree: Tree, target: THREE.Color): THREE.Color {
-  target.set(tree.tint).multiplyScalar(1 - tree.biome.hills - tree.biome.highlands);
-  target.add(scratch.copy(hedgeGround).multiplyScalar(tree.biome.hills));
-  target.add(scratch.copy(highlandPalette[1]!).multiplyScalar(tree.biome.highlands));
+  const remainder = fixedCrownKeys.reduce((weight, key) => weight - tree.biome[key], 1);
+  target.set(tree.tint).multiplyScalar(remainder);
+  for (const key of fixedCrownKeys) {
+    target.add(scratch.set(BIOME_PROFILES[key].crowns.fixed!).multiplyScalar(tree.biome[key]));
+  }
   return target;
 }
 
@@ -759,9 +749,10 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
           depths[vertex] = waterDepth[corners[corner]!]!;
           const sample = this.world.sample(worldX + dx!, worldZ + dz!);
           waterColor.set(0x2a8fa8);
-          waterColor.lerp(new THREE.Color(0x2a7fa0), sample.biome.highlands);
-          scratch.copy(shallowWater).lerp(deepWater, THREE.MathUtils.smoothstep(sample.surface - sample.height, 2, 18));
-          waterColor.lerp(scratch, sample.biome.lakeland);
+          for (const key of waterTintKeys) {
+            BIOME_PROFILES[key].waterTint!(sample, scratch);
+            waterColor.lerp(scratch, sample.biome[key]);
+          }
           colors[vertex * 3] = waterColor.r; colors[vertex * 3 + 1] = waterColor.g; colors[vertex * 3 + 2] = waterColor.b;
           vertex += 1;
         }

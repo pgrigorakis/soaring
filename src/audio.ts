@@ -1,4 +1,4 @@
-import type { BiomeWeights } from './biome';
+import { AUDIO_BIOME_KEYS, BIOME_KEYS, BIOME_PROFILES, emptyBiomeWeights, type BiomeKey, type BiomeWeights } from './biome';
 import type { EagleBehavior } from './eagle';
 
 // Four original eight-bar D-major phrases. Phrases, arpeggio shapes, and
@@ -14,21 +14,21 @@ const PHRASES = [
 ] as const;
 const ARPEGGIOS = [[0, 1, 2, 1, 2, 1], [0, 2, 1, 2, 1, 0], [2, 1, 0, 1, 2, 3], [0, 1, 2, 3, 2, 1]] as const;
 const BEATS_PER_BAR = 6;
-const BIOME_KEYS = ['hills', 'woodland', 'lakeland', 'highlands', 'moor'] as const;
-const HILLS_ONLY: BiomeWeights = { hills: 1, woodland: 0, moor: 0, highlands: 0, lakeland: 0 };
+const DEFAULT_WEIGHTS = emptyBiomeWeights();
+DEFAULT_WEIGHTS[BIOME_KEYS[0]!] = 1;
 
 function frequency(midi: number): number {
   return 440 * 2 ** ((midi - 69) / 12);
 }
 
 function normalizeWeights(weights?: BiomeWeights): BiomeWeights {
-  if (!weights) return HILLS_ONLY;
-  const safe = Object.fromEntries(BIOME_KEYS.map((key) => [
+  if (!weights) return DEFAULT_WEIGHTS;
+  const safe = Object.fromEntries(AUDIO_BIOME_KEYS.map((key) => [
     key, Number.isFinite(weights[key]) ? Math.max(0, weights[key]) : 0,
   ])) as BiomeWeights;
-  const total = BIOME_KEYS.reduce((sum, key) => sum + safe[key], 0);
-  if (total <= 0) return HILLS_ONLY;
-  for (const key of BIOME_KEYS) safe[key] /= total;
+  const total = AUDIO_BIOME_KEYS.reduce((sum, key) => sum + safe[key], 0);
+  if (total <= 0) return DEFAULT_WEIGHTS;
+  for (const key of AUDIO_BIOME_KEYS) safe[key] /= total;
   return safe;
 }
 
@@ -43,16 +43,14 @@ type MusicFeel = {
 };
 
 function musicFeel(weights: BiomeWeights): MusicFeel {
-  return {
-    beat: 0.42 * weights.hills + 0.47 * weights.woodland + 0.60 * weights.lakeland
-      + 0.50 * weights.highlands + 0.56 * weights.moor,
-    register: -5 * weights.woodland - 2 * weights.lakeland - weights.moor,
-    openMajor: weights.hills,
-    warmth: weights.woodland,
-    spaciousness: weights.lakeland,
-    modal: weights.highlands,
-    sparse: weights.moor,
-  };
+  const feel: MusicFeel = { beat: 0, register: 0, openMajor: 0, warmth: 0, spaciousness: 0, modal: 0, sparse: 0 };
+  for (const key of AUDIO_BIOME_KEYS) {
+    const audio = BIOME_PROFILES[key].audio;
+    feel.beat += audio.beat * weights[key];
+    if (audio.register !== 0) feel.register += audio.register * weights[key];
+    feel[audio.mood] += weights[key];
+  }
+  return feel;
 }
 
 export class Soundscape {
@@ -140,16 +138,12 @@ export class Soundscape {
     if (!this.ambienceLayers) return;
     const gust = Math.max(0, Math.sin(now * 0.22 + 0.7)) ** 2;
     const lap = 0.5 + 0.5 * Math.sin(now * 0.42);
-    const setLayer = (biome: keyof BiomeWeights, level: number) => {
-      this.ambienceLayers![biome].gain.setTargetAtTime(level, now, 0.28);
-    };
     // Each target follows the world's existing visual weights. The short gain ramp
     // only removes clicks; it does not add a second biome boundary.
-    setLayer('hills', 0.075 * weights.hills * (1 - 0.55 * weights.lakeland));
-    setLayer('woodland', 0.052 * weights.woodland * (0.08 + 0.92 * gust));
-    setLayer('lakeland', 0.046 * weights.lakeland * (0.2 + 0.8 * lap));
-    setLayer('highlands', 0.04 * weights.highlands);
-    setLayer('moor', 0.042 * weights.moor * (0.7 + 0.3 * gust));
+    for (const key of AUDIO_BIOME_KEYS) {
+      const level = BIOME_PROFILES[key].audio.level({ weights, weight: weights[key], gust, lap });
+      this.ambienceLayers[key].gain.setTargetAtTime(level, now, 0.28);
+    }
   }
 
   private playBar(start: number, behavior: EagleBehavior, feel: MusicFeel): void {
@@ -270,31 +264,28 @@ export class Soundscape {
         return { source, gain };
       };
 
-      const hills = makeLayer('lowpass', 680);
-      const woodland = makeLayer('bandpass', 1700);
-      const lakeland = makeLayer('lowpass', 380);
-      const highlands = makeLayer('highpass', 1250, true);
-      const moor = makeLayer('lowpass', 1500);
-      const drone = context.createOscillator();
-      const droneLevel = context.createGain();
-      drone.type = 'sine';
-      drone.frequency.value = 73.42;
-      droneLevel.gain.value = 0.28;
-      drone.connect(droneLevel).connect(moor.gain);
-      drone.start();
+      const layers = Object.fromEntries(AUDIO_BIOME_KEYS.map((key) => {
+        const audio = BIOME_PROFILES[key].audio;
+        return [key, makeLayer(audio.filter, audio.cutoff, audio.reverb)];
+      })) as Record<BiomeKey, ReturnType<typeof makeLayer>>;
+      for (const key of AUDIO_BIOME_KEYS) {
+        const config = BIOME_PROFILES[key].audio.drone;
+        if (!config) continue;
+        const drone = context.createOscillator();
+        const droneLevel = context.createGain();
+        drone.type = 'sine';
+        drone.frequency.value = config.frequency;
+        droneLevel.gain.value = config.level;
+        drone.connect(droneLevel).connect(layers[key].gain);
+        drone.start();
+      }
 
       this.context = context;
       this.master = master;
       this.ambience = ambience;
       this.music = music;
-      this.wind = hills.source;
-      this.ambienceLayers = {
-        hills: hills.gain,
-        woodland: woodland.gain,
-        lakeland: lakeland.gain,
-        highlands: highlands.gain,
-        moor: moor.gain,
-      };
+      this.wind = layers[AUDIO_BIOME_KEYS.find((key) => BIOME_PROFILES[key].audio.wind)!].source;
+      this.ambienceLayers = Object.fromEntries(AUDIO_BIOME_KEYS.map((key) => [key, layers[key].gain])) as Record<BiomeKey, GainNode>;
       this.nextBar = context.currentTime + 0.12;
       this.applyVolume();
     } catch (error) {

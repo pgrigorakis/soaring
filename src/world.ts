@@ -1,11 +1,12 @@
 import {
-  BIOME_PROFILES,
+  BIOME_ENTRIES,
   BIOME_SELECTION,
   CLIMATE,
   CLIMATE_LINES,
   WOODLAND_GLADES,
   biomeWeights,
   blendParameter,
+  crownTint,
   transition,
   type BiomeWeights,
 } from './biome';
@@ -198,19 +199,20 @@ export class WorldModel {
     const { field, hedge, fieldEdge } =
       biome.hills > 0 ? farmland(x, z, this.seed) : { field: 0, hedge: 0, fieldEdge: null };
     const legacyForest = Math.max(smootherstep(-0.04, 0.05, woodland), shoreside * 0.62) * (1 - mountainRegion * 0.5);
-    const forest = water
-      ? 0
-      : biome.hills * (BIOME_PROFILES.hills.forestDensity + hedge * 0.55) +
-        biome.woodland * BIOME_PROFILES.woodland.forestDensity * (1 - glade) +
-        biome.moor * BIOME_PROFILES.moor.forestDensity +
-        biome.highlands * legacyForest +
-        biome.lakeland * BIOME_PROFILES.lakeland.forestDensity;
+    let forest = 0;
+    if (!water) {
+      const forestContext = { hedge, glade, legacyForest };
+      for (const [key, profile] of BIOME_ENTRIES) forest += profile.forest(forestContext, biome[key]);
+    }
     const moorPatch = biome.moor > 0 ? clamp01(0.5 + fbm(x / 250, z / 250, this.seed + 155, 2)) : 0;
     const detail = fbm(x / 125, z / 125, this.seed + 31, 3) * 4.2 + fbm(x / 46, z / 46, this.seed + 37, 2) * 1.05;
+    const localHigh = smootherstep(0.6, 2.8, detail);
+    let localRock = 0;
+    for (const [key, profile] of BIOME_ENTRIES) localRock += biome[key] * localHigh * profile.localRock;
     const rock = clamp01(
       biome.highlands * (mountainRegion * 0.74 + smootherstep(96, 170, height)) +
-        blendParameter(biome, 'rockBias', 0) +
-        biome.moor * smootherstep(0.6, 2.8, detail) * 0.7,
+        blendParameter(biome, 'rockBias') +
+        localRock,
     );
     return {
       height,
@@ -310,19 +312,16 @@ export class WorldModel {
         if (x < minX || x >= minX + size || z < minZ || z >= minZ + size) continue;
         const sample = this.sample(x, z);
         const clumping = sample.biome.highlands > 0 ? 0.5 + fbm(x / 120, z / 120, this.seed + 157, 2) * 1.2 : 0;
-        const density = blendParameter(sample.biome, 'treeDensity', 1),
+        const density = blendParameter(sample.biome, 'treeDensity'),
           gx = Math.floor(x / 1000),
           gz = Math.floor(z / 1000);
         const groveX = (gx + 0.3 + hash2(gx, gz, this.seed + 158) * 0.4) * 1000,
           groveZ = (gz + 0.3 + hash2(gx, gz, this.seed + 159) * 0.4) * 1000;
         const moorGrove =
           hash2(gx, gz, this.seed + 160) < 0.25 ? 1 - smootherstep(100, 150, Math.hypot(x - groveX, z - groveZ)) : 0;
-        const chance =
-          sample.biome.hills * (0.018 + sample.hedge * 0.45) +
-          sample.biome.woodland * (1 - sample.glade) * 0.35 * density +
-          sample.biome.moor * (0.004 + moorGrove * 0.3) +
-          sample.biome.highlands * (0.018 + sample.forest * clumping) +
-          sample.biome.lakeland * 0.2;
+        const treeContext = { sample, density, moorGrove, clumping };
+        let chance = 0;
+        for (const [key, profile] of BIOME_ENTRIES) chance += profile.treeChance(treeContext, sample.biome[key]);
         const [treeStart, treeEnd] = CLIMATE_LINES.treeLine;
         if (
           sample.water ||
@@ -337,31 +336,15 @@ export class WorldModel {
           Math.hypot(this.sample(x + 3, z).height - sample.height, this.sample(x, z + 3).height - sample.height) / 3;
         if (slope > 0.6) continue;
         const b = sample.biome;
-        const conifer =
-          b.hills * BIOME_PROFILES.hills.species[0] +
-          b.woodland * BIOME_PROFILES.woodland.species[0] +
-          b.moor * BIOME_PROFILES.moor.species[0] +
-          b.highlands +
-          b.lakeland * BIOME_PROFILES.lakeland.species[0];
-        const birch =
-          b.hills * BIOME_PROFILES.hills.species[2] +
-          b.woodland * BIOME_PROFILES.woodland.species[2] +
-          b.moor * BIOME_PROFILES.moor.species[2] +
-          b.lakeland * BIOME_PROFILES.lakeland.species[2];
+        let conifer = 0,
+          birch = 0;
+        for (const [key, profile] of BIOME_ENTRIES) {
+          conifer += b[key] * profile.species[0];
+          birch += b[key] * profile.species[2];
+        }
         const species = hash2(cx, cz, this.seed + 353),
           kind = species < conifer ? 0 : species > 1 - birch ? 2 : 1;
-        const autumn = hash2(cx, cz, this.seed + 355) < b.woodland * 0.04;
-        const tint = autumn
-          ? hash2(cx, cz, this.seed + 356) < 0.25
-            ? 0xd9a441
-            : 0xc9772e
-          : kind === 2
-            ? 0x9dbf4e
-            : kind === 0
-              ? 0x1f5a34
-              : b.woodland > hash2(cx, cz, this.seed + 358)
-                ? BIOME_PROFILES.woodland.palette[Math.floor(hash2(cx, cz, this.seed + 357) * 3)]!
-                : 0x2e7a3e;
+        const tint = crownTint(b, kind, (offset) => hash2(cx, cz, this.seed + offset));
         trees.push({
           x,
           y: sample.height,
@@ -369,7 +352,7 @@ export class WorldModel {
           kind,
           tint,
           biome: b,
-          scale: (0.8 + hash2(cx, cz, this.seed + 359) * 0.4) * blendParameter(b, 'crownScale', 1),
+          scale: (0.8 + hash2(cx, cz, this.seed + 359) * 0.4) * blendParameter(b, 'crownScale'),
           turn: hash2(cx, cz, this.seed + 361) * Math.PI * 2,
         });
       }
@@ -429,13 +412,15 @@ export class WorldModel {
       nz = this.sample(x, z - 28).height - this.sample(x, z + 28).height;
     const inv = 1 / Math.hypot(nx, ny, nz),
       sun = clamp01(((nx * SUN_OFFSET.x + ny * SUN_OFFSET.y + nz * SUN_OFFSET.z) * inv) / SUN_LENGTH);
+    let canopy = 0;
+    for (const [key, profile] of BIOME_ENTRIES) canopy += sample.biome[key] * profile.canopySuppress * (1 - sample.glade);
     const open = 1 - sample.forest,
       land = (1 - sample.moisture) * 0.4 + open * 0.45 + sun * 0.4 + (1 - ny * inv) * 0.12 + sample.rock * 0.12;
     return (
       land *
       (0.2 + 0.8 * open) *
-      blendParameter(sample.biome, 'thermalOdds', 1) *
-      (1 - sample.biome.woodland * (1 - sample.glade))
+      blendParameter(sample.biome, 'thermalOdds') *
+      (1 - canopy)
     );
   }
   interest(x: number, z: number): number {
@@ -463,9 +448,9 @@ export class WorldModel {
       (water ? 0.8 : 0) +
       center.rock * 0.35 +
       Math.min(center.forest, 1 - center.forest) * 0.5 +
-      blendParameter(center.biome, 'scenicBonus', 0) +
-      blendParameter(center.biome, 'gladeEdgeScenic', 0) * (open - closed) +
-      blendParameter(center.biome, 'torScenic', 0) * smootherstep(0.45, 0.6, center.rock)
+      blendParameter(center.biome, 'scenicBonus') +
+      blendParameter(center.biome, 'gladeEdgeScenic') * (open - closed) +
+      blendParameter(center.biome, 'torScenic') * smootherstep(0.45, 0.6, center.rock)
     );
   }
   scenicStart(visit: number): { x: number; z: number; heading: number } {

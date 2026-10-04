@@ -1,0 +1,65 @@
+
+> soaring-wilderness@0.1.0 check
+> npm run test && npm run build
+
+
+> soaring-wilderness@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.7 /Users/pgrigorakis/.treehouse/soaring-b45a19/7/soaring
+
+ ✓ tests/sky-cycle.test.ts (4 tests) 8ms
+ ✓ tests/cloud-sea.test.ts (3 tests) 3ms
+ ✓ tests/audio.test.ts (6 tests) 41ms
+ ✓ tests/eagle.test.ts (5 tests) 749ms
+   ✓ procedural eagle > circles with the rendered bank toward the thermal and climbs at 3–4 m/s  730ms
+ ✓ tests/thermal-marker.test.ts (3 tests) 1388ms
+   ✓ thermal markers within 3.5 km > reuses one instanced column for every in-range thermal and hides the rest  536ms
+   ✓ thermal markers within 3.5 km > tracks every in-range thermal through seeking, circling, and replacement  752ms
+ ✓ tests/world.test.ts (11 tests) 1466ms
+   ✓ deterministic world generation > keeps tree positions identical across chunk partitions, including negative boundaries  710ms
+   ✓ deterministic world generation > makes large forests, open meadows, small groves and isolated trees  463ms
+ ✓ tests/navigation-route.test.ts (3 tests) 8972ms
+   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 448122  3086ms
+   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 0  2658ms
+   ✓ one-hour eagle navigation routes > keeps a safe persistent route and bounded world caches for seed 4294967295  3227ms
+ ✓ tests/navigation.test.ts (12 tests) 12215ms
+   ✓ autonomous eagle navigation > finishes a thermal approach through the visible navigation path  1225ms
+   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 50–70 m during a one-hour flight  3469ms
+   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 90–145 m during a one-hour flight  3415ms
+   ✓ autonomous eagle navigation > never enters terrain and caps thermal climb against smoothed ground in 65–210 m during a one-hour flight  3099ms
+   ✓ autonomous eagle navigation > circles a thermal with varying radius and bank, climbing without flapping  329ms
+   ✓ autonomous eagle navigation > keeps thermal-riding past 19 s when below maximum flight height  322ms
+   ✓ autonomous eagle navigation > leaves thermal-riding at maximum flight height without a fixed timer  342ms
+ ✓ tests/terrain.test.ts (6 tests) 15593ms
+   ✓ terrain streaming > streams nearest first within a time budget and covers the reach  1039ms
+   ✓ terrain streaming > keeps haze on loaded tiles while extending the reach, including after recentering  5298ms
+   ✓ terrain streaming > gives distant tiles the same trees as detailed tiles  6536ms
+   ✓ terrain streaming > renders several distinct instanced tree silhouettes at generated world positions  607ms
+   ✓ terrain streaming > keeps pooled trees in place across re-anchoring and frees their slots  1095ms
+   ✓ terrain streaming > matches terrain and sea-level water across a chunk seam built by separate streams  1016ms
+
+ Test Files  9 passed (9)
+      Tests  53 passed (53)
+   Start at  16:38:03
+   Duration  16.10s (transform 338ms, setup 0ms, collect 1.29s, tests 40.43s, environment 1ms, prepare 414ms)
+
+
+> soaring-wilderness@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 31 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.79 kB │ gzip:   0.49 kB
+dist/assets/index-B4_9kUkP.css    3.34 kB │ gzip:   1.38 kB
+dist/assets/index-DmY3IO1v.js   634.96 kB │ gzip: 171.48 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 541ms

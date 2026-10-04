@@ -901,6 +901,8 @@ function updateFlight(delta: number, now: number): void {
 }
 
 let renderedFrames = 0;
+// The fog probe also renders, so keep the scene's own count for diagnostics and smoke checks.
+let sceneDrawCalls = 0;
 const profiler = profileMode ? new FrameProfiler(renderer) : null;
 let smokeFrameIndex = 0;
 function frame(now: number): void {
@@ -987,6 +989,7 @@ function frame(now: number): void {
   if (!smokeMode || smokeFrameIndex++ % 4 === 0) {
     profiler?.renderBegin();
     renderer.render(scene, camera);
+    sceneDrawCalls = renderer.info.render.calls;
     profiler?.renderEnd();
     renderedFrames += 1;
   }
@@ -1011,7 +1014,7 @@ function frame(now: number): void {
       `cap          ${currentFrameCap() === null ? 'uncapped' : `${currentFrameCap()} fps`}`,
       `quality step ${qualityStep}/3 · pixel ${renderer.getPixelRatio().toFixed(2)}`,
       `render       ${renderer.domElement.width} × ${renderer.domElement.height} · ${renderer.domElement.width * renderer.domElement.height} px`,
-      `draw calls   ${renderer.info.render.calls}`,
+      `draw calls   ${sceneDrawCalls}`,
       `puff clouds  ${puffClouds.count} instances · 1 draw call`,
       `geometries   ${renderer.info.memory.geometries}`,
       `behavior     ${state.behavior}${state.flapping ? ' (flapping)' : ''}`,
@@ -1115,7 +1118,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
     return {
       renderedFrames,
       buildTiming: terrain.buildTiming,
-      drawCalls: renderer.info.render.calls,
+      drawCalls: sceneDrawCalls,
       seed: world.seed,
       chunks: terrain.chunkCount,
       pending: terrain.pendingCount,
