@@ -42,8 +42,6 @@ export const WOODLAND_GLADES = { wavelength: 300, start: 0.28, end: 0.43 } as co
 
 export type BiomeWeights = { hills: number; woodland: number; moor: number; highlands: number; lakeland: number };
 export type BiomeProfile = {
-  heightAmplitude: number;
-  heightOffset: number;
   forestDensity: number;
   treeDensity: number;
   crownScale: number;
@@ -59,19 +57,18 @@ export type BiomeProfile = {
   torScenic: number;
 };
 
-// Highlands retains its existing landform; Lakeland uses wooded low shores.
+// Profiles own vegetation and appearance. Continental fields own height.
 export const BIOME_PROFILES = {
-  hills: { heightAmplitude: 75, heightOffset: 150, forestDensity: 0.025, treeDensity: 1, crownScale: 1,
+  hills: { forestDensity: 0.025, treeDensity: 1, crownScale: 1,
     rockBias: 0, palette: [0x6fa03c, 0x86b83f, 0xb3b04a], species: [0, 1, 0], thermalOdds: 1, scenicBonus: 0.1,
     gladeEdgeScenic: 0, torScenic: 0 },
-  woodland: { heightAmplitude: 60, heightOffset: 100, forestDensity: 0.92, treeDensity: 2.5, crownScale: 1.5,
+  woodland: { forestDensity: 0.92, treeDensity: 2.5, crownScale: 1.5,
     rockBias: 0.02, palette: [0x1f5a34, 0x2e7a3e, 0x5c9443, 0x7fae45, 0x2f6b3a], species: [0.3, 0.6, 0.1], thermalOdds: 1.6, scenicBonus: 0.2,
     gladeEdgeScenic: 0.5, torScenic: 0 },
-  moor: { heightAmplitude: 60, heightOffset: 150, forestDensity: 0.02, treeDensity: 1, crownScale: 0.85,
+  moor: { forestDensity: 0.02, treeDensity: 1, crownScale: 0.85,
     rockBias: 0.12, palette: [0x8a5a8c, 0xb06fa6, 0xb0763a, 0xa6a25a], species: [0.2, 0.6, 0.2], thermalOdds: 1.2, scenicBonus: 0.25,
     gladeEdgeScenic: 0, torScenic: 0.5 },
-  // Appearance only: WorldModel.relief retains the pre-59 blended drainage landform.
-  lakeland: { heightAmplitude: 75, heightOffset: 150, forestDensity: 0.55, treeDensity: 1, crownScale: 1,
+  lakeland: { forestDensity: 0.55, treeDensity: 1, crownScale: 1,
     rockBias: 0.02, palette: [0x6fa03c, 0x2f6b3a], species: [0.45, 0.35, 0.2], thermalOdds: 1, scenicBonus: 0.3,
     gladeEdgeScenic: 0, torScenic: 0 },
 } satisfies Record<'hills' | 'woodland' | 'moor' | 'lakeland', BiomeProfile>;

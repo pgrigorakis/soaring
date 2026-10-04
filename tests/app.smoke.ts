@@ -920,7 +920,7 @@ test('renders daytime, aurora, and midnight sky states', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('shows drainage water from altitude without page errors', async ({ page }) => {
+test('shows sea-level water from altitude without page errors', async ({ page }) => {
   test.setTimeout(270_000);
   const errors = captureErrors(page);
   await page.goto('/?smoke');
@@ -945,7 +945,7 @@ test('shows drainage water from altitude without page errors', async ({ page }) 
     });
   }, landmark!);
   await page.waitForFunction(() => window.__SOARING__.snapshot().tiers.far > 0, undefined, { timeout: 240_000 });
-  await page.screenshot({ path: 'test-results/hydrology-altitude.png' });
+  await page.screenshot({ path: 'test-results/sea-level-altitude.png' });
   const seen = await page.evaluate((mark) => window.__SOARING__.sample(mark.x, mark.z), landmark!);
   expect(seen.water).toBe(true);
   expect(errors).toEqual([]);

@@ -24,14 +24,14 @@ test('climate selects lowland biomes and cools rendered ground deterministically
         - (climate.seaTemperature - Math.max(0, sample.height) / CLIMATE.lapse)) };
     });
     const world = new WorldModel(57);
-    // The ridged massif moved the cold crest. The cooling assertions are unchanged.
-    const peak = world.sample(-7880, 3960);
-    const trees = world.treesInArea(-7880, 3960, 360, 36);
+    // The continental mask moves the cold crest. Cooling assertions are unchanged.
+    const peak = world.sample(113400, 73500);
+    const trees = world.treesInArea(113400, 73500, 360, 36);
     return { centres, fields,
       highlands: biomeWeights(1, 1, 0, 1, 1), lakeland: biomeWeights(0, 0, 1, 0, 1),
       coldPeak: { temperature: peak.temperature, treeEnd: CLIMATE_LINES.treeLine[1], trees: trees.length,
-        snow: snowCover(peak, .2, -7880, 3960, 57),
-        warmSnow: snowCover({ ...peak, temperature: .5 }, .2, -7880, 3960, 57) } };
+        snow: snowCover(peak, .2, 113400, 73500, 57),
+        warmSnow: snowCover({ ...peak, temperature: .5 }, .2, 113400, 73500, 57) } };
   });
   for (const { name, weights } of evidence.centres) expect(weights[name]).toBeGreaterThan(.99);
   expect(evidence.highlands.highlands).toBe(1);

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 
-// Failure modes: weights depend on cache/order, profile blending recurses through drainage,
+// Failure modes: weights depend on cache/order, profile blending changes continental height,
 // adjacent meshes disagree on colour/height, pool water floats above dry ground, or rendering fails.
 test('renders blended biome terrain with deterministic shared chunk edges', async ({ page }, testInfo) => {
   test.setTimeout(60_000);
@@ -92,12 +92,13 @@ test('renders varied farmland with physical hedgerows', async ({ page }, testInf
     }
     const scene = new THREE.Scene();
     const terrain = new TerrainStream(scene, new WorldModel(80231));
-    terrain.update(-8000, -40000, Infinity);
+    // The old fixture is flooded by the continental field. This dry Hills parcel retains hedges.
+    terrain.update(-6240, -37680, Infinity);
     let hedgeInstances = 0;
     scene.traverse((object: any) => { if (object.name === 'hedgerows') hedgeInstances += object.count; });
     terrain.dispose();
     window.__SOARING__.setTimeOfDay(.5);
-    window.__SOARING__.setViewpoint({ x: -8200, y: 290, z: -39500, lookX: -8000, lookY: 140, lookZ: -40300 });
+    window.__SOARING__.setViewpoint({ x: -6440, y: 220, z: -37180, lookX: -6240, lookY: 80, lookZ: -37980 });
     return { fields: fields.size, angles: angles.size, deterministic, hedgeInstances };
   });
   expect(evidence.deterministic).toBe(true);

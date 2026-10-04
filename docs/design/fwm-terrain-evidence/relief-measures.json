@@ -1,0 +1,48 @@
+{
+  "bounds": [
+    -24000,
+    24000
+  ],
+  "spacing": 160,
+  "seeds": [
+    {
+      "seed": 42,
+      "peak": {
+        "x": 18560,
+        "z": 8160,
+        "height": 709.587911625125,
+        "highlands": 0
+      },
+      "waterFraction": 0.4932837385900818,
+      "drySamples": 45909,
+      "medianSlope": 12.781398484233298,
+      "maxSlope": 73.01887173195473
+    },
+    {
+      "seed": 80231,
+      "peak": {
+        "x": -5920,
+        "z": -8000,
+        "height": 824.1553979209003,
+        "highlands": 0
+      },
+      "waterFraction": 0.49149567885564177,
+      "drySamples": 46071,
+      "medianSlope": 12.831996263042441,
+      "maxSlope": 72.06770061775482
+    },
+    {
+      "seed": 57,
+      "peak": {
+        "x": 22400,
+        "z": 3200,
+        "height": 871.4591151243852,
+        "highlands": 0
+      },
+      "waterFraction": 0.4981291597222989,
+      "drySamples": 45470,
+      "medianSlope": 13.056248757058825,
+      "maxSlope": 70.4027040426608
+    }
+  ]
+}

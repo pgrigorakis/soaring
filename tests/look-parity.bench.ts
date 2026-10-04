@@ -39,7 +39,7 @@ test('capture and compare finished pictures at the performance bench vantages', 
     for (const vantage of selectedVantages) {
       console.log(`Capturing ${vantage.name}, repeat ${repeat + 1}/${repeats}`);
       const spot = vantage.spot === 'origin' ? { x: 0, z: 0 } : spots[vantage.spot];
-      const heading = vantage.heading === 'spot' ? spots.run.heading : vantage.heading;
+      const heading = vantage.heading === 'spot' ? spots.basin.heading : vantage.heading;
       await page.evaluate(({ x, z, heading, timeOfDay, visibility }) => {
         const app = window.__SOARING__;
         app.reviewFlight!({ x, z, heading });

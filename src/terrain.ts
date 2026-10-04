@@ -26,7 +26,6 @@ const lakeCliff = new THREE.Color(0x8a8174);
 const shallowWater = new THREE.Color(0x78b4a3);
 const deepWater = new THREE.Color(0x2b6c73);
 const graniteGround = new THREE.Color(0x857e72);
-const peatGround = new THREE.Color(0x2e4a4a);
 const hedgeGround = new THREE.Color(0x2e6b34);
 const gladeFlowers = [0xe6c43a, 0xd2553f, 0xb06fa6].map((hex) => new THREE.Color(hex));
 const flecks = [0xe6c43a, 0xd2553f, 0xe1b93a].map((hex) => new THREE.Color(hex));
@@ -55,7 +54,7 @@ export function terrainColor(sample: LandscapeSample, x: number, z: number, seed
   scratch.lerp(highlandPalette[5]!, snow).multiplyScalar(biome.highlands);
   target.add(scratch);
   scratch.copy(lakeMeadow).lerp(palettes.lakeland[1]!, sample.forest);
-  if (!sample.river && sample.bank > 0 && sample.bank < 100) {
+  if (sample.bank > 0 && sample.bank < 100) {
     if (slope > 0.45) scratch.copy(lakeCliff);
     else if (sample.height - sample.surface <= 3) scratch.copy(lakeBeach);
     else if (sample.height - sample.surface < 5) scratch.copy(lakeReeds);
@@ -69,8 +68,9 @@ export function terrainColor(sample: LandscapeSample, x: number, z: number, seed
     && fbm(x / 65, z / 65, seed + 163, 2) > 0.22) {
     target.lerp(gladeFlowers[Math.floor(jitter * 15)]!, biome.woodland * sample.glade * 0.7);
   }
-  target.lerp(peatGround, sample.peat);
-  if (sample.water) target.set(sample.peat > 0 ? 0x2e4a4a : 0x2f6e6a);
+  // FWM's height-relative beach fade applies to every biome, not only Lakeland.
+  if (!sample.water) target.lerp(lakeBeach, 1 - THREE.MathUtils.smoothstep(sample.height, 1.5, 7.5));
+  if (sample.water) target.set(0x2f6e6a);
   return target;
 }
 
@@ -129,7 +129,6 @@ export class TerrainStream {
   private active: { tile: Pending; job: Generator<void, Chunk>; cpuMs: number } | null = null;
   private readonly free: Record<Tier, ChunkBuffers[]> = { near: [], mid: [], far: [] };
   private readonly samples: LandscapeSample[] = [];
-  private readonly waterSamples: LandscapeSample[] = [];
   private readonly wet = new Uint8Array(41 * 41);
   private readonly levels = new Float64Array(41 * 41);
   private readonly waterDepth = new Float64Array(41 * 41);
@@ -143,7 +142,6 @@ export class TerrainStream {
     this.active?.job.return(undefined as never);
     this.active = null;
     this.samples.length = 0;
-    this.waterSamples.length = 0;
   }
 
   private release(tier: Tier, buffers: ChunkBuffers): void {
@@ -296,6 +294,7 @@ float waterRippleHeight(vec2 worldXZ) {
         .replace(
           '#include <color_fragment>',
           `#include <color_fragment>
+if ( vWaterDepth <= 0.0 ) discard;
 vec3 biomeWaterColor = diffuseColor.rgb;
 float shallowWater = 1.0 - smoothstep( 0.7, 3.2, vWaterDepth );
 vec3 depthWaterColor = mix( waterDeepColor, waterShallowColor, shallowWater );
@@ -417,7 +416,6 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       this.buildMaxMs = Math.max(this.buildMaxMs, this.active.cpuMs);
       this.active = null;
       this.samples.length = 0;
-      this.waterSamples.length = 0;
       this.pending.splice(this.pending.findIndex((tile) => tile.key === next.key), 1);
       const old = this.chunks.get(next.key);
       if (old) { this.scene.remove(old.group); old.dispose(); }
@@ -564,7 +562,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     group.position.set(originX, 0, originZ);
     let buffers = this.free[tier].pop();
     if (buffers) this.reused += 1;
-    else { buffers = new ChunkBuffers(segments, chunkSize / 36, !detailed); this.allocated += 1; }
+    else { buffers = new ChunkBuffers(segments, segments, !detailed); this.allocated += 1; }
     const owned = buffers;
     let complete = false;
     const pooled: InstancePool[] = [];
@@ -676,29 +674,21 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       terrain.castShadow = true;
       group.add(terrain);
 
-      // One world-aligned water grid across every terrain tier prevents LOD water seams.
-      const waterSegments = chunkSize / 36;
-      const waterSamples = this.waterSamples;
-      for (let iz = -1; iz <= waterSegments + 1; iz += 1) {
-        for (let ix = -1; ix <= waterSegments + 1; ix += 1) {
-          waterSamples.push(this.world.sample(originX + ix * 36, originZ + iz * 36));
-          if ((ix + 1) % 8 === 0) yield;
-        }
-      }
-      const waterAt = (ix: number, iz: number) => waterSamples[(iz + 1) * (waterSegments + 3) + ix + 1]!;
+      // Water uses the actual terrain vertices and diagonal. Signed depth then
+      // interpolates on the same triangles; the shader clips at the zero crossing.
+      // Sea level is identical across tiers, so there is no local-level water seam.
       const { wet, levels, waterDepth } = this;
       let waterVertex = 0;
-      for (let iz = 0; iz <= waterSegments; iz += 1) {
-        for (let ix = 0; ix <= waterSegments; ix += 1) {
-          const sample = waterAt(ix, iz);
-          const waterSurface = sample.water ? sample.surface : this.dryWaterLevel(waterAt, ix, iz);
+      for (let iz = 0; iz <= segments; iz++) {
+        for (let ix = 0; ix <= segments; ix++) {
+          const sample = sampleAt(ix, iz);
           wet[waterVertex] = Number(sample.water);
-          levels[waterVertex] = waterSurface;
-          waterDepth[waterVertex++] = Math.max(0, waterSurface - sample.height);
+          levels[waterVertex] = sample.surface;
+          waterDepth[waterVertex++] = sample.surface - sample.height;
           if (ix % 8 === 0) yield;
         }
       }
-      const waterGeometry = yield* this.createWaterGeometry(originX, originZ, chunkSize, waterSegments, wet, levels, waterDepth, buffers);
+      const waterGeometry = yield* this.createWaterGeometry(originX, originZ, chunkSize, segments, wet, levels, waterDepth, buffers);
       // The shared water pool draws a copy; the tile keeps its built water as a hidden source mesh.
       const waterSource = waterGeometry ? new THREE.Mesh(waterGeometry, this.waterMaterial) : null;
       if (waterSource) { waterSource.visible = false; group.add(waterSource); }
@@ -733,27 +723,8 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       return { group, tier, descriptor: `${tier}:${treeMode}`, dispose: release };
     } finally {
       this.samples.length = 0;
-      this.waterSamples.length = 0;
       if (!complete) release();
     }
-  }
-
-  // A dry vertex at a water edge takes its wet neighbors' level, so river and lake edges stay flat.
-  private dryWaterLevel(sampleAt: (xIndex: number, zIndex: number) => LandscapeSample, xIndex: number, zIndex: number): number {
-    let sum = 0;
-    let count = 0;
-    for (let dz = -1; dz <= 1; dz += 1) {
-      for (let dx = -1; dx <= 1; dx += 1) {
-        const neighbor = sampleAt(xIndex + dx, zIndex + dz);
-        if (!neighbor.water) continue;
-        sum += neighbor.surface;
-        count += 1;
-      }
-    }
-    const dry = sampleAt(xIndex, zIndex);
-    // Neighboring reaches can have different levels. Never extend their water
-    // above a dry bank, including the 0.15 m render offset.
-    return Math.min(count > 0 ? sum / count : dry.surface, dry.height - 0.15);
   }
 
   private *createWaterGeometry(originX: number, originZ: number, chunkSize: number, segments: number, water: Uint8Array, surface: Float64Array, waterDepth: Float64Array, buffers: ChunkBuffers): Generator<void, THREE.BufferGeometry | null> {
@@ -775,7 +746,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
         const worldX = originX + localX;
         const worldZ = originZ + localZ;
         if (!corners.some((corner) => water[corner])) continue;
-        const [y0, y1, y2, y3] = corners.map((corner) => surface[corner]! + 0.15);
+        const [y0, y1, y2, y3] = corners.map((corner) => surface[corner]!);
         const base = vertex;
         const offset = base * 3;
         positions[offset] = localX; positions[offset + 1] = y0!; positions[offset + 2] = localZ;
@@ -788,12 +759,9 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
           depths[vertex] = waterDepth[corners[corner]!]!;
           const sample = this.world.sample(worldX + dx!, worldZ + dz!);
           waterColor.set(0x2a8fa8);
-          if (!sample.river) {
-            waterColor.lerp(new THREE.Color(0x2a7fa0), sample.biome.highlands);
-            scratch.copy(shallowWater).lerp(deepWater, THREE.MathUtils.smoothstep(sample.surface - sample.height, 2, 18));
-            waterColor.lerp(scratch, sample.biome.lakeland);
-          }
-          if (sample.peat > 0) waterColor.set(0x2e4a4a);
+          waterColor.lerp(new THREE.Color(0x2a7fa0), sample.biome.highlands);
+          scratch.copy(shallowWater).lerp(deepWater, THREE.MathUtils.smoothstep(sample.surface - sample.height, 2, 18));
+          waterColor.lerp(scratch, sample.biome.lakeland);
           colors[vertex * 3] = waterColor.r; colors[vertex * 3 + 1] = waterColor.g; colors[vertex * 3 + 2] = waterColor.b;
           vertex += 1;
         }

@@ -12,8 +12,6 @@ describe('one-hour eagle navigation routes', () => {
     let nearOldRoute = false;
     let revisitPasses = 0;
     let maxThermals = 0;
-    let maxRiverNodes = 0;
-    let maxNearbyReaches = 0;
     for (let step = 0; step < 36_000; step += 1) {
       const previous = { x: navigator.state.x, z: navigator.state.z };
       const state = navigator.update(0.1);
@@ -29,8 +27,6 @@ describe('one-hour eagle navigation routes', () => {
       if ((step + 1) % 10 !== 0) continue;
       const sizes = world.trim(WORLD_CACHE_LIMIT);
       maxThermals = Math.max(maxThermals, sizes.thermals);
-      maxRiverNodes = Math.max(maxRiverNodes, sizes.riverNodes);
-      maxNearbyReaches = Math.max(maxNearbyReaches, sizes.nearbyReaches);
     }
     const netDistance = Math.hypot(navigator.state.x - start.x, navigator.state.z - start.z);
     // #86 approval: seed 0 reaches 30.1% with lowland hills; accept 30% for this seed only.
@@ -38,7 +34,5 @@ describe('one-hour eagle navigation routes', () => {
     expect(netDistance).toBeGreaterThanOrEqual(distanceFlown * (seed === 0 ? 0.30 : 0.35));
     expect(revisitPasses).toBeLessThanOrEqual(5);
     expect(maxThermals).toBeLessThanOrEqual(WORLD_CACHE_LIMIT);
-    expect(maxRiverNodes).toBeLessThanOrEqual(WORLD_CACHE_LIMIT);
-    expect(maxNearbyReaches).toBeLessThanOrEqual(WORLD_CACHE_LIMIT);
   }, 20_000); // A simulated hour exceeds Vitest's 5 s default on shared CI CPUs.
 });

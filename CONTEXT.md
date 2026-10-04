@@ -34,17 +34,13 @@ _Avoid_: Soaring (unless in a thermal)
 **Flapping**:
 Short bursts of wing beats the eagle uses to climb outside a thermal. Never used while thermal-riding.
 
-**Drainage lattice**:
-The coarse deterministic grid, at 500 m spacing, that decides where water flows before the terrain is shaped. Each node drains to its lowest neighbor. It is computed lazily per region and cached, not precomputed for the whole world.
-_Avoid_: Whole-world water map, river painted on after the hills
-
-**River**:
-Water along a drainage-lattice segment. It runs downhill, joins larger rivers, and never crosses them. Valley sides rise from the channel, and the channel stays visible on the far terrain mesh.
-_Avoid_: Stream placed on an unrelated slope
+**Sea level**:
+The shared water height across the world. Bays, coasts and inland basins all fill to this height.
+_Avoid_: Local lake level
 
 **Lake**:
-Water filling a lattice basin: a node with no lower neighbor and enough upstream drainage. A river ends in a lake or continues past the loaded area.
-_Avoid_: Noise puddle, sea
+An inland basin filled to sea level. Its shore follows the surrounding land rather than a separate lake outline.
+_Avoid_: Drainage lake, elevated cirque lake
 
 **Terrain visibility**:
 The setting described in [README.md](README.md#terrain-visibility).

@@ -1,107 +1,93 @@
 import { expect, test } from '@playwright/test';
 
-// Failure modes: water changes its grid at LOD boundaries, dry banks flood,
-// islands lose their trees, thermals occupy the lake, or a long crossing stalls.
-test('renders a long valley lake with a wooded island, beach and seamless water tiers', async ({ page }, testInfo) => {
-  test.setTimeout(90_000);
+// Failure modes: local water levels return, water interpolates a different
+// diagonal from terrain, tier edges disagree, or shore targets/placements flood.
+test('sea-level basins use terrain triangles and seamless water across tiers', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
   const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('pageerror', (e) => errors.push(e.message));
   await page.addInitScript(() => localStorage.setItem('soaring.world-seed.v1', '448122'));
   await page.goto('/?smoke');
-  await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0);
   const evidence = await page.evaluate(async () => {
-    const worldPath = '/src/world.ts';
-    const terrainPath = '/src/terrain.ts';
-    const threePath = '/node_modules/.vite/deps/three.js';
-    const { WorldModel, lakeShorePoint } = await import(worldPath);
-    const { TerrainStream } = await import(terrainPath);
-    const THREE = await import(threePath);
-    const world = new WorldModel(448122);
-    // A long Lakeland lake with an island. The previous landmark was a drainage
-    // basin of the old height field; #85 moves those basins.
-    const x = 7267.07754781004, z = -250.06799930008128;
-    const lake = world.reachesNear(x, z).find((r: any) => r.ax === x && r.az === z && r.lake);
-    const scene = new THREE.Scene();
-    const terrain = new TerrainStream(scene, world);
-    const chunks: any[] = [];
-    const make = (cx: number, cz: number, size: number, tier: string) => {
-      const build = terrain.createChunk({ x: cx, z: cz, chunkSize: size, tier, trees: 'none' });
-      let result = build.next();
-      while (!result.done) result = build.next();
-      const chunk = result.value;
-      chunks.push(chunk);
-      return chunk.group;
+    const worldPath = '/src/world.ts',
+      terrainPath = '/src/terrain.ts',
+      threePath = '/node_modules/.vite/deps/three.js';
+    const { WorldModel } = await import(worldPath),
+      { TerrainStream } = await import(terrainPath),
+      THREE = await import(threePath);
+    const world = new WorldModel(448122),
+      scene = new THREE.Scene(),
+      terrain = new TerrainStream(scene, world),
+      chunks: any[] = [];
+    const make = (x: number, z: number, size: number, tier: string) => {
+      const build = terrain.createChunk({ x, z, chunkSize: size, tier, trees: 'none' });
+      let r = build.next();
+      while (!r.done) r = build.next();
+      chunks.push(r.value);
+      return r.value.group;
     };
-    const far = make(5, -1, 1440, 'far');
+    let row = 0;
+    for (let candidate = -8; candidate <= 8; candidate++) {
+      if (Array.from({ length: 17 }, (_, i) => world.sample(1440, candidate * 1440 + i * 90).water).some(Boolean)) {
+        row = candidate;
+        break;
+      }
+    }
+    const far = make(1, row, 1440, 'far');
     const edge = (group: any, localX: number) => {
       const result = new Map();
       const mesh = group.children.find((m: any) => m.material?.transparent);
       if (!mesh) return result;
-      const positions = mesh.geometry.getAttribute('position');
-      const colors = mesh.geometry.getAttribute('color');
-      for (let index = 0; index < positions.count; index++) {
-        if (positions.getX(index) !== localX) continue;
-        const wx = positions.getX(index) + group.position.x;
-        const wz = positions.getZ(index) + group.position.z;
-        const sample = world.sample(wx, wz);
-        const y = positions.getY(index);
-        if (!sample.water && y > sample.height + .0001) throw new Error(`Flooded dry bank at ${wx},${wz}`);
-        result.set(wz, [y, colors.getX(index), colors.getY(index), colors.getZ(index)]);
+      const p = mesh.geometry.getAttribute('position'),
+        c = mesh.geometry.getAttribute('color'),
+        d = mesh.geometry.getAttribute('waterDepth');
+      for (let i = 0; i < p.count; i++) {
+        const wx = p.getX(i) + group.position.x,
+          wz = p.getZ(i) + group.position.z,
+          s = world.sample(wx, wz);
+        if (Math.abs(d.getX(i) + s.height) > 0.0001) throw new Error('Water depth does not match terrain vertex');
+        if (p.getY(i) !== 0) throw new Error('Local water level');
+        if (p.getX(i) === localX) result.set(wz, [p.getY(i), c.getX(i), c.getY(i), c.getZ(i), d.getX(i)]);
       }
       return result;
     };
-    let seamError = 0, sharedVertices = 0;
     const farEdge = edge(far, 0);
-    for (let row = -3; row < 1; row++) {
-      const mid = make(19, row, 360, 'mid');
-      const near = make(20, row, 360, 'near');
-      const left = edge(mid, 360), right = edge(near, 0);
-      for (const [wz, values] of left) {
-        for (const neighbor of [right.get(wz), farEdge.get(wz)]) {
-          if (!neighbor) continue;
-          sharedVertices++;
-          values.forEach((value: number, axis: number) => { seamError = Math.max(seamError, Math.abs(value - neighbor[axis])); });
-        }
-      }
+    let seamError = 0,
+      sharedVertices = 0;
+    for (let j = row * 4; j < row * 4 + 4; j++) {
+      const mid = make(3, j, 360, 'mid'),
+        near = make(4, j, 360, 'near');
+      const left = edge(mid, 360),
+        right = edge(near, 0);
+      for (const [z, values] of left)
+        for (const neighbor of [right.get(z), farEdge.get(z)])
+          if (neighbor) {
+            sharedVertices++;
+            values.forEach((v: number, i: number) => (seamError = Math.max(seamError, Math.abs(v - neighbor[i]))));
+          }
     }
-    const islandTrees = world.treesInArea(x - 180, z - 180, 360, 29).filter((tree: any) => world.sample(tree.x, tree.z).island);
-    const ring = Array.from({ length: 32 }, (_, index) => {
-      const angle = index * Math.PI / 16;
-      return world.sample(x + Math.cos(angle) * (lake.islandRadius + 90), z + Math.sin(angle) * (lake.islandRadius + 90)).water;
-    });
-    // Main's accepted shore-following behavior must use the new ellipse outline.
-    const shoreTargets = Array.from({ length: 32 }, (_, index) => lakeShorePoint(lake, index * Math.PI / 16, 60));
-    // A river inlet may cross the outward ring. The lake outline itself must be dry.
-    const dryShoreTargets = shoreTargets.every((point: any) => {
-      const sample = world.sample(point.x, point.z);
-      return !sample.water || sample.river;
-    });
-    const minorPoint = lakeShorePoint(lake, lake.heading + Math.PI / 2);
-    const minorRadius = Math.hypot(minorPoint.x - x, minorPoint.z - z);
-    const thermals = world.nearbyThermals(x, z, 3);
+    const lake = world.landmarkNear(0, 0),
+      shore = world.nearestShore(lake.x, lake.z);
+    const thermals = world.nearbyThermals(lake.x, lake.z, 3);
     const dryThermals = thermals.every((t: any) => !world.sample(t.x, t.z).water);
-    // This seed's largest nominal basin is entirely removed by tributary protection.
-    const maskedWorld = new WorldModel(-1214809889);
-    const maskedLandmark = maskedWorld.landmarkNear(-147, -3730);
-    const landmarkWater = !!maskedLandmark && maskedWorld.sample(maskedLandmark.x, maskedLandmark.z).water;
-    chunks.forEach((chunk) => chunk.dispose());
+    const shoreHeight = shore ? world.sample(shore.x, shore.z).height : null;
+    chunks.forEach((c) => c.dispose());
     terrain.dispose();
-    window.__SOARING__.setTimeOfDay(.5);
-    window.__SOARING__.setViewpoint({ x: x - 1100, y: lake.aLevel + 540, z: z + 1300, lookX: x, lookY: lake.aLevel, lookZ: z });
-    return { seed: world.seed, lake, seamError, sharedVertices, islandTrees: islandTrees.length, waterRing: ring.filter(Boolean).length, dryThermals, landmarkWater, dryShoreTargets, minorRadius };
+    window.__SOARING__.reviewFlight!({ x: lake.x, z: lake.z, heading: 0.4 });
+    window.__SOARING__.setTimeOfDay(0.5);
+    window.__SOARING__.setVisibility(720);
+    return { seed: 448122, row, lake, shoreHeight, seamError, sharedVertices, dryThermals };
   });
   expect(evidence.sharedVertices).toBeGreaterThan(10);
   expect(evidence.seamError).toBe(0);
-  expect(evidence.islandTrees).toBeGreaterThan(10);
-  expect(evidence.waterRing).toBe(32);
+  expect(evidence.lake.surface).toBe(0);
+  expect(Math.abs(evidence.shoreHeight!)).toBeLessThan(0.01);
   expect(evidence.dryThermals).toBe(true);
-  expect(evidence.landmarkWater).toBe(true);
-  expect(evidence.dryShoreTargets).toBe(true);
-  expect(evidence.minorRadius).toBeLessThan(evidence.lake.aWidth * 0.35);
   expect(errors).toEqual([]);
   await page.waitForFunction(() => window.__SOARING__.snapshot().pending === 0);
-  const rendered = await page.evaluate(() => window.__SOARING__.snapshot().renderedFrames);
-  await page.waitForFunction((previous) => window.__SOARING__.snapshot().renderedFrames > previous, rendered);
-  await testInfo.attach('lakeland-evidence', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' });
+  await testInfo.attach('lakeland-evidence', {
+    body: JSON.stringify(evidence, null, 2),
+    contentType: 'application/json',
+  });
   await testInfo.attach('lakeland-render', { body: await page.screenshot(), contentType: 'image/png' });
 });

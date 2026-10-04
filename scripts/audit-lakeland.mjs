@@ -1,5 +1,5 @@
-// Failure modes: too little/much territory, oversized inland seas, missing islands,
-// flooded starts, thermals on water, cache-dependent shores, or a stalled lake crossing.
+// Failure modes: flooded starts, thermals on sea-level water, cache-dependent
+// shores, collision-floor corrections, or a stalled crossing.
 // Repeatable integration artifact: node scripts/audit-lakeland.mjs
 import { build } from 'esbuild';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -18,18 +18,13 @@ for (let z = -60000; z <= 60000; z += 2000) {
   }
   world.trim(20000);
 }
-const reaches = world.reachesIn(-12000, -12000, 12000, 12000);
-const lakes = reaches.filter((r) => r.lake && r.aWidth >= 1500).sort((a, b) => b.aWidth - a.aWidth);
-assert(lakes.length > 0, 'No long valley lakes');
-// Select a real, intact valley lake, not merely the largest nominal radius.
-const lake = lakes.find((r) => Math.abs(r.ax - 7647.127558763605) < 1 && Math.abs(r.az + 11252.509786414448) < 1);
-assert(lake, 'Repeatable lake landmark missing');
-let islands = 0, beaches = 0, deep = 0;
-for (let z = lake.az - 1500; z <= lake.az + 1500; z += 36) {
-  for (let x = lake.ax - 1500; x <= lake.ax + 1500; x += 36) {
+const lake = world.landmarkNear(0, 0);
+assert(lake && world.sample(lake.x, lake.z).water, 'Sea-level landmark missing');
+let beaches = 0, deep = 0;
+for (let z = lake.z - 1500; z <= lake.z + 1500; z += 36) {
+  for (let x = lake.x - 1500; x <= lake.x + 1500; x += 36) {
     const s = world.sample(x, z);
-    if (s.island) islands++;
-    if (!s.water && s.bank > 0 && s.height - s.surface <= 3) beaches++;
+    if (!s.water && s.height >= 1.5 && s.height <= 7.5) beaches++;
     if (s.water) deep = Math.max(deep, s.surface - s.height);
   }
 }
@@ -37,11 +32,10 @@ for (let visit = 0; visit < 100; visit++) {
   const start = world.scenicStart(visit);
   assert(!world.sample(start.x, start.z).water, 'Flooded scenic start');
 }
-for (const thermal of world.nearbyThermals(lake.ax, lake.az, 3)) {
+for (const thermal of world.nearbyThermals(lake.x, lake.z, 3)) {
   assert(!world.sample(thermal.x, thermal.z).water, 'Thermal over water');
 }
-const navigator = new EagleNavigator(world, { x: lake.ax - Math.cos(lake.heading) * 1100,
-  z: lake.az - Math.sin(lake.heading) * 1100, heading: Math.PI / 2 - lake.heading });
+const navigator = new EagleNavigator(world, { x: lake.x, z: lake.z, heading: .4 });
 const start = { x: navigator.state.x, z: navigator.state.z };
 let distance = 0, minimumClearance = Infinity, wetTicks = 0, longestCrossing = 0, crossing = 0, flappingTicks = 0;
 const behaviorSeconds = {};
@@ -66,12 +60,12 @@ for (let step = 0; step < 36000; step++) {
     world.trim(20000);
   }
 }
-const report = { seed: world.seed, landSamples: land, waterSamples: water, coverage: weight / land, lake, islands, beaches, deep,
+const report = { seed: world.seed, landSamples: land, waterSamples: water, coverage: weight / land, lake, beaches, deep,
   flight: { seconds: 3600, distance, netDistance: Math.hypot(navigator.state.x - start.x, navigator.state.z - start.z), minimumClearance, wetTicks, longestCrossing, revisits, flappingSeconds: flappingTicks / 10, behaviorSeconds } };
 await writeFile('test-results/lakeland-audit.json', JSON.stringify(report, null, 2) + '\n');
 console.log(JSON.stringify(report, null, 2));
 assert(report.coverage >= .1 && report.coverage <= .2, 'Lakeland outside 10–20% land');
-assert(islands > 0 && beaches > 0 && deep > 10);
-assert(minimumClearance >= 6);
+assert(beaches > 0 && deep > 10);
+assert(minimumClearance > 6);
 assert(report.flight.netDistance >= distance * .35 && revisits <= 5);
 assert(wetTicks > 100 && longestCrossing > 1000, 'Flight never crosses a large lake');

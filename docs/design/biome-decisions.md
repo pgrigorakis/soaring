@@ -1,4 +1,6 @@
-# Biome weights: design decisions for review
+# Historical biome weights: design decisions for review
+
+Terrain-height, drainage, river-bend and peat-pool decisions below are superseded by the [continental generator](continental-terrain.md). The original measurements remain historical evidence.
 
 These choices implement issue #58. Decision B (independent Hills territory and broader fields) and Woodland-related flapping were authorized by the captain through firstmate. Numeric settings remain easy to change in `src/biome.ts` and the named world-generation rules.
 

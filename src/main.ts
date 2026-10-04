@@ -1049,7 +1049,7 @@ declare global {
       setVisibility: (meters: number) => void;
       mistAt: (x: number, z: number) => { cover: number; water: boolean; moisture: number; bank: number; height: number; surface: number };
       fillMist: (budgetMs: number) => void;
-      reviewSpots: () => { confluence: { x: number; z: number; surface: number }; lake: { x: number; z: number; surface: number }; run: { x: number; z: number; surface: number; heading: number }; network: { x: number; z: number; surface: number } };
+      reviewSpots: () => { coast: { x: number; z: number; surface: number }; lake: { x: number; z: number; surface: number }; basin: { x: number; z: number; surface: number; heading: number }; islands: { x: number; z: number; surface: number } };
     };
   }
 }
