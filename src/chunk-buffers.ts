@@ -13,12 +13,12 @@ export class ChunkBuffers {
   readonly depths: Float32Array;
   readonly waterIndices: Uint16Array;
 
-  constructor(segments: number, waterSegments: number, skirts: boolean) {
-    const vertices = (segments + 1) ** 2 + (skirts ? 4 * (segments + 1) : 0);
+  constructor(segments: number, waterSegments: number) {
+    const vertices = (segments + 1) ** 2;
     this.positions = new Float32Array(vertices * 3);
     this.normals = new Float32Array(vertices * 3);
     this.colors = new Float32Array(vertices * 3);
-    this.indices = new Uint16Array(segments * segments * 6 + (skirts ? segments * 24 : 0));
+    this.indices = new Uint16Array(segments * segments * 6);
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     this.geometry.setAttribute('normal', new THREE.BufferAttribute(this.normals, 3));
     this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
