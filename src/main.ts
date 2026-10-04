@@ -150,6 +150,8 @@ sky.material.uniforms.auroraAmount = { value: 0 };
 sky.material.uniforms.cloudTime = { value: 0 };
 sky.material.uniforms.cloudCoverage = { value: 0.5 };
 sky.material.uniforms.moonPosition = { value: new THREE.Vector3(0, -1, 0) };
+sky.material.uniforms.moonLit = { value: 1 };
+sky.material.uniforms.moonSunlight = { value: new THREE.Vector3(0, 1, 0) };
 sky.material.uniforms.sunTint = { value: new THREE.Color(1, 1, 1) };
 sky.material.uniforms.lowSun = { value: 0 };
 sky.material.uniforms.glowAmount = { value: 0 };
@@ -163,7 +165,7 @@ sky.material.uniforms.twilightHorizonWarm = { value: new THREE.Color() };
 sky.material.fragmentShader = sky.material.fragmentShader
   .replace(
     'uniform float mieDirectionalG;',
-    'uniform float mieDirectionalG;\nuniform float skyExposure;\nuniform float nightAmount;\nuniform float goldenAmount;\nuniform float blueAmount;\nuniform float starAmount;\nuniform float auroraAmount;\nuniform float cloudTime;\nuniform float cloudCoverage;\nuniform vec3 moonPosition;\nuniform vec3 sunTint;\nuniform float lowSun;\nuniform float glowAmount;\nuniform float venusAmount;\nuniform float twilightAmount;\nuniform vec3 twilightZenith;\nuniform vec3 twilightUpper;\nuniform vec3 twilightUpperWarm;\nuniform vec3 twilightHorizon;\nuniform vec3 twilightHorizonWarm;',
+    'uniform float mieDirectionalG;\nuniform float skyExposure;\nuniform float nightAmount;\nuniform float goldenAmount;\nuniform float blueAmount;\nuniform float starAmount;\nuniform float auroraAmount;\nuniform float cloudTime;\nuniform float cloudCoverage;\nuniform vec3 moonPosition;\nuniform float moonLit;\nuniform vec3 moonSunlight;\nuniform vec3 sunTint;\nuniform float lowSun;\nuniform float glowAmount;\nuniform float venusAmount;\nuniform float twilightAmount;\nuniform vec3 twilightZenith;\nuniform vec3 twilightUpper;\nuniform vec3 twilightUpperWarm;\nuniform vec3 twilightHorizon;\nuniform vec3 twilightHorizonWarm;',
   )
   .replace(
     'void main() {',
@@ -269,10 +271,11 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			}
 			vec3 moonDir = normalize(moonPosition);
 			float moonUp = smoothstep(0.02, 0.08, moonDir.y);
-			float moonLight = smoothstep(0.02, 0.3, moonDir.y) * nightAmount;
+			float moonLight = smoothstep(0.02, 0.3, moonDir.y) * nightAmount * moonLit;
 			// The disc is about 3.4 degrees across. u and v run across it in units of its radius.
 			vec3 moonRight = normalize(cross(moonDir, vec3(0.0, 1.0, 0.0)));
-			vec2 moonUv = vec2(dot(direction, moonRight), dot(direction, cross(moonRight, moonDir))) / 0.0295;
+			vec3 moonUpAxis = cross(moonRight, moonDir);
+			vec2 moonUv = vec2(dot(direction, moonRight), dot(direction, moonUpAxis)) / 0.0295;
 			float moonRadius = length(moonUv);
 			float moonDisc = smoothstep(1.06, 0.94, moonRadius) * step(0.0, dot(direction, moonDir)) * moonUp;
 			float cloudMass = paintedClouds(direction);
@@ -287,10 +290,13 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			retColor += vec3(0.82, 0.88, 1.0) * stars * starAmount;
 			// A cool two-term halo out to about 12 degrees carries the moon's glow, so the disc can stay near 1.3.
 			float moonFacing = max(dot(direction, moonDir), 0.0);
-			retColor += vec3(0.62, 0.72, 1.0) * (pow(moonFacing, 250.0) * 0.35 + pow(moonFacing, 30.0) * 0.06) * moonUp * nightAmount;
+			retColor += vec3(0.62, 0.72, 1.0) * (pow(moonFacing, 250.0) * 0.35 + pow(moonFacing, 30.0) * 0.06) * moonUp * nightAmount * moonLit * (1.0 - moonDisc);
 			float maria = cloudNoise(moonUv * 1.7 + 4.0) * 0.65 + cloudNoise(moonUv * 4.3 + 11.0) * 0.35;
 			float moonSurface = (1.0 - 0.38 * smoothstep(0.45, 0.72, maria)) * (1.0 - 0.25 * moonRadius * moonRadius);
-			retColor += vec3(0.95, 0.96, 1.0) * 1.35 * moonSurface * moonDisc;
+			// The phase: light the moon's near face as a sphere. The terminator is soft, with faint earthshine.
+			vec3 moonNormal = moonUv.x * moonRight + moonUv.y * moonUpAxis - sqrt(max(1.0 - moonRadius * moonRadius, 0.0)) * moonDir;
+			float moonPhase = mix(0.025, 1.0, smoothstep(-0.12, 0.12, dot(moonNormal, moonSunlight)));
+			retColor += vec3(0.95, 0.96, 1.0) * 1.35 * moonSurface * moonPhase * moonDisc;
 			vec3 cloudLight = mix(vec3(0.76, 0.84, 0.94), vec3(0.98, 0.98, 1.0), sunUp);
 			cloudLight = mix(cloudLight, vec3(1.0, 0.49, 0.25), goldenAmount * 0.4);
 			// Lit toward the sun, on fire near a low sun, blushing opposite it.
@@ -908,6 +914,8 @@ function applyDaylight(body: Daylight, delta: number): void {
   const day = 1 - body.night;
   sky.material.uniforms.sunPosition!.value.copy(sunDir).multiplyScalar(450000);
   sky.material.uniforms.moonPosition!.value.copy(moonDir);
+  sky.material.uniforms.moonLit!.value = body.moonLit;
+  sky.material.uniforms.moonSunlight!.value.set(body.moonSunlight.x, body.moonSunlight.y, body.moonSunlight.z);
   sky.material.uniforms.turbidity!.value = 9.5 - high * 8.5;
   sky.material.uniforms.rayleigh!.value = 2.4 + high * 1.6;
   sky.material.uniforms.mieCoefficient!.value = 0.016 - high * 0.015;
@@ -938,7 +946,7 @@ function applyDaylight(body: Daylight, delta: number): void {
   keyDir.copy(dominantSun ? sunDir : moonDir);
   const keyColor = dominantSun ? body.sunColor : body.moonColor;
   const keyIntensity = dominantSun ? body.sunIntensity : body.moonIntensity;
-  terrain.setWaterLighting(keyDir, body.sun.y, body.moon.y, dominantSun, delta, renderOrigin);
+  terrain.setWaterLighting(keyDir, body.sun.y, body.moon.y, body.moonShine, dominantSun, delta, renderOrigin);
   keyLight.color.setRGB(keyColor.r, keyColor.g, keyColor.b);
   keyLight.intensity = keyIntensity;
   hemisphere.color.setRGB(0.16 + day * 0.68, 0.2 + day * 0.68, 0.36 + day * 0.5);
@@ -1144,7 +1152,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; starAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; morningMist: number; mistReady: boolean };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; moonLit: number; moonIntensity: number; dominant: 'sun' | 'moon'; starAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; morningMist: number; mistReady: boolean };
       puffCloudSnapshot: () => PuffCloudSnapshot;
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
@@ -1153,7 +1161,7 @@ declare global {
       pauseFlight: () => void;
       setCapturePixelRatio: (ratio: number) => void;
       setTimeScale: (scale: number) => void;
-      setTimeOfDay: (phase: number) => void;
+      setTimeOfDay: (phase: number, day?: number) => void;
       lookAtBody: (body: 'sun' | 'moon' | 'horizon' | 'chase') => void;
       landmark: () => { x: number; z: number; surface: number; lake: boolean } | null;
       sample: (x: number, z: number) => { water: boolean; river: boolean; height: number; surface: number };
@@ -1246,6 +1254,9 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       moonElevation: body.moon.y,
       sunDirection: [body.sun.x, body.sun.y, body.sun.z],
       moonDirection: [body.moon.x, body.moon.y, body.moon.z],
+      moonLit: body.moonLit,
+      moonIntensity: body.moonIntensity,
+      dominant: body.dominant,
       starAmount: sky.material.uniforms.starAmount!.value,
       twilightAmount: sky.material.uniforms.twilightAmount!.value,
       auroraAmount: auroraAmount(body, auroraSchedule.hasAurora(nightCycle(skySeconds))),
@@ -1271,8 +1282,8 @@ if (import.meta.env.DEV) window.__SOARING__ = {
     renderer.setPixelRatio(THREE.MathUtils.clamp(ratio, 0.25, 2));
   },
   setTimeScale: (scale: number) => { timeScale = Math.max(1, Math.min(12, scale)); },
-  setTimeOfDay: (phase: number) => {
-    skySeconds = phase * DAY_SECONDS;
+  setTimeOfDay: (phase: number, day = 0) => {
+    skySeconds = (day + phase) * DAY_SECONDS;
     skyPaused = true;
     fogInputRevision += 1;
     fogSampleAge = 999;

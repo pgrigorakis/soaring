@@ -331,7 +331,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     this.shadowFadeRange.value.set(inner, outer);
   }
 
-  setWaterLighting(direction: THREE.Vector3, sunHeight: number, moonHeight: number, sunDominant: boolean, delta: number, renderOrigin: THREE.Vector3): void {
+  setWaterLighting(direction: THREE.Vector3, sunHeight: number, moonHeight: number, moonShine: number, sunDominant: boolean, delta: number, renderOrigin: THREE.Vector3): void {
     this.waterLightDirection.value.copy(direction);
     this.waterPatternOffset.value.set(renderOrigin.x, renderOrigin.z);
     if (sunDominant) {
@@ -342,7 +342,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       this.waterSparkle.value = sunUp * (0.28 + goldenHour * 0.72);
     } else {
       this.waterGlintColor.value.set(0xdde7f0);
-      this.waterSparkle.value = THREE.MathUtils.smoothstep(moonHeight, 0, 0.35) * 0.16;
+      this.waterSparkle.value = THREE.MathUtils.smoothstep(moonHeight, 0, 0.35) * 0.16 * moonShine;
     }
     this.waterTime.value += Math.max(0, delta);
   }
