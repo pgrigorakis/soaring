@@ -79,7 +79,7 @@ describe('terrain streaming', () => {
     terrain.setReach(MIN_VISIBILITY);
     expect(terrain.chunkCount).toBeLessThanOrEqual(25);
     terrain.dispose();
-  }, 20_000); // Full visibility builds are CPU-bound on the shared CI runner.
+  }, 60_000); // A full visibility build takes about 5 s locally and 12 to 20 s on the shared CI runner.
 
   it('gives distant tiles the same trees as detailed tiles', () => {
     const scene = new THREE.Scene();
