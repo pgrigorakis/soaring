@@ -11,9 +11,12 @@ export function smoothstep(a: number, b: number, x: number): number {
 
 export function cloudControls(cameraWorldY: number): { above: number; whiteout: number; bodies: number } {
   const rel = (cameraWorldY - CLOUD_DECK) / CLOUD_HEIGHT_SCALE;
+  const above = smoothstep(-90, 30, rel);
   return {
-    above: smoothstep(-90, 30, rel),
+    above,
     whiteout: 0.996 * (1 - smoothstep(0, 80, Math.abs(rel + 20))),
-    bodies: smoothstep(-240, -80, rel),
+    // Puffs sit at the deck height, inside the cloud layer. The deck draws over them
+    // without depth, so from above only puffs on its horizon would show. Hide them all.
+    bodies: smoothstep(-240, -80, rel) * (1 - above),
   };
 }

@@ -23,9 +23,9 @@ test('keeps forty seeded puffs, drifts and wraps them, and adds one draw call', 
   await page.evaluate(() => {
     const api = window.__SOARING__ as unknown as CloudHarness;
     const state = api.snapshot();
-    // Puff bodies fade in with camera height. Hold the bird above the deck so
-    // the puff mesh is in the frame.
-    api.reviewFlight({ x: state.position[0]!, y: 700, z: state.position[2]!, heading: state.heading });
+    // Puff bodies fade in with camera height and fade out under the deck from
+    // above. Hold the bird just below the deck so the puff mesh is in the frame.
+    api.reviewFlight({ x: state.position[0]!, y: 450, z: state.position[2]!, heading: state.heading });
     api.setTimeOfDay(0.5);
   });
   await page.waitForFunction(() => {
