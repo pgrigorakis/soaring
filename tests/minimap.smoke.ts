@@ -91,7 +91,11 @@ test('minimap shows four days of trail, survives a reload, and exports the biome
   expect(reloaded.clock).toBeGreaterThan(flown.clock);
   const gaps = reloaded.points.flatMap((value, index) => (index % 4 === 3 && value === 1 ? [index / 4 - 0.75] : []));
   expect(gaps.length).toBe(2);
-  expect(reloaded.points.length / 4).toBeGreaterThan(times.length);
+  // The count can stay level: new points push points older than four days out. So count new points,
+  // which start at the second gap. The trail saves every 20 s, so 30 s of flight store about five.
+  const fresh = reloaded.points.filter((value, index) => index % 4 === 2 && value > flown.clock).length;
+  expect(fresh).toBeGreaterThanOrEqual(4);
+  expect(reloaded.points[gaps[1]! * 4 + 2]).toBeGreaterThan(flown.clock);
 
   // M does nothing while typing in a settings field, and opens the biome map otherwise.
   await page.evaluate(() => {
