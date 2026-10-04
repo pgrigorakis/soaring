@@ -78,6 +78,7 @@ export class MapPanel {
         resolve();
       };
     });
+    this.paint(this.job);
     return this.ready;
   }
 
@@ -86,13 +87,16 @@ export class MapPanel {
     this.job = null;
   }
 
-  /** Advance painting by one slice; call every frame. */
-  update(): void {
-    if (!this.job) return;
+  /**
+   * Paint one slice, then yield to the browser and continue. Slices run on their own timer,
+   * not per frame, so a low frame rate does not stretch the painting to minutes.
+   */
+  private paint(job: Generator<number, void>): void {
+    if (job !== this.job) return;
     const start = performance.now();
     let progress = 0;
     while (performance.now() - start < SLICE_MS) {
-      const step = this.job.next();
+      const step = job.next();
       if (step.done) {
         this.job = null;
         this.status.textContent = '';
@@ -102,6 +106,7 @@ export class MapPanel {
       progress = step.value;
     }
     this.status.textContent = `Surveying the land… ${Math.round(progress * 100)}%`;
+    setTimeout(() => this.paint(job), 0);
   }
 
   /** North-up square that fits the trail with a margin, or a fixed width around the bird. */

@@ -1125,7 +1125,6 @@ function frame(now: number): void {
   updateFog();
   if (!skyPaused) skySeconds += rawDelta * navigator.openingDayRate;
   minimap.update(state.x, state.z, state.heading, rawDelta);
-  mapPanel.update();
   const body = currentDaylight();
   applyDaylight(body, rawDelta);
   puffClouds.update(state, navigator.wind, reviewFlightPaused ? 0 : delta, cameraPosition, fogGoal, puffSkyLight,
