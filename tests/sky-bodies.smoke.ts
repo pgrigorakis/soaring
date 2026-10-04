@@ -1,19 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
+import { captureScreen } from './screen-pixels';
 
 type SkyMeasure = { centre: number; discSpread: number; halo: number; far: number; stars: number };
 
 // Rendered sky pixels, measured in the page from a Playwright screenshot.
 async function measureSky(page: Page, name: string, testInfo: { outputPath: (name: string) => string }): Promise<SkyMeasure> {
-  const shot = await page.screenshot({ path: testInfo.outputPath(`${name}.png`) });
-  return page.evaluate(async (base64) => {
-    const image = new Image();
-    image.src = `data:image/png;base64,${base64}`;
-    await image.decode();
-    const canvas = new OffscreenCanvas(image.width, image.height);
-    const context = canvas.getContext('2d')!;
-    context.drawImage(image, 0, 0);
-    const { data, width, height } = context.getImageData(0, 0, image.width, image.height);
+  await captureScreen(page, testInfo.outputPath(`${name}.png`));
+  return page.evaluate(() => {
+    const { data, width, height } = window.__screen!;
     const luma = (x: number, y: number) => {
       const index = (Math.round(y) * width + Math.round(x)) * 4;
       return 0.2126 * data[index]! + 0.7152 * data[index + 1]! + 0.0722 * data[index + 2]!;
@@ -45,7 +40,7 @@ async function measureSky(page: Page, name: string, testInfo: { outputPath: (nam
       far: ring(330),
       stars,
     };
-  }, shot.toString('base64'));
+  });
 }
 
 test('the moon glows with a face and stars appear with the afterglow', async ({ page }, testInfo) => {

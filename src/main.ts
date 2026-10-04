@@ -150,10 +150,20 @@ sky.material.uniforms.auroraAmount = { value: 0 };
 sky.material.uniforms.cloudTime = { value: 0 };
 sky.material.uniforms.cloudCoverage = { value: 0.5 };
 sky.material.uniforms.moonPosition = { value: new THREE.Vector3(0, -1, 0) };
+sky.material.uniforms.sunTint = { value: new THREE.Color(1, 1, 1) };
+sky.material.uniforms.lowSun = { value: 0 };
+sky.material.uniforms.glowAmount = { value: 0 };
+sky.material.uniforms.venusAmount = { value: 0 };
+sky.material.uniforms.twilightAmount = { value: 0 };
+sky.material.uniforms.twilightZenith = { value: new THREE.Color() };
+sky.material.uniforms.twilightUpper = { value: new THREE.Color() };
+sky.material.uniforms.twilightUpperWarm = { value: new THREE.Color() };
+sky.material.uniforms.twilightHorizon = { value: new THREE.Color() };
+sky.material.uniforms.twilightHorizonWarm = { value: new THREE.Color() };
 sky.material.fragmentShader = sky.material.fragmentShader
   .replace(
     'uniform float mieDirectionalG;',
-    'uniform float mieDirectionalG;\nuniform float skyExposure;\nuniform float nightAmount;\nuniform float goldenAmount;\nuniform float blueAmount;\nuniform float starAmount;\nuniform float auroraAmount;\nuniform float cloudTime;\nuniform float cloudCoverage;\nuniform vec3 moonPosition;',
+    'uniform float mieDirectionalG;\nuniform float skyExposure;\nuniform float nightAmount;\nuniform float goldenAmount;\nuniform float blueAmount;\nuniform float starAmount;\nuniform float auroraAmount;\nuniform float cloudTime;\nuniform float cloudCoverage;\nuniform vec3 moonPosition;\nuniform vec3 sunTint;\nuniform float lowSun;\nuniform float glowAmount;\nuniform float venusAmount;\nuniform float twilightAmount;\nuniform vec3 twilightZenith;\nuniform vec3 twilightUpper;\nuniform vec3 twilightUpperWarm;\nuniform vec3 twilightHorizon;\nuniform vec3 twilightHorizonWarm;',
   )
   .replace(
     'void main() {',
@@ -198,17 +208,57 @@ sky.material.fragmentShader = sky.material.fragmentShader
     `vec3 dayColor = pow( texColor, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) ) * skyExposure;
 			float sunFacing = max(dot(direction, vSunDirection), 0.0);
 			float sunUp = smoothstep(0.0, 0.06, vSunDirection.y);
-			float sunDisc = smoothstep(0.99962, 0.99984, sunFacing);
 			float lowSky = 1.0 - smoothstep(0.0, 0.42, direction.y);
+			// Azimuth weights use the world-fixed sun direction, never the camera.
+			vec2 flatSun = vSunDirection.xz / max(length(vSunDirection.xz), 0.0001);
+			float sunSide = dot(direction.xz / max(length(direction.xz), 0.0001), flatSun);
+			float align = max(sunSide, 0.0);
+			float anti = max(-sunSide, 0.0);
+			// Powers by multiplication: software WebGL in CI pays for every pow and acos on every sky pixel.
+			float align3 = align * align * align;
+			// Warmth leans toward the sun's azimuth, with a little left on the far side.
 			vec3 warmBand = vec3(0.78, 0.4, 0.22);
-			dayColor = mix(dayColor, warmBand, clamp(goldenAmount, 0.0, 1.0) * lowSky * 0.62);
+			dayColor = mix(dayColor, warmBand, clamp(goldenAmount, 0.0, 1.0) * lowSky * mix(0.25, 0.7, align3));
+			// Twilight: a painted gradient keyed by sun elevation replaces the Preetham sky, which goes dark before sunset.
+			// Warmth climbs higher toward the sun's azimuth, as in FWM.
+			if (twilightAmount > 0.0) {
+				float skyHeight = max(direction.y, 0.0);
+				float facing2 = sunFacing * sunFacing;
+				vec3 twilightSide = mix(twilightUpper, twilightUpperWarm, align3 * sqrt(align) * 0.8 + facing2 * facing2 * sunFacing * 0.2);
+				vec3 twilightSky = mix(twilightSide, twilightZenith, smoothstep(0.1, 0.85, skyHeight));
+				// A little warmth reaches the far side, so the single fog colour, read side-on to the sun, is not grey under an orange sky.
+				vec3 twilightLow = mix(twilightHorizon, twilightHorizonWarm, 0.2 + 0.8 * align3 * align * align);
+				dayColor = mix(dayColor, mix(twilightLow, twilightSky, smoothstep(0.0, 0.4, skyHeight)), twilightAmount);
+			}
+			// Dawn and dusk: a thin saturated glow along the sun-side horizon.
+			vec3 glowColor = vec3(1.0, 0.24, 0.06);
+			if (glowAmount > 0.0) dayColor = mix(dayColor, glowColor, align3 * exp(-abs(direction.y) / 0.07) * glowAmount * 0.8);
+			// The belt of Venus: a rose band opposite a low sun, over the earth's blue shadow.
+			vec3 venusColor = vec3(0.86, 0.46, 0.52);
+			float venusHeight = (direction.y - 0.07) / 0.06;
+			float venusShape = exp(-venusHeight * venusHeight);
+			dayColor = mix(dayColor, venusColor, anti * anti * venusShape * venusAmount * 0.35);
+			float earthShadow = anti * anti * smoothstep(0.06, 0.0, direction.y) * venusAmount;
+			dayColor = mix(dayColor, dayColor * vec3(0.78, 0.84, 1.0), earthShadow * 0.5);
 			float zenith = smoothstep(0.0, 0.55, direction.y);
 			vec3 noonBlue = dayColor * vec3(0.55, 0.78, 1.35) + vec3(0.02, 0.07, 0.22);
 			dayColor = mix(dayColor, noonBlue, clamp(blueAmount, 0.0, 1.0) * mix(0.62, 1.0, zenith));
-			dayColor += vec3(1.2, 0.55, 0.18) * sunDisc * 0.55 * sunUp;
+			// The sun: a disc about 3 degrees across, a tight glow, and a broad warm halo while it is low.
+			// The disc stays pale yellow, so it reads against the orange glow near the horizon.
+			float sunLight = sunFacing * smoothstep(-0.14, 0.02, vSunDirection.y);
+			vec3 sunColor = mix(sunTint, glowColor, lowSun * 0.6);
+			// The disc edge runs from 0.03 to 0.024 radians from the sun's centre, as cosines.
+			float sunDisc = smoothstep(0.99955003, 0.99971201, sunLight);
+			float sunLight2 = sunLight * sunLight;
+			float sunLight4 = sunLight2 * sunLight2;
+			float sunLight15 = sunLight4 * sunLight4 * sunLight4 * sunLight2 * sunLight;
+			float sunGlow = sunLight15 * sunLight15 * 0.12 + pow(sunLight, 500.0) * 0.6 + sunLight4 * lowSun * 0.35;
+			// The glow fades softly below the horizon, so the haze under it shows no edge. The disc sets sharply.
+			dayColor += sunColor * sunGlow * smoothstep(-0.12, 0.02, direction.y) + (sunDisc * mix(1.4, 3.0, lowSun) * smoothstep(-0.02, 0.0, direction.y) * mix(sunTint, vec3(1.0, 0.9, 0.7), 0.5));
 			float skyHorizon = pow(1.0 - clamp(direction.y, 0.0, 1.0), 3.0);
 			vec3 nightColor = vec3(0.004, 0.007, 0.026) + vec3(0.018, 0.026, 0.048) * skyHorizon;
-			vec3 retColor = mix(dayColor, nightColor, clamp(nightAmount, 0.0, 1.0));
+			// The painted keys carry their own darkening, so night only takes over as the gradient fades out.
+			vec3 retColor = mix(dayColor, nightColor, clamp(nightAmount, 0.0, 1.0) * (1.0 - twilightAmount));
 			if (auroraAmount > 0.001) {
 				float auroraCenter = 0.22 + 0.035 * sin(direction.x * 10.0 + direction.z * 3.0);
 				float auroraBand = 1.0 - smoothstep(0.015, 0.09, abs(direction.y - auroraCenter));
@@ -242,12 +292,19 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			float moonSurface = (1.0 - 0.38 * smoothstep(0.45, 0.72, maria)) * (1.0 - 0.25 * moonRadius * moonRadius);
 			retColor += vec3(0.95, 0.96, 1.0) * 1.35 * moonSurface * moonDisc;
 			vec3 cloudLight = mix(vec3(0.76, 0.84, 0.94), vec3(0.98, 0.98, 1.0), sunUp);
-			cloudLight = mix(cloudLight, vec3(1.0, 0.49, 0.25), goldenAmount * 0.72);
+			cloudLight = mix(cloudLight, vec3(1.0, 0.49, 0.25), goldenAmount * 0.4);
+			// Lit toward the sun, on fire near a low sun, blushing opposite it.
+			cloudLight = mix(cloudLight, sunColor, sunLight4 * 0.75);
+			cloudLight = mix(cloudLight, glowColor, lowSun * align * sqrt(align) * 0.7);
+			cloudLight = mix(cloudLight, mix(cloudLight, venusColor, 0.5), venusAmount * anti * sqrt(anti) * 0.6);
 			vec3 cloudShade = mix(vec3(0.32, 0.39, 0.5), vec3(0.52, 0.36, 0.3), goldenAmount * 0.65);
 			vec3 dayCloud = mix(cloudShade, cloudLight, smoothstep(0.42, 1.0, cloudMass));
 			vec3 nightCloud = mix(vec3(0.012, 0.018, 0.04), vec3(0.06, 0.075, 0.12), smoothstep(0.35, 0.85, cloudMass));
 			vec3 cloudColor = mix(dayCloud, nightCloud, nightAmount);
-			retColor = mix(retColor, cloudColor, cloudMask * mix(0.84, 0.96, nightAmount));`,
+			retColor = mix(retColor, cloudColor, cloudMask * mix(0.84, 0.96, nightAmount));
+			// Thin cloud edges near the sun catch a bright rim.
+			float cloudEdge = cloudMask * (1.0 - cloudMask) * 4.0;
+			retColor += sunColor * cloudEdge * sunLight15 * 0.7 * (1.0 - nightAmount) * smoothstep(0.025, 0.12, direction.y);`,
   );
 scene.add(sky);
 
@@ -819,6 +876,31 @@ const smooth01 = (edge0: number, edge1: number, value: number): number => {
   return t * t * (3 - 2 * t);
 };
 
+// FWM's dusk keys (main.js:255-273 at aca247b), placed by sun elevation in degrees: late afternoon,
+// sunset, civil dusk and nautical dusk. Dawn uses the same keys, mirrored by the sun's height.
+const twilightKeys = [
+  [6, 0x3f7fae, 0x7ca4c2, 0xc4b8a0, 0xa4b4ba, 0xf4c584],
+  [1, 0x2f4a82, 0x6c7aa0, 0xe09a78, 0x9aa0b0, 0xffa040],
+  [-5, 0x172850, 0x394272, 0xa06a82, 0x6c6480, 0xf07a3a],
+  [-11, 0x060c22, 0x0e1838, 0x101838, 0x243050, 0x3d3452],
+].map(([elevation, ...colors]) => ({ elevation: elevation!, colors: colors.map((hex) => new THREE.Color(hex)) }));
+const twilightColor = new THREE.Color();
+const twilightNames = ['twilightZenith', 'twilightUpper', 'twilightUpperWarm', 'twilightHorizon', 'twilightHorizonWarm'] as const;
+
+function applyTwilight(sunY: number): void {
+  const elevation = THREE.MathUtils.radToDeg(Math.asin(sunY));
+  // Full from sunset to nautical dusk, gone by +6 and -12 degrees.
+  sky.material.uniforms.twilightAmount!.value = smooth01(6, 1, elevation) * smooth01(-12, -10, elevation);
+  let index = 0;
+  while (index < twilightKeys.length - 2 && twilightKeys[index + 1]!.elevation > elevation) index += 1;
+  const from = twilightKeys[index]!;
+  const to = twilightKeys[index + 1]!;
+  const blend = smooth01(from.elevation, to.elevation, elevation);
+  twilightNames.forEach((name, slot) => {
+    sky.material.uniforms[name]!.value.copy(twilightColor.copy(from.colors[slot]!).lerp(to.colors[slot]!, blend));
+  });
+}
+
 function applyDaylight(body: Daylight, delta: number): void {
   sunDir.set(body.sun.x, body.sun.y, body.sun.z);
   moonDir.set(body.moon.x, body.moon.y, body.moon.z);
@@ -834,6 +916,12 @@ function applyDaylight(body: Daylight, delta: number): void {
   sky.material.uniforms.nightAmount!.value = body.night;
   sky.material.uniforms.goldenAmount!.value = 1 - high;
   sky.material.uniforms.blueAmount!.value = high;
+  sky.material.uniforms.sunTint!.value.setRGB(body.sunColor.r, body.sunColor.g, body.sunColor.b);
+  // FWM's low-sun weights by sun height: a horizon sun, the sun-side glow band, and the rose belt.
+  sky.material.uniforms.lowSun!.value = Math.exp(-((body.sun.y / 0.14) ** 2));
+  sky.material.uniforms.glowAmount!.value = smooth01(-0.22, -0.04, body.sun.y) * (1 - smooth01(0.12, 0.32, body.sun.y));
+  sky.material.uniforms.venusAmount!.value = Math.exp(-(((body.sun.y + 0.03) / 0.09) ** 2));
+  applyTwilight(body.sun.y);
   // Keep more clouds near dawn and dusk, and let the layer drift on real time.
   sky.material.uniforms.cloudCoverage!.value = cloudCoverageOverride ?? 0.22 + (1 - high) * 0.5;
   sky.material.uniforms.cloudTime!.value += delta * 0.001;
@@ -1056,7 +1144,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; starAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; morningMist: number; mistReady: boolean };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; starAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; morningMist: number; mistReady: boolean };
       puffCloudSnapshot: () => PuffCloudSnapshot;
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
@@ -1159,6 +1247,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       sunDirection: [body.sun.x, body.sun.y, body.sun.z],
       moonDirection: [body.moon.x, body.moon.y, body.moon.z],
       starAmount: sky.material.uniforms.starAmount!.value,
+      twilightAmount: sky.material.uniforms.twilightAmount!.value,
       auroraAmount: auroraAmount(body, auroraSchedule.hasAurora(nightCycle(skySeconds))),
       exposure: renderer.toneMappingExposure,
       hemisphereIntensity: hemisphere.intensity,
