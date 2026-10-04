@@ -122,6 +122,25 @@ describe('autonomous eagle navigation', () => {
     expect(state.y).toBeGreaterThan(before);
   });
 
+  it('the up arrow flaps below the maximum, and the down arrow sinks faster above the floor', () => {
+    const world = new WorldModel(448122);
+    const at = (clearance: number, climb: number) => {
+      const navigator = new EagleNavigator(world, world.scenicStart(2), DEFAULT_FLIGHT_HEIGHT);
+      navigator.state.y = world.sample(navigator.state.x, navigator.state.z).height + clearance;
+      navigator.setNudge({ turn: 0, climb });
+      const before = navigator.state.y;
+      let flapped = false;
+      for (let step = 0; step < 10; step += 1) flapped = navigator.update(0.1).flapping || flapped;
+      return { flapped, change: navigator.state.y - before };
+    };
+    expect(at(140, 1).flapped).toBe(true);
+    expect(at(140, 1).change).toBeGreaterThan(0);
+    // Above the maximum the up arrow does not power a climb.
+    expect(at(1000, 1).flapped).toBe(false);
+    expect(at(140, -1).flapped).toBe(false);
+    expect(at(140, -1).change).toBeLessThan(at(140, 0).change - 3);
+  });
+
   it('never flaps while thermal-riding', () => {
     const world = new WorldModel(448122);
     const navigator = new EagleNavigator(world, world.scenicStart(2));
@@ -137,12 +156,20 @@ describe('autonomous eagle navigation', () => {
     const state = new EagleNavigator(world, world.scenicStart(2)).state;
     const wing = view.group.children.find((child) => child instanceof Group && child.position.x < 0);
     expect(wing).toBeDefined();
-    state.flapping = true;
-    view.update(state, 0.2);
-    expect(Math.abs(wing!.rotation.z)).toBeGreaterThan(0.1);
-    state.flapping = false;
-    view.update(state, 0.2);
-    expect(Math.abs(wing!.rotation.z)).toBeLessThan(0.03);
+    // Flaps ease in and out, so sample a second of each.
+    const stroke = (flapping: boolean) => {
+      state.flapping = flapping;
+      let largest = 0;
+      for (let frame = 0; frame < 60; frame += 1) {
+        view.update(state, 1 / 60);
+        largest = Math.max(largest, Math.abs(wing!.rotation.z));
+      }
+      return largest;
+    };
+    expect(stroke(true)).toBeGreaterThan(0.4);
+    stroke(false);
+    // A gliding wing holds only its shallow dihedral.
+    expect(stroke(false)).toBeLessThan(0.1);
   });
 
   it('circles a thermal with varying radius and bank, climbing without flapping',
@@ -177,7 +204,7 @@ describe('autonomous eagle navigation', () => {
         }
         if (!riding || !navigator.activeThermal) continue;
         elapsed += 0.1;
-        if (elapsed < 2) continue; // settle after entry
+        if (elapsed < 24) continue; // the circle slides onto the core over about 8 s
         expect(state.flapping).toBe(false);
         const radius = Math.hypot(state.x - navigator.activeThermal.x, state.z - navigator.activeThermal.z);
         radii.push(radius);
