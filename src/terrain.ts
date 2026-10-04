@@ -400,12 +400,15 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     // A ground level that trails the camera by more than one move takes the whole budget; tiles still get one slice.
     const tileBudget = this.ground.lagging ? 0 : this.ground.working(this.reach) ? buildBudgetMs / 2 : buildBudgetMs;
     let built = 0;
-    // At least one slice per update: a coarse browser clock can otherwise report the budget spent at once.
+    // At least one slice per update when a tile is ready: a coarse browser clock can otherwise report the budget spent at once.
+    // When no tile is ready, the ground gets the whole budget.
     let sliced = false;
+    const groundWorking = this.ground.working(this.reach);
     while (this.pending.length > 0 && (!sliced || performance.now() - start < tileBudget)) {
-      sliced = true;
       // Finish already-started work if recenter still needs it. New jobs remain nearest first.
-      const next = this.active?.tile ?? this.pending[0]!;
+      const next = this.active?.tile ?? this.pending.find((tile) => !groundWorking || this.groundHolds(tile));
+      if (!next) break;
+      sliced = true;
       this.active ??= { tile: next, job: this.createChunk(next), cpuMs: 0 };
       const sliceStart = performance.now();
       const result = this.active.job.next();
@@ -429,6 +432,18 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     this.ground.update(x, z, this.reach, Math.max(start + buildBudgetMs, performance.now() + buildBudgetMs - tileBudget));
     this.maxUpdateMs = Math.max(this.maxUpdateMs, performance.now() - start);
     return built;
+  }
+
+  /**
+   * Mid and far tiles take their water heights from a ground level. While the ground loads, such a tile
+   * waits until a level holds the tile's grid point nearest the camera, so it rarely samples the world again.
+   * Near tiles never wait: they sample the full world record for hedgerows.
+   */
+  private groundHolds({ x, z, chunkSize, tier }: Pending): boolean {
+    if (tier === 'near') return true;
+    const step = chunkSize / WATER_SEGMENTS[tier];
+    const nearest = (camera: number, origin: number) => origin + Math.round(THREE.MathUtils.clamp(camera - origin, 0, chunkSize) / step) * step;
+    return this.ground.heightAt(nearest(this.rawX, x * chunkSize), nearest(this.rawZ, z * chunkSize)) !== undefined;
   }
 
   private recenter(centerX: number, centerZ: number): void {
@@ -599,7 +614,8 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
           for (let xIndex = -1; xIndex <= segments + 1; xIndex += 1) {
             const x = originX + xIndex * step;
             const z = originZ + zIndex * step;
-            samples.push(this.world.sample(x, z));
+            // The finest ground level usually sampled this point already.
+            samples.push(this.ground.sampleAt(x, z) ?? this.world.sample(x, z));
             if ((xIndex + 1) % 8 === 0) yield;
           }
         }
