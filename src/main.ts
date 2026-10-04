@@ -792,6 +792,8 @@ let skyPaused = false;
 let skyLook: 'sun' | 'moon' | 'horizon' | null = null;
 const sunDir = new THREE.Vector3();
 const moonDir = new THREE.Vector3();
+const puffSkyLight = new THREE.Color();
+const puffNightLight = new THREE.Color(0.16, 0.2, 0.3);
 const skyAim = new THREE.Vector3();
 const keyDir = new THREE.Vector3();
 const veil = document.querySelector<HTMLElement>('#veil')!;
@@ -835,8 +837,12 @@ function applyDaylight(body: Daylight, delta: number): void {
   keyLight.intensity = keyIntensity;
   hemisphere.color.setRGB(0.16 + day * 0.68, 0.2 + day * 0.68, 0.36 + day * 0.5);
   hemisphere.groundColor.setRGB(0.08 + day * 0.27, 0.09 + day * 0.3, 0.08 + day * 0.2);
-  hemisphere.intensity = 1.15 + day * 1.05;
-  renderer.toneMappingExposure = 1.00 + body.night * 0.12;
+  hemisphere.intensity = 0.65 + day * 1.55;
+  renderer.toneMappingExposure = 1.00 - body.night * 0.2;
+  // Puff tops use the same warm-to-cool sky light as the painted cloud layer,
+  // not an unlit white face that remains bright after sunset.
+  puffSkyLight.setRGB(1, 0.49 + high * 0.49, 0.25 + high * 0.75)
+    .lerp(puffNightLight, body.night);
 
   const flare = smooth01(0, 0.12, body.sun.y);
   const low = 1 - high;
@@ -944,7 +950,7 @@ function frame(now: number): void {
   if (!skyPaused) skySeconds += rawDelta;
   const body = currentDaylight();
   applyDaylight(body, rawDelta);
-  puffClouds.update(state, navigator.wind, delta, cameraPosition, fogGoal);
+  puffClouds.update(state, navigator.wind, delta, cameraPosition, fogGoal, puffSkyLight);
   cloudSea.update(cameraPosition.x, cameraPosition.z, cameraPosition.y, body.phase, skySeconds, fog, sunDir, body.sunColor, renderOrigin, world);
 
   keyLight.target.position.set(cameraPosition.x, world.sample(cameraPosition.x, cameraPosition.z).height, cameraPosition.z);
@@ -1029,7 +1035,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; morningMist: number; mistReady: boolean };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; morningMist: number; mistReady: boolean };
       puffCloudSnapshot: () => PuffCloudSnapshot;
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
@@ -1129,6 +1135,8 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       sunElevation: body.sun.y,
       moonElevation: body.moon.y,
       auroraAmount: auroraAmount(body, auroraSchedule.hasAurora(nightCycle(skySeconds))),
+      exposure: renderer.toneMappingExposure,
+      hemisphereIntensity: hemisphere.intensity,
       cloudCoverage: sky.material.uniforms.cloudCoverage!.value,
       cloudTime: sky.material.uniforms.cloudTime!.value,
       fog: {

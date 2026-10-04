@@ -18,6 +18,7 @@ export type PuffCloudSnapshot = {
   count: number;
   layout: PuffCloudLayout[];
   placements: PuffCloudPlacement[];
+  skyLight: number[];
 };
 
 type Puff = PuffCloudLayout & {
@@ -91,6 +92,7 @@ export class PuffClouds {
   readonly mesh: THREE.InstancedMesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
   private readonly puffs: Puff[];
   private readonly horizonColor = { value: new THREE.Color(0x8faeb8) };
+  private readonly skyLight = { value: new THREE.Color(1, 1, 1) };
   private readonly lastEagle: { x: number; z: number };
   private readonly shown: PuffCloudPlacement[] = Array.from({ length: PUFF_CLOUD_COUNT }, () => ({ x: 0, y: 0, z: 0, opacity: 0 }));
 
@@ -100,6 +102,7 @@ export class PuffClouds {
     const material = new THREE.ShaderMaterial({
       uniforms: {
         horizonColor: this.horizonColor,
+        skyLight: this.skyLight,
         puffOpacity: { value: 0.68 },
       },
       transparent: true,
@@ -123,6 +126,7 @@ export class PuffClouds {
       `,
       fragmentShader: `
         uniform vec3 horizonColor;
+        uniform vec3 skyLight;
         uniform float puffOpacity;
         varying vec3 vWorldNormal;
         varying float vViewDistance;
@@ -132,8 +136,8 @@ export class PuffClouds {
           float distanceFade = 1.0 - smoothstep(2300.0, 2900.0, vViewDistance);
           float closeFade = smoothstep(55.0, 175.0, vViewDistance);
           float facingWhite = smoothstep(-0.65, 0.45, vWorldNormal.y);
-          vec3 cloudWhite = mix(vec3(0.86, 0.9, 0.94), vec3(1.0), vWhiteness);
-          vec3 cloudColor = mix(horizonColor, cloudWhite, facingWhite);
+          vec3 cloudFace = skyLight * mix(0.86, 1.0, vWhiteness);
+          vec3 cloudColor = mix(horizonColor, cloudFace, facingWhite);
           float alpha = puffOpacity * vPuffOpacity * distanceFade * closeFade;
           gl_FragColor = vec4(cloudColor, alpha);
           #include <tonemapping_fragment>
@@ -181,8 +185,9 @@ export class PuffClouds {
     this.mesh.visible = visible;
   }
 
-  update(eagle: EaglePosition, wind: Wind, delta: number, camera: EaglePosition, horizon: THREE.Color): void {
+  update(eagle: EaglePosition, wind: Wind, delta: number, camera: EaglePosition, horizon: THREE.Color, skyLight: THREE.Color): void {
     this.horizonColor.value.copy(horizon);
+    this.skyLight.value.copy(skyLight);
     const birdDeltaX = eagle.x - this.lastEagle.x;
     const birdDeltaZ = eagle.z - this.lastEagle.z;
     for (let index = 0; index < this.puffs.length; index += 1) {
@@ -215,6 +220,7 @@ export class PuffClouds {
   snapshot(): PuffCloudSnapshot {
     return {
       count: this.count,
+      skyLight: this.skyLight.value.toArray(),
       layout: this.puffs.map(({ offsetX, offsetZ, height, width, driftSpeed }) => ({ offsetX, offsetZ, height, width, driftSpeed })),
       placements: this.shown.map(({ x, y, z, opacity }) => ({ x, y, z, opacity })),
     };
