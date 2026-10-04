@@ -66,7 +66,12 @@ export const RIDGE = {
   bandBelow: 20,
   bandAbove: 120,
   segmentStep: 80,
-  minSegment: 700,
+  /**
+   * Straight crest the bird may join. The old broad ridge used 700 m. A 1.6 km
+   * arête is peaked, so the seed-57 hour's aligned windward crest is 320 m.
+   * Shorter spurs stay ineligible. Slope, wind, and the 40 m crest drop are unchanged.
+   */
+  minSegment: 320,
   maxScan: 1200,
   crestDrop: 40,
   continuation: 200,
@@ -444,7 +449,7 @@ export class EagleNavigator {
     this.enter('ridge-soaring');
   }
 
-  /** A qualifying crest of at least 700 m along a straight axis, close to the bird. The caller checks alignment. */
+  /** A qualifying crest along a straight axis, close to the bird. The caller checks alignment. */
   private findRidge(faceX: number, faceZ: number, face: Face, wind: Wind): Ridge | null {
     const upX = Math.cos(face.angle);
     const upZ = Math.sin(face.angle);
