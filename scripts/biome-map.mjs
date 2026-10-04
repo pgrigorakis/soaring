@@ -24,7 +24,7 @@ await build({ entryPoints: ['src/world.ts'], outfile, bundle: true, platform: 'n
     });
   } }] });
 const { WorldModel } = await import(`../${outfile}`);
-const colours = { hills: [134, 184, 63], woodland: [31, 90, 52], moor: [176, 111, 166], highlands: [150, 140, 125], lakeland: [60, 140, 190] };
+const colours = { hills: [140, 199, 74], woodland: [87, 155, 59], moor: [147, 167, 108], highlands: [158, 165, 154], lakeland: [60, 140, 190] };
 const world = new WorldModel(seed);
 const width = Math.round(size / pixel);
 const row = Math.ceil(width * 3 / 4) * 4;

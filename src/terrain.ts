@@ -18,7 +18,7 @@ export function snowCover(sample: LandscapeSample, slope: number, x: number, z: 
 import { BIOME_ENTRIES, BIOME_KEYS, BIOME_PROFILES, CLIMATE_LINES, type BiomeKey } from './biome';
 import type { GroundContext } from './biomes/types';
 
-const beachGround = new THREE.Color(0xe3cd8b);
+const beachGround = new THREE.Color(0xd8ce91);
 const scratch = new THREE.Color();
 const extras = BIOME_ENTRIES.filter(([, profile]) => profile.groundExtras)
   .sort(([, a], [, b]) => a.extrasOrder! - b.extrasOrder!);
@@ -166,7 +166,7 @@ export class TerrainStream {
     new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
     new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
   ];
-  private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x857e72, roughness: 1, flatShading: true });
+  private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x899b98, roughness: 1, flatShading: true });
   private readonly trunkGeometry = new THREE.CylinderGeometry(0.8, 1.35, 9, 5);
   private readonly crownGeometries = [
     new THREE.ConeGeometry(5.5, 12, 7), // layered conifer
@@ -176,7 +176,7 @@ export class TerrainStream {
   private readonly rockGeometry = new THREE.DodecahedronGeometry(4.5, 0);
   private readonly torGeometry = new THREE.BoxGeometry(6, 3.2, 5);
   private readonly hedgeGeometry = new THREE.DodecahedronGeometry(1, 0);
-  private readonly hedgeMaterial = new THREE.MeshStandardMaterial({ color: 0x2e6b34, roughness: 1, flatShading: true });
+  private readonly hedgeMaterial = new THREE.MeshStandardMaterial({ color: 0x518628, roughness: 1, flatShading: true });
   // Distant trees keep the near placement, trunks, and colors with a simpler crown.
   private readonly farCrownGeometry = new THREE.IcosahedronGeometry(5.4, 0);
   private readonly farFoliageMaterial = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });

@@ -1,0 +1,218 @@
+{
+  "stage": "before",
+  "commit": "d80b813c085447e4e9b236aa65b95e2092a79d71",
+  "sourceChanges": "",
+  "origin": "http://127.0.0.1:4173",
+  "seed": 5,
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "visibility": 5000,
+  "phases": [
+    {
+      "name": "noon",
+      "phase": 0.5
+    }
+  ],
+  "vantages": [
+    {
+      "name": "hills",
+      "x": -6950,
+      "z": -1000,
+      "heading": 0
+    },
+    {
+      "name": "woodland",
+      "x": 7600,
+      "z": -7250,
+      "heading": 0
+    },
+    {
+      "name": "moor",
+      "x": -6850,
+      "z": 1500,
+      "heading": 0
+    },
+    {
+      "name": "highlands",
+      "x": 0,
+      "z": 0,
+      "heading": 0
+    },
+    {
+      "name": "lakeland",
+      "x": -10950,
+      "z": 1050,
+      "heading": 0
+    }
+  ],
+  "captures": {
+    "hills-noon": {
+      "file": "docs/design/biome-palette-evidence/before/hills-noon.png",
+      "vantage": {
+        "name": "hills",
+        "x": -6950,
+        "z": -1000,
+        "heading": 0
+      },
+      "phase": {
+        "name": "noon",
+        "phase": 0.5
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -6950,
+          284.0465117653521,
+          -1000
+        ],
+        "pending": 0,
+        "chunks": 601,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.5
+      }
+    },
+    "woodland-noon": {
+      "file": "docs/design/biome-palette-evidence/before/woodland-noon.png",
+      "vantage": {
+        "name": "woodland",
+        "x": 7600,
+        "z": -7250,
+        "heading": 0
+      },
+      "phase": {
+        "name": "noon",
+        "phase": 0.5
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          7600,
+          226.0656653240776,
+          -7250
+        ],
+        "pending": 0,
+        "chunks": 600,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.5
+      }
+    },
+    "moor-noon": {
+      "file": "docs/design/biome-palette-evidence/before/moor-noon.png",
+      "vantage": {
+        "name": "moor",
+        "x": -6850,
+        "z": 1500,
+        "heading": 0
+      },
+      "phase": {
+        "name": "noon",
+        "phase": 0.5
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -6850,
+          264.6174817892406,
+          1500
+        ],
+        "pending": 0,
+        "chunks": 600,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.5
+      }
+    },
+    "highlands-noon": {
+      "file": "docs/design/biome-palette-evidence/before/highlands-noon.png",
+      "vantage": {
+        "name": "highlands",
+        "x": 0,
+        "z": 0,
+        "heading": 0
+      },
+      "phase": {
+        "name": "noon",
+        "phase": 0.5
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          0,
+          421.7140536248486,
+          0
+        ],
+        "pending": 0,
+        "chunks": 605,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.5
+      }
+    },
+    "lakeland-noon": {
+      "file": "docs/design/biome-palette-evidence/before/lakeland-noon.png",
+      "vantage": {
+        "name": "lakeland",
+        "x": -10950,
+        "z": 1050,
+        "heading": 0
+      },
+      "phase": {
+        "name": "noon",
+        "phase": 0.5
+      },
+      "state": {
+        "seed": 5,
+        "position": [
+          -10950,
+          253.92278175618182,
+          1050
+        ],
+        "pending": 0,
+        "chunks": 598,
+        "visibleDistance": 5000,
+        "requestedDistance": 5000,
+        "cameraDistance": 100,
+        "orbitYaw": 0,
+        "orbitPitch": 0,
+        "pixelRatio": 1,
+        "qualityStep": 0,
+        "lowPower": false,
+        "shadowsEnabled": true,
+        "timeOfDay": 0.5
+      }
+    }
+  },
+  "completed": "2026-10-04T12:13:11.082Z"
+}
