@@ -13,7 +13,7 @@ async function start(page: Page): Promise<void> {
     localStorage.setItem('soaring.scenic-visit.v1', '0');
   }, SEED);
   await page.goto('/?smoke');
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
   await page.evaluate(() => window.__SOARING__.advanceSimulation!(30));
 }
 
@@ -31,7 +31,7 @@ test('a held arrow bends the course, the hint names it, and release adopts the n
   const baseline = await snapshot(page);
 
   await page.reload();
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
   await advance(page, 30);
   await expect(hint(page)).not.toHaveClass(/visible/);
   await page.keyboard.down('ArrowLeft');
@@ -73,7 +73,7 @@ test('arrow keys stay with a focused slider, and up or down names the climb', as
   await start(page);
 
   // Reveal the settings, as a viewer would, so the slider can take focus.
-  const box = (await page.locator('canvas').boundingBox())!;
+  const box = (await page.locator('canvas').first().boundingBox())!;
   await page.mouse.move(box.x + box.width * 0.45, box.y + box.height * 0.5);
   await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.5);
   await page.locator('#settings-toggle').click();
