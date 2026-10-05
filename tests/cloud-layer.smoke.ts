@@ -33,7 +33,7 @@ test('cloud deck hides low ground above and whites out the chase bird inside', a
   for (const view of VIEWS) {
     const frame = await page.evaluate(({ place, cameraY }) => {
       const api = window.__SOARING__;
-      api.reviewFlight!({ x: place.x, z: place.z, heading: 0.4, y: cameraY - 178 * 0.31 / 3 });
+      api.reviewFlight!({ x: place.x, z: place.z, heading: 0.4, y: cameraY - api.snapshot().cameraHeight });
       return api.snapshot().renderedFrames;
     }, { place, cameraY: view.cameraY });
     // Stream at the smoke ratio. Full-resolution software frames would slow the
@@ -100,9 +100,9 @@ test('cloud deck hides low ground above and whites out the chase bird inside', a
 });
 
 // Use the real navigator and procedural world. A complete repeatable trace is
-// emitted even if an assertion fails. This covers the opening and a normal cycle.
+// emitted even if an assertion fails. It covers two flight cycles from the lake.
 // Seed 5914: from the 448122 lake, the 7 km land field keeps the second cycle over high ground.
-test('scheduled lowland flight crosses the cloud deck without collision-floor jumps', async ({ page }, testInfo) => {
+test('the lowland flight cycle climbs through the cloud deck without collision-floor jumps', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   await page.goto('/?smoke');
   const metrics = await page.evaluate(async () => {
@@ -112,10 +112,10 @@ test('scheduled lowland flight crosses the cloud deck without collision-floor ju
     const { EagleNavigator, TERRAIN_SAFETY_MARGIN } = await import(/* @vite-ignore */ eaglePath) as typeof import('../src/eagle');
     const world = new WorldModel(5914);
     const lake = world.reviewSpots().lake;
-    const nav = new EagleNavigator(world, { x: lake.x, z: lake.z, heading: 0.4 }, undefined, 0.4);
-    let minClearance = Infinity, corrections = 0, climb = 0;
+    const nav = new EagleNavigator(world, { x: lake.x, z: lake.z, heading: 0.4 });
+    let minClearance = Infinity, corrections = 0, climb = 0, dive = 0;
     const trace: Array<Record<string, unknown>> = [];
-    for (let step = 0; step < 9000; step++) {
+    for (let step = 0; step < 13000; step++) {
       const y = nav.state.y;
       const state = nav.update(0.1);
       const sample = world.sample(state.x, state.z);
@@ -123,23 +123,26 @@ test('scheduled lowland flight crosses the cloud deck without collision-floor ju
       minClearance = Math.min(minClearance, clearance);
       if (clearance <= TERRAIN_SAFETY_MARGIN + 0.001) corrections++;
       climb = Math.max(climb, (state.y - y) / 0.1);
-      if (step % 10 === 0) trace.push({ t: (step + 1) / 10, y: state.y, clearance });
+      dive = Math.max(dive, (y - state.y) / 0.1);
+      if (step % 10 === 0) trace.push({ t: (step + 1) / 10, y: state.y, clearance, phase: nav.cycle.phase, top: nav.cycle.top });
       if (step % 100 === 0) world.trim(20000);
     }
-    return { seed: 5914, lake, minClearance, corrections, climb, trace };
+    return { seed: 5914, lake, minClearance, corrections, climb, dive, trace };
   });
   await writeFile('test-results/cloud-crossing.json', JSON.stringify(metrics, null, 2));
   await testInfo.attach('cloud-crossing', { body: JSON.stringify(metrics), contentType: 'application/json' });
   expect(metrics.minClearance).toBeGreaterThan(6);
   expect(metrics.corrections).toBe(0);
+  // Thermals climb at up to 4 m/s and dives sink at up to 6 m/s: no floor jumps.
   expect(metrics.climb).toBeLessThanOrEqual(4.001);
-  // A visual flap must not keep adding 4 m/s after reaching high cruise.
-  const lowland = metrics.trace.filter((point) => (point.y as number) - (point.clearance as number) < 400);
-  expect(Math.max(...lowland.map((point) => point.y as number))).toBeLessThan((710 + 30) * HEIGHT_SCALE + 4);
+  expect(metrics.dive).toBeLessThanOrEqual(6.001);
   const y = metrics.trace.map((point) => point.y as number);
-  expect(Math.min(...y)).toBeLessThan(430 * HEIGHT_SCALE);
-  expect(Math.max(...y)).toBeGreaterThan(660 * HEIGHT_SCALE);
-  expect(Math.max(...metrics.trace.filter((point) => (point.t as number) < 300).map((point) => point.y as number))).toBeGreaterThan(660 * HEIGHT_SCALE);
-  expect(Math.max(...metrics.trace.filter((point) => (point.t as number) > 500).map((point) => point.y as number))).toBeGreaterThan(660 * HEIGHT_SCALE);
-  expect(y.some((h) => Math.abs(h + 178 * 0.31 / 3 - 500 * HEIGHT_SCALE) < 5)).toBe(true);
+  // Lowland climbs end near 700 m above sea level, through the 600 m deck and not far past it.
+  expect(Math.max(...y)).toBeGreaterThan(650);
+  const lowland = metrics.trace.filter((point) => (point.y as number) - (point.clearance as number) < 400);
+  expect(Math.max(...lowland.map((point) => point.y as number))).toBeLessThan(750 + 4);
+  // Each climb is followed by a dive to the low cruise, under the deck again.
+  const phases = metrics.trace.map((point) => point.phase as string);
+  expect(phases.filter((phase, index) => phase === 'dive' && phases[index - 1] === 'lift').length).toBeGreaterThanOrEqual(2);
+  expect(Math.min(...metrics.trace.filter((point) => point.phase === 'cruise' && (point.t as number) > 300).map((point) => point.clearance as number))).toBeLessThan(190);
 });

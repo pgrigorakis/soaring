@@ -4,7 +4,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { milkyWayComposite, milkyWayDeclarations, milkyWayFunctions, milkyWayUniforms } from './milky-way';
 import './style.css';
 import { Soundscape } from './audio';
-import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS, normalizeFlightHeight, type NudgeStatus } from './eagle';
+import { EagleNavigator, EagleView, skyBearing, type FlightPhase, type NudgeStatus } from './eagle';
 import { DEFAULT_VISIBILITY, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
 import { THERMAL_MARKER_RANGE, ThermalMarker } from './thermal-marker';
 import { CloudSea, bindCloudFog } from './cloud-sea';
@@ -16,37 +16,36 @@ import { Trail } from './trail';
 import { Minimap } from './minimap';
 import { MapPanel } from './map-panel';
 
-type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; lowPower: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean; minFlightHeight: number; maxFlightHeight: number };
-const CAMERA_DISTANCE = { min: 10, max: 100, default: 100 } as const;
+type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean };
+const CAMERA_DISTANCE = { min: 10, max: 200, default: 100 } as const;
 const CAMERA_CLOSE_HEIGHT = 3;
-// The previous far height was 178 m x 0.31; the camera now sits one third as high at full zoom-out.
-const CAMERA_FAR_HEIGHT = 178 * 0.31 / 3;
+// At full zoom-out the camera sits 36 m above the bird.
+const CAMERA_FAR_HEIGHT = 36;
+const CHUNK_BUILD_BUDGET_MS = 4;
 const RENDER_ORIGIN_DISTANCE = 10_000;
 const MAX_RENDER_PIXELS = 2_000_000;
 const MAX_PIXEL_RATIO = 1.5;
 const SETTINGS_KEY = 'soaring.settings.v1';
 const SEED_KEY = 'soaring.world-seed.v1';
 const VISIT_KEY = 'soaring.scenic-visit.v1';
-const defaultSettings: StoredSettings = { ambienceVolume: 0.52, musicVolume: 0.52, muted: true, lowPower: false, cameraDistance: CAMERA_DISTANCE.default, terrainVisibility: DEFAULT_VISIBILITY,
-  showThermal: true, minFlightHeight: DEFAULT_FLIGHT_HEIGHT.min, maxFlightHeight: DEFAULT_FLIGHT_HEIGHT.max };
+const defaultSettings: StoredSettings = { ambienceVolume: 0.52, musicVolume: 0.52, muted: true, cameraDistance: CAMERA_DISTANCE.default, terrainVisibility: DEFAULT_VISIBILITY,
+  showThermal: true };
+// The earlier visibility maximum. The 80 m slider grid never yields it, so a saved value is the old maximum.
+const LEGACY_MAX_VISIBILITY = 5000;
 const clamp = (value: unknown, fallback: number, min: number, max: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 
 function loadSettings(): StoredSettings {
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<StoredSettings> & { volume?: number };
-    const height = normalizeFlightHeight(saved.minFlightHeight ?? defaultSettings.minFlightHeight,
-      saved.maxFlightHeight ?? defaultSettings.maxFlightHeight);
     return {
       ambienceVolume: clamp(saved.ambienceVolume, clamp(saved.volume, defaultSettings.ambienceVolume, 0, 1), 0, 1),
       musicVolume: clamp(saved.musicVolume, clamp(saved.volume, defaultSettings.musicVolume, 0, 1), 0, 1),
       muted: typeof saved.muted === 'boolean' ? saved.muted : defaultSettings.muted,
-      lowPower: typeof saved.lowPower === 'boolean' ? saved.lowPower : defaultSettings.lowPower,
       cameraDistance: clamp(saved.cameraDistance, defaultSettings.cameraDistance, CAMERA_DISTANCE.min, CAMERA_DISTANCE.max),
       showThermal: typeof saved.showThermal === 'boolean' ? saved.showThermal : defaultSettings.showThermal,
-      terrainVisibility: clamp(saved.terrainVisibility, defaultSettings.terrainVisibility, MIN_VISIBILITY, MAX_VISIBILITY),
-      minFlightHeight: height.min,
-      maxFlightHeight: height.max,
+      terrainVisibility: saved.terrainVisibility === LEGACY_MAX_VISIBILITY ? MAX_VISIBILITY
+        : clamp(saved.terrainVisibility, defaultSettings.terrainVisibility, MIN_VISIBILITY, MAX_VISIBILITY),
     };
   } catch {
     return { ...defaultSettings };
@@ -72,7 +71,7 @@ function nextVisit(): number {
 
 // Development-only smoke harness uses a smaller software-WebGL render budget and bounded
 // terrain visibility for fresh storage. Saved settings still take the normal migration path,
-// including the 5 km product default when a legacy record has no visibility value.
+// including the 8 km product default when a legacy record has no visibility value.
 const smokeMode = import.meta.env.DEV && new URLSearchParams(location.search).has('smoke');
 // Development-only `?profile` arms the frame profiler and holds quality steady for held-vantage benches.
 const profileMode = import.meta.env.DEV && new URLSearchParams(location.search).has('profile');
@@ -85,7 +84,6 @@ if (smokeMode && !hasSavedSettings) settings.terrainVisibility = MIN_VISIBILITY;
 function pixelRatioForStep(step = qualityStep): number {
   if (smokeMode) return 0.25;
   const budgetRatio = Math.sqrt(MAX_RENDER_PIXELS / (innerWidth * innerHeight));
-  if (settings.lowPower) return Math.min(1.0, budgetRatio);
   return Math.min(devicePixelRatio,
     QUALITY_PIXEL_RATIOS[Math.min(step, QUALITY_PIXEL_RATIOS.length - 1)]!, budgetRatio);
 }
@@ -93,9 +91,7 @@ const world = new WorldModel(loadSeed());
 const auroraSchedule = new AuroraSchedule(world.seed);
 const visit = nextVisit();
 const start = world.scenicStart(visit);
-const openingSun = daylight(DAY_SECONDS * 0.25 - 15).sun;
-let navigator = new EagleNavigator(world, start, { min: settings.minFlightHeight, max: settings.maxFlightHeight },
-  visit === 1 ? Math.atan2(openingSun.x, openingSun.z) : undefined);
+let navigator = new EagleNavigator(world, start);
 const eagle = new EagleView();
 const soundscape = new Soundscape();
 soundscape.setAmbienceVolume(settings.ambienceVolume);
@@ -118,7 +114,7 @@ renderer.setPixelRatio(pixelRatioForStep());
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NeutralToneMapping;
 renderer.toneMappingExposure = 1.00;
-renderer.shadowMap.enabled = !smokeMode && !settings.lowPower;
+renderer.shadowMap.enabled = !smokeMode;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.domElement.setAttribute('aria-label', 'Autonomous golden eagle flying above a temperate wilderness');
 app.append(renderer.domElement);
@@ -128,7 +124,7 @@ worldRoot.add(hemisphere);
 // One shadow caster. Its direction follows whichever body is higher. Both intensities are zero
 // on the horizon, so the direction can flip there without a visible shadow pop.
 const keyLight = new THREE.DirectionalLight(0xffe1ab, 3.6);
-keyLight.castShadow = !smokeMode && !settings.lowPower;
+keyLight.castShadow = !smokeMode;
 keyLight.shadow.camera.near = 1;
 keyLight.shadow.bias = -0.0005;
 keyLight.shadow.normalBias = 0.8;
@@ -495,9 +491,6 @@ const thermalMarker = new ThermalMarker(worldRoot, world);
 function applyRenderQuality(): void {
   const pixelRatio = pixelRatioForStep();
   if (renderer.getPixelRatio() !== pixelRatio) renderer.setPixelRatio(pixelRatio);
-  const shadowsEnabled = !smokeMode && !settings.lowPower;
-  renderer.shadowMap.enabled = shadowsEnabled;
-  keyLight.castShadow = shadowsEnabled;
   terrain.setReach(terrainReach());
 }
 let pixelRatioMedia: MediaQueryList | undefined;
@@ -511,7 +504,7 @@ function handlePixelRatioChange(): void {
   watchPixelRatioChange();
 }
 watchPixelRatioChange();
-let lastChunkBuilds = terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, settings.lowPower ? 2 : 4);
+let lastChunkBuilds = terrain.update(navigator.state.x, navigator.state.z - settings.cameraDistance, CHUNK_BUILD_BUDGET_MS);
 
 let orbitYaw = 0;
 let orbitPitch = 0;
@@ -585,13 +578,8 @@ app.insertAdjacentHTML('beforeend', `
       <label class="setting">Sound <button class="mute-button" id="mute" type="button">Muted</button></label>
       <label class="setting">Ambience <output id="ambience-value">${Math.round(settings.ambienceVolume * 100)}%</output><input id="ambience" type="range" min="0" max="1" step="0.01" value="${settings.ambienceVolume}"></label>
       <label class="setting">Music <output id="music-value">${Math.round(settings.musicVolume * 100)}%</output><input id="music" type="range" min="0" max="1" step="0.01" value="${settings.musicVolume}"></label>
-      <label class="setting">Terrain visibility <output id="visibility-value">${Math.round(settings.terrainVisibility)} m</output><input id="visibility" type="range" min="${MIN_VISIBILITY}" max="${MAX_VISIBILITY}" step="120" value="${settings.terrainVisibility}"></label>
-      <label class="setting">Low power <input id="low-power" type="checkbox" ${settings.lowPower ? 'checked' : ''}></label>
+      <label class="setting">Terrain visibility <output id="visibility-value">${Math.round(settings.terrainVisibility)} m</output><input id="visibility" type="range" min="${MIN_VISIBILITY}" max="${MAX_VISIBILITY}" step="80" value="${settings.terrainVisibility}"></label>
       <label class="setting">Show thermal <input id="show-thermal" type="checkbox" ${settings.showThermal ? 'checked' : ''}></label>
-      <label class="setting">Minimum flight height <output id="min-height-value">${settings.minFlightHeight} m</output><input id="min-height" type="range" min="${FLIGHT_HEIGHT_LIMITS.min}" max="${FLIGHT_HEIGHT_LIMITS.max - FLIGHT_HEIGHT_LIMITS.gap}" step="1" value="${settings.minFlightHeight}"></label>
-      <label class="setting">Maximum flight height <output id="max-height-value">${settings.maxFlightHeight} m</output><input id="max-height" type="range" min="${FLIGHT_HEIGHT_LIMITS.min + FLIGHT_HEIGHT_LIMITS.gap}" max="${FLIGHT_HEIGHT_LIMITS.max}" step="1" value="${settings.maxFlightHeight}"></label>
-      <p class="height-note">Height above local terrain · ${FLIGHT_HEIGHT_LIMITS.gap} m minimum range</p>
-      <label class="setting">Camera distance <output id="distance-value">${Math.round(settings.cameraDistance)} m</output><input id="distance" type="range" min="${CAMERA_DISTANCE.min}" max="${CAMERA_DISTANCE.max}" step="1" value="${settings.cameraDistance}"></label>
       <label class="setting"><button class="new-world" id="new-world" type="button">Generate a new world</button></label>
       <p class="audio-note" role="status">Sound starts muted. It is generated in your browser; no media is downloaded.</p>
     </section>
@@ -617,14 +605,7 @@ const musicValue = document.querySelector<HTMLOutputElement>('#music-value')!;
 const audioNote = document.querySelector<HTMLElement>('.audio-note')!;
 const visibilityInput = document.querySelector<HTMLInputElement>('#visibility')!;
 const visibilityValue = document.querySelector<HTMLOutputElement>('#visibility-value')!;
-const lowPowerInput = document.querySelector<HTMLInputElement>('#low-power')!;
 const showThermalInput = document.querySelector<HTMLInputElement>('#show-thermal')!;
-const distanceInput = document.querySelector<HTMLInputElement>('#distance')!;
-const distanceValue = document.querySelector<HTMLOutputElement>('#distance-value')!;
-const minHeightInput = document.querySelector<HTMLInputElement>('#min-height')!;
-const maxHeightInput = document.querySelector<HTMLInputElement>('#max-height')!;
-const minHeightValue = document.querySelector<HTMLOutputElement>('#min-height-value')!;
-const maxHeightValue = document.querySelector<HTMLOutputElement>('#max-height-value')!;
 const diagnostics = document.querySelector<HTMLElement>('#diagnostics')!;
 
 let controlsTimer = 0;
@@ -714,12 +695,6 @@ visibilityInput.addEventListener('input', () => {
   applyRenderQuality();
   saveSettings();
 });
-lowPowerInput.addEventListener('change', () => {
-  settings.lowPower = lowPowerInput.checked;
-  resetQualityTimers();
-  applyRenderQuality();
-  saveSettings();
-});
 showThermalInput.addEventListener('change', () => {
   settings.showThermal = showThermalInput.checked;
   thermalMarker.update(navigator.state, navigator.activeThermal, settings.showThermal, performance.now() / 1000);
@@ -727,34 +702,12 @@ showThermalInput.addEventListener('change', () => {
 });
 function setCameraDistance(distance: number): void {
   settings.cameraDistance = distance;
-  distanceInput.value = String(distance);
-  distanceValue.value = `${Math.round(distance)} m`;
   saveSettings();
 }
-distanceInput.addEventListener('input', () => {
-  zoomTarget = Number(distanceInput.value);
-  setCameraDistance(zoomTarget);
-});
 function easeCameraDistance(seconds: number): void {
   if (settings.cameraDistance === zoomTarget) return;
   const gap = zoomTarget - settings.cameraDistance;
   setCameraDistance(Math.abs(gap) < 0.05 ? zoomTarget : settings.cameraDistance + gap * (1 - Math.exp(-seconds * 9)));
-}
-minHeightInput.addEventListener('input', () => {
-  settings.minFlightHeight = Math.min(Number(minHeightInput.value), settings.maxFlightHeight - FLIGHT_HEIGHT_LIMITS.gap);
-  updateFlightHeight();
-});
-maxHeightInput.addEventListener('input', () => {
-  settings.maxFlightHeight = Math.max(Number(maxHeightInput.value), settings.minFlightHeight + FLIGHT_HEIGHT_LIMITS.gap);
-  updateFlightHeight();
-});
-function updateFlightHeight(): void {
-  minHeightInput.value = String(settings.minFlightHeight);
-  maxHeightInput.value = String(settings.maxFlightHeight);
-  minHeightValue.value = `${settings.minFlightHeight} m`;
-  maxHeightValue.value = `${settings.maxFlightHeight} m`;
-  navigator.setFlightHeightRange({ min: settings.minFlightHeight, max: settings.maxFlightHeight });
-  saveSettings();
 }
 document.querySelector('#new-world')?.addEventListener('click', () => {
   const values = new Uint32Array(1);
@@ -853,7 +806,7 @@ function resetQualityTimers(): void {
   headroomSeconds = 0;
 }
 function currentFrameCap(): 30 | null {
-  return settings.lowPower || !windowFocused ? 30 : null;
+  return windowFocused ? null : 30;
 }
 function setWindowFocused(focused: boolean): void {
   if (windowFocused === focused) return;
@@ -861,7 +814,6 @@ function setWindowFocused(focused: boolean): void {
   resetQualityTimers();
 }
 function nextQualityStep(): number {
-  if (settings.lowPower) return 3;
   const currentRatio = pixelRatioForStep();
   for (let step = qualityStep + 1; step < QUALITY_PIXEL_RATIOS.length; step += 1) {
     if (pixelRatioForStep(step) < currentRatio) return step;
@@ -1156,12 +1108,13 @@ function frame(now: number): void {
   }
   camera.position.copy(cameraPosition).sub(renderOrigin);
   camera.lookAt(renderLookAt.copy(lookAt).sub(renderOrigin));
-  lastChunkBuilds = terrain.update(cameraPosition.x, cameraPosition.z, settings.lowPower ? 2 : 4);
+  lastChunkBuilds = terrain.update(cameraPosition.x, cameraPosition.z, CHUNK_BUILD_BUDGET_MS);
   updateFog();
-  if (!skyPaused) skySeconds += rawDelta * navigator.openingDayRate;
+  if (!skyPaused) skySeconds += rawDelta;
   minimap.update(state.x, state.z, state.heading, rawDelta);
   const body = currentDaylight();
   applyDaylight(body, rawDelta);
+  navigator.setSkyBearing(skyBearing(body, sky.material.uniforms.milkyWayAmount!.value, milkyWayUniforms.milkyWayCentre.value));
   puffClouds.update(state, navigator.wind, reviewFlightPaused ? 0 : delta, cameraPosition, { horizon: fogGoal,
     skyLight: puffSkyLight, keyDir, keyLight: puffKeyLight, bodies: cloudSea.snapshot().bodies,
     whiteout: cloudSea.fogUniforms.whiteout.value });
@@ -1252,7 +1205,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; ground: string; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; moonLit: number; moonIntensity: number; dominant: 'sun' | 'moon'; starAmount: number; milkyWayAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; cloudLayer: ReturnType<CloudSea['snapshot']>; nudge: NudgeStatus };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; ground: string; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; moonLit: number; moonIntensity: number; dominant: 'sun' | 'moon'; starAmount: number; milkyWayAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; cloudLayer: ReturnType<CloudSea['snapshot']>; nudge: NudgeStatus; cycle: { phase: FlightPhase; top: number; cruise: number } };
       puffCloudSnapshot: () => PuffCloudSnapshot;
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
@@ -1285,7 +1238,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
     reviewFlight: (pose: { x: number; y?: number; z: number; heading: number } | null) => {
       reviewFlightPaused = pose !== null;
       if (!pose) return;
-      navigator = new EagleNavigator(world, pose, { min: settings.minFlightHeight, max: settings.maxFlightHeight });
+      navigator = new EagleNavigator(world, pose);
       if (pose.y !== undefined) navigator.state.y = pose.y;
       cameraHeading = pose.heading;
       orbitYaw = 0;
@@ -1326,8 +1279,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       orbitYaw,
       orbitPitch,
       frameCap: currentFrameCap(),
-      lowPower: settings.lowPower,
-      chunkBuildBudget: settings.lowPower ? 2 : 4,
+      chunkBuildBudget: CHUNK_BUILD_BUDGET_MS,
       qualityStep,
       pixelRatio: renderer.getPixelRatio(),
       renderWidth: renderer.domElement.width,
@@ -1340,6 +1292,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       bank: navigator.state.bank,
       heading: navigator.state.heading,
       nudge: navigator.nudgeStatus,
+      cycle: navigator.cycle,
       position: [navigator.state.x, navigator.state.y, navigator.state.z],
       renderOrigin: [renderOrigin.x, renderOrigin.y, renderOrigin.z],
       geometries: renderer.info.memory.geometries,

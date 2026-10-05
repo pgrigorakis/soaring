@@ -30,10 +30,10 @@ test('resumable streaming cancels safely and reuses detached buffers', async ({ 
   test.setTimeout(480_000);
   await page.addInitScript(() => {
     localStorage.setItem('soaring.world-seed.v1', '12345');
-    localStorage.setItem('soaring.settings.v1', JSON.stringify({ terrainVisibility: 720, lowPower: true }));
+    localStorage.setItem('soaring.settings.v1', JSON.stringify({ terrainVisibility: 720 }));
   });
   await page.goto('/?smoke');
-  // Coverage is measured at fixed poses. A slow CI CPU can otherwise add work faster than 2 ms builds drain it.
+  // Coverage is measured at fixed poses. A slow CI CPU can otherwise add work faster than 4 ms builds drain it.
   const records = [];
   for (const x of [720, 1440, -720]) {
     await page.evaluate((x) => window.__SOARING__.reviewFlight!({ x, z: 0, heading: 0 }), x);
@@ -51,11 +51,8 @@ test('resumable streaming cancels safely and reuses detached buffers', async ({ 
     expect(s.visibleDistance).toBe(720);
     expect(s.chunks).toBeLessThanOrEqual(49);
     expect(s.geometries).toBeLessThan(220);
-    expect(s.chunkBuildBudget).toBe(records.length === 0 ? 2 : 4);
+    expect(s.chunkBuildBudget).toBe(4);
     records.push(s);
-    if (records.length === 1) {
-      await page.locator('#low-power').evaluate((input: HTMLInputElement) => input.click());
-    }
   }
   const last = records.at(-1)!;
   expect(last.buildTiming.reused).toBeGreaterThan(0);

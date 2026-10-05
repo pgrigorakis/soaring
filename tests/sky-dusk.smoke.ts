@@ -11,8 +11,8 @@ test('dusk warmth follows the sun, a rose belt faces it, and the low sun is wide
     localStorage.setItem('soaring.world-seed.v1', '1406157560');
     localStorage.setItem('soaring.scenic-visit.v1', '0');
     localStorage.setItem('soaring.settings.v1', JSON.stringify({
-      muted: true, lowPower: false, cameraDistance: 100, terrainVisibility: 720,
-      showThermal: false, minFlightHeight: 470, maxFlightHeight: 500,
+      muted: true, cameraDistance: 100, terrainVisibility: 720,
+      showThermal: false,
     }));
   });
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -20,7 +20,7 @@ test('dusk warmth follows the sun, a rose belt faces it, and the low sun is wide
   const sunElevation = 2;
   const sun = await page.evaluate((phase) => {
     const api = window.__SOARING__;
-    api.reviewFlight!({ x: 0, z: 0, heading: 0 });
+    api.reviewFlight!({ x: 0, y: api.sample(0, 0).height + 470, z: 0, heading: 0 });
     api.setCapturePixelRatio(1);
     api.setPuffCloudsVisible(false);
     api.setTimeOfDay(phase);

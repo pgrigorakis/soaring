@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, GLIDE_SINK_RATE, normalizeFlightHeight,
+  CYCLE, EagleNavigator, EagleView, FLIGHT_HEIGHT, GLIDE_SINK_RATE,
   TERRAIN_SAFETY_MARGIN, THERMAL_BANK_RANGE, THERMAL_CLIMB_RANGE, THERMAL_RADIUS_RANGE,
 } from '../src/eagle';
 import { WorldModel } from '../src/world';
@@ -42,12 +42,8 @@ describe('autonomous eagle navigation', () => {
     expect(closeRetargets).toBe(0);
   });
 
-  it.each([
-    { min: 50, max: 70 },
-    { min: 90, max: 145 },
-    { min: 65, max: 210 },
-  ])(
-    'never enters terrain and caps thermal climb against smoothed ground in $min–$max m during a one-hour flight', (range) => {
+  it.each([FLIGHT_HEIGHT])(
+    'never enters terrain and caps thermal climb at the cycle top within $min–$max m during a one-hour flight', (range) => {
       const world = new WorldModel(448122);
       const navigator = new EagleNavigator(world, world.scenicStart(2), range);
       const start = { x: navigator.state.x, z: navigator.state.z };
@@ -55,16 +51,17 @@ describe('autonomous eagle navigation', () => {
       let minimumClearance = Infinity;
       let seekingTurns = 0;
       let circleEntries = 0;
-      let episodeTicks = 0;
-      let longestEpisodeTicks = 0;
+      let dives = 0;
+      let fastestDive = 0;
       for (let step = 0; step < 36_000; step += 1) {
         const before = navigator.state.behavior;
+        const beforePhase = navigator.cycle.phase;
         const previousY = navigator.state.y;
         const heading = navigator.state.heading;
         const state = navigator.update(0.1);
         behaviors.add(state.behavior);
-        episodeTicks = state.behavior === before ? episodeTicks + 1 : 1;
-        longestEpisodeTicks = Math.max(longestEpisodeTicks, episodeTicks);
+        if (beforePhase === 'lift' && navigator.cycle.phase === 'dive') dives += 1;
+        if (beforePhase === 'dive' && navigator.cycle.phase === 'dive') fastestDive = Math.max(fastestDive, (previousY - state.y) / 0.1);
         const sample = world.sample(state.x, state.z);
         const clearance = state.y - sample.height;
         minimumClearance = Math.min(minimumClearance, clearance);
@@ -75,9 +72,12 @@ describe('autonomous eagle navigation', () => {
           expect(state.flapping).toBe(false);
           expect(state.y).toBeLessThanOrEqual(Math.max(previousY, navigator.flightGround + range.max) + 0.001);
         }
+        if (state.behavior === 'thermal-riding') expect(state.y).toBeLessThanOrEqual(Math.max(previousY, navigator.cycle.top) + 0.001);
       }
       expect(minimumClearance).toBeGreaterThanOrEqual(TERRAIN_SAFETY_MARGIN - 0.001);
-      expect(longestEpisodeTicks * 0.1).toBeLessThanOrEqual(240); // no behaviour runs four minutes
+      // Each 300 s cruise ends in a climb to the top and a dive of at most 6 m/s.
+      expect(dives).toBeGreaterThanOrEqual(4);
+      expect(fastestDive).toBeLessThanOrEqual(CYCLE.diveRate.max + 0.001);
       expect(seekingTurns).toBeGreaterThan(10);
       expect(circleEntries).toBeGreaterThan(0);
       // Total flap time is unrestricted. Thermal/ridge no-flap rules remain checked above.
@@ -91,11 +91,6 @@ describe('autonomous eagle navigation', () => {
     },
     20_000,
   );
-
-  it('normalizes invalid and inverted flight height preferences to safe bounds', () => {
-    expect(normalizeFlightHeight(Number.NaN, Infinity)).toEqual({ min: 65, max: 210 });
-    expect(normalizeFlightHeight(490, 40)).toEqual({ min: 480, max: 500 });
-  });
 
   it('sinks while gliding, trading height for distance with no flapping', () => {
     const world = new WorldModel(448122);
@@ -112,9 +107,9 @@ describe('autonomous eagle navigation', () => {
 
   it('flaps to climb when clearance nears the minimum flight height floor', () => {
     const world = new WorldModel(448122);
-    const navigator = new EagleNavigator(world, world.scenicStart(2), DEFAULT_FLIGHT_HEIGHT);
+    const navigator = new EagleNavigator(world, world.scenicStart(2), FLIGHT_HEIGHT);
     const ground = world.sample(navigator.state.x, navigator.state.z).height;
-    navigator.state.y = ground + DEFAULT_FLIGHT_HEIGHT.min + 5; // just under the soft floor trigger
+    navigator.state.y = ground + FLIGHT_HEIGHT.min + 5; // just under the soft floor trigger
     const before = navigator.state.y;
     const state = navigator.update(0.1);
     expect(state.flapping).toBe(true);
@@ -124,7 +119,7 @@ describe('autonomous eagle navigation', () => {
   it('the up arrow flaps below the maximum, and the down arrow sinks faster above the floor', () => {
     const world = new WorldModel(448122);
     const at = (clearance: number, climb: number) => {
-      const navigator = new EagleNavigator(world, world.scenicStart(2), DEFAULT_FLIGHT_HEIGHT);
+      const navigator = new EagleNavigator(world, world.scenicStart(2), FLIGHT_HEIGHT);
       navigator.state.y = world.sample(navigator.state.x, navigator.state.z).height + clearance;
       navigator.setNudge({ turn: 0, climb });
       const before = navigator.state.y;
@@ -132,12 +127,12 @@ describe('autonomous eagle navigation', () => {
       for (let step = 0; step < 10; step += 1) flapped = navigator.update(0.1).flapping || flapped;
       return { flapped, change: navigator.state.y - before };
     };
-    expect(at(140, 1).flapped).toBe(true);
-    expect(at(140, 1).change).toBeGreaterThan(0);
+    expect(at(250, 1).flapped).toBe(true);
+    expect(at(250, 1).change).toBeGreaterThan(0);
     // Above the maximum the up arrow does not power a climb.
     expect(at(1000, 1).flapped).toBe(false);
-    expect(at(140, -1).flapped).toBe(false);
-    expect(at(140, -1).change).toBeLessThan(at(140, 0).change - 3);
+    expect(at(250, -1).flapped).toBe(false);
+    expect(at(250, -1).change).toBeLessThan(at(250, 0).change - 3);
   });
 
   it('never flaps while thermal-riding', () => {
@@ -182,13 +177,13 @@ describe('autonomous eagle navigation', () => {
       let elapsed = 0;
       let startThermalX = 0;
       let startThermalZ = 0;
-      for (let step = 0; step < 36_000 && radii.length < 40; step += 1) {
+      for (let step = 0; step < 36_000 && radii.length < 100; step += 1) {
         const before = navigator.state.behavior;
         const state = navigator.update(0.1);
         if (before !== 'thermal-riding' && state.behavior === 'thermal-riding' && navigator.activeThermal) {
           riding = true;
           const ground = world.sample(state.x, state.z).height;
-          state.y = ground + DEFAULT_FLIGHT_HEIGHT.min + 40;
+          state.y = ground + FLIGHT_HEIGHT.min + 40;
           startY = state.y;
           startThermalX = navigator.activeThermal.x;
           startThermalZ = navigator.activeThermal.z;
@@ -213,7 +208,7 @@ describe('autonomous eagle navigation', () => {
         expect(radius).toBeGreaterThan(THERMAL_RADIUS_RANGE.min - 12);
         expect(radius).toBeLessThan(THERMAL_RADIUS_RANGE.max + 12);
       }
-      expect(radii.length).toBeGreaterThan(20);
+      expect(radii.length).toBeGreaterThan(60);
       expect(Math.max(...radii) - Math.min(...radii)).toBeGreaterThan(0.4);
       expect(Math.max(...banks) - Math.min(...banks)).toBeGreaterThan(0.01);
       const climbRate = (navigator.state.y - startY) / elapsed;
@@ -235,7 +230,7 @@ describe('autonomous eagle navigation', () => {
       if (before !== 'thermal-riding' && state.behavior === 'thermal-riding') {
         riding = true;
         const ground = world.sample(state.x, state.z).height;
-        state.y = ground + DEFAULT_FLIGHT_HEIGHT.min + 20;
+        state.y = ground + FLIGHT_HEIGHT.min + 20;
         held = 0;
         continue;
       }
@@ -245,23 +240,60 @@ describe('autonomous eagle navigation', () => {
     expect(held).toBeGreaterThan(19);
   });
 
-  it('leaves thermal-riding at maximum flight height without a fixed timer', () => {
+  it('leaves thermal-riding at the cycle top, near 700 m above sea level, and dives', () => {
     const world = new WorldModel(448122);
     const navigator = new EagleNavigator(world, world.scenicStart(2));
-    let exitedAtMax = false;
-    for (let step = 0; step < 36_000; step += 1) {
+    let exitY: number | null = null;
+    for (let step = 0; step < 36_000 && exitY === null; step += 1) {
       const before = navigator.state.behavior;
-      const beforeY = navigator.state.y;
-      const beforeX = navigator.state.x;
-      const beforeZ = navigator.state.z;
+      const top = navigator.cycle.top;
       const state = navigator.update(0.1);
-      if (before !== 'thermal-riding' || state.behavior === 'thermal-riding') continue;
-      const ground = world.sample(beforeX, beforeZ).height;
-      if (beforeY - ground >= DEFAULT_FLIGHT_HEIGHT.max - 0.05) {
-        exitedAtMax = true;
-        break;
+      if (before === 'thermal-riding' && state.behavior !== 'thermal-riding' && state.y >= top - 1) {
+        expect(navigator.cycle.phase).toBe('dive');
+        exitY = state.y;
       }
     }
-    expect(exitedAtMax).toBe(true);
+    expect(exitY).not.toBeNull();
+    expect(exitY!).toBeGreaterThanOrEqual(CYCLE.top - CYCLE.topVariation - 1);
+    expect(exitY!).toBeLessThanOrEqual(CYCLE.top + CYCLE.topVariation + 1);
+  });
+
+  it('dives at 5–6 m/s into a 50–150 m cruise, holds it by flapping, and steers toward the sky', () => {
+    const world = new WorldModel(448122);
+    const navigator = new EagleNavigator(world, world.scenicStart(2));
+    const bearing = 1.2;
+    navigator.setSkyBearing(bearing);
+    const rates: number[] = [];
+    const cruise: number[] = [];
+    let cruiseFlaps = 0;
+    let towardSky = 0;
+    let cruiseTicks = 0;
+    let reachedCruise = false;
+    let wasFlapping = false;
+    for (let step = 0; step < 36_000 && cruiseTicks < 2400; step += 1) {
+      const phase = navigator.cycle.phase;
+      const previousY = navigator.state.y;
+      const state = navigator.update(0.1);
+      const flapped = navigator.state.flapping;
+      if (phase === 'dive' && navigator.cycle.phase === 'dive' && !state.flapping && !wasFlapping) rates.push((previousY - state.y) / 0.1);
+      wasFlapping = flapped;
+      if (phase === 'dive' && navigator.cycle.phase === 'cruise') reachedCruise = true;
+      if (!reachedCruise || navigator.cycle.phase !== 'cruise' || state.behavior !== 'gliding') continue;
+      cruiseTicks += 1;
+      cruise.push(state.y - navigator.flightGround);
+      if (state.flapping) cruiseFlaps += 1;
+      if (Math.cos(state.heading - bearing) > 0) towardSky += 1;
+    }
+    expect(reachedCruise).toBe(true);
+    // Over rising ground the dive eases to a 1 m/s glide; otherwise it sinks at this cycle's 5–6 m/s.
+    const diving = rates.filter((rate) => rate > GLIDE_SINK_RATE + 0.001);
+    expect(diving.length).toBeGreaterThan(rates.length * 0.6);
+    expect(Math.min(...diving)).toBeGreaterThanOrEqual(CYCLE.diveRate.min - 0.001);
+    expect(Math.max(...diving)).toBeLessThanOrEqual(CYCLE.diveRate.max + 0.001);
+    // The cruise band is 50–150 m, wandering by up to 30 m; a flap burst can overshoot by a few metres.
+    expect(Math.min(...cruise)).toBeGreaterThan(CYCLE.cruise.min - 10);
+    expect(Math.max(...cruise)).toBeLessThan(CYCLE.cruise.max + CYCLE.cruiseWander + 10);
+    expect(cruiseFlaps).toBeGreaterThan(0);
+    expect(towardSky / cruiseTicks).toBeGreaterThan(0.75);
   });
 });
