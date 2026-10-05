@@ -8,7 +8,7 @@ The captain selected option C: replace Soaring's land and lakes with Fly-with-me
 
 The port keeps FWM's construction:
 
-- 700 m coordinate warp at 2.2 km, with continentalness at 3.4 km.
+- 700 m coordinate warp at 2.2 km, with continentalness at 7 km. At 3.4 km, narrow sea channels split every biome into small patches.
 - `smoothstep(0.4, 0.6, continentalness)` determines land.
 - 520 m hills range from 10 m offshore amplitude to 48 m on land.
 - `smoothstep(0.56, 0.82, continentalness)` masks mountains.
@@ -22,7 +22,7 @@ Two deliberate differences from FWM remain. Noise uses Soaring's hash rather tha
 
 ## Climate and content
 
-Soaring keeps its 28 km climate scale, field warp, altitude lapse, five biome rules and existing palettes/content. Highlands and Lakeland retain their previous selection fields. Mountains now follow continentalness rather than a biome-owned elevation profile, so mountain geometry and the Highlands appearance region need not coincide everywhere. Final shelved height determines temperature.
+Soaring keeps its 28 km climate scale, field warp, altitude lapse, five biome rules and existing palettes/content. Highlands and Lakeland retain their previous selection fields. Mountains now follow continentalness rather than a biome-owned elevation profile, so mountain geometry and the Highlands appearance region need not coincide everywhere. Biomes are chosen with temperature cooled by the broad continental plate, `-70 + 150 × smoothstep(0.4, 0.6, continentalness)`. Final shelved height cools snow, scree and the tree line.
 
 Biome profiles no longer contain height offsets or amplitudes. Woodland glades, Hills parcels/hedges, Moor tors/heather, tree species, snow thresholds, ambience and thermal preferences remain. There are no explicit lake-island objects or guaranteed elliptical Lakeland lakes. Natural dry islands use the surrounding biome's ordinary vegetation.
 

@@ -43,10 +43,11 @@ describe('deterministic world generation', () => {
   it('generates the same tree positions and forms after a chunk is rebuilt', () => {
     const first = new WorldModel(80231),
       second = new WorldModel(80231);
-    const trees = first.treesInArea(-6 * 360, -10 * 360, 360, 36);
+    // The 7 km continental field floods the old chunk at (-6, -10); this one is forested.
+    const trees = first.treesInArea(-9 * 360, -4 * 360, 360, 36);
     expect(trees.length).toBeGreaterThan(0);
-    expect(trees).toEqual(second.treesInArea(-6 * 360, -10 * 360, 360, 36));
-    expect(trees).not.toEqual(new WorldModel(80232).treesInArea(-6 * 360, -10 * 360, 360, 36));
+    expect(trees).toEqual(second.treesInArea(-9 * 360, -4 * 360, 360, 36));
+    expect(trees).not.toEqual(new WorldModel(80232).treesInArea(-9 * 360, -4 * 360, 360, 36));
     expect(new Set(trees.map((tree) => tree.kind)).size).toBeGreaterThan(1);
   });
   it('keeps tree positions identical across chunk partitions, including negative boundaries', () => {
@@ -74,12 +75,14 @@ describe('deterministic world generation', () => {
     expect(streamed.filter((tree) => tree.x >= seam && tree.x < seam + 90).length).toBeGreaterThan(0);
   });
   it('makes large forests, open meadows, small groves and isolated trees', () => {
+    // A wooded window on the 7 km continental field: 20 cells west, 25 south.
     const world = new WorldModel(80231),
+      westX = -20,
       southZ = -25;
     const counts: Array<{ x: number; z: number; n: number }> = [];
     for (let z = -12; z <= 12; z++)
       for (let x = -12; x <= 12; x++)
-        counts.push({ x, z, n: world.treesInArea(x * 360, (z + southZ) * 360, 360, 36).length });
+        counts.push({ x, z, n: world.treesInArea((x + westX) * 360, (z + southZ) * 360, 360, 36).length });
     const at = (x: number, z: number) => counts.find((cell) => cell.x === x && cell.z === z)?.n ?? 0;
     const interior = counts.filter((cell) => Math.abs(cell.x) < 12 && Math.abs(cell.z) < 12),
       forests = counts.filter((cell) => cell.n > 40);
@@ -117,14 +120,15 @@ describe('deterministic world generation', () => {
     const first = new WorldModel(1001),
       second = new WorldModel(1002);
     expect(first.sample(481, -219).height).not.toBe(second.sample(481, -219).height);
-    expect(first.thermalAtCell(2, 3)).not.toEqual(second.thermalAtCell(2, 3));
+    expect(first.thermalAtCell(2, 0)).not.toEqual(second.thermalAtCell(2, 0));
   });
   it('places thermals deterministically and never on water', () => {
     const first = new WorldModel(448122),
       second = new WorldModel(448122),
       placed: Array<{ x: number; z: number }> = [];
+    // Thermals sit only on land, so the window lies 16 cells west, where land is common.
     for (let z = -8; z <= 8; z++)
-      for (let x = -8; x <= 8; x++) {
+      for (let x = -24; x <= -8; x++) {
         const thermal = first.thermalAtCell(x, z);
         expect(thermal).toEqual(second.thermalAtCell(x, z));
         if (!thermal) continue;
@@ -140,11 +144,16 @@ describe('deterministic world generation', () => {
     let chosen = 0,
       unscored = 0;
     for (let visit = 1; visit <= 24; visit++) {
+      const radius = (3 + (visit % 9)) * 920 + 350,
+        angle = visit * 2.399,
+        x = Math.cos(angle) * radius,
+        z = Math.sin(angle) * radius;
+      // Starts are always on land, so compare them with land ring points only. Open sea scores
+      // a shore bonus, and the 7 km continental field puts many ring points there.
+      if (world.sample(x, z).water) continue;
       const start = world.scenicStart(visit);
       chosen += world.interest(start.x, start.z);
-      const radius = (3 + (visit % 9)) * 920 + 350,
-        angle = visit * 2.399;
-      unscored += world.interest(Math.cos(angle) * radius, Math.sin(angle) * radius);
+      unscored += world.interest(x, z);
     }
     expect(chosen).toBeGreaterThan(unscored * 1.3);
   });

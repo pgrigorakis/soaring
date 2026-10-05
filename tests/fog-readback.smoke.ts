@@ -40,7 +40,7 @@ test('samples horizon fog asynchronously at fixed sky phases', async ({ page }, 
   });
 
   await page.goto('/?smoke');
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
   await page.evaluate(() => {
     document.querySelector('#intro')?.classList.add('hidden');
     const toggle = document.querySelector<HTMLElement>('#settings-toggle');

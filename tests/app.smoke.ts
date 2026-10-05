@@ -48,7 +48,7 @@ function captureErrors(page: Page): string[] {
 }
 
 async function revealSettingsControl(page: Page): Promise<void> {
-  const canvas = page.locator('canvas');
+  const canvas = page.locator('canvas').first();
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Canvas has no layout box');
   await page.mouse.move(box.x + box.width * 0.45, box.y + box.height * 0.5);
@@ -58,7 +58,7 @@ async function revealSettingsControl(page: Page): Promise<void> {
 }
 
 async function openSettings(page: Page): Promise<void> {
-  const canvas = page.locator('canvas');
+  const canvas = page.locator('canvas').first();
   const canvasBox = await canvas.boundingBox();
   if (!canvasBox) throw new Error('Canvas has no layout box');
   const toggle = page.locator('#settings-toggle');
@@ -78,7 +78,7 @@ test('renders high-detail terrain, streams, and supports camera controls', async
   const errors = captureErrors(page);
   // Development-only smoke mode reduces software-WebGL pixel work and disables shadows.
   await page.goto('/?smoke');
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
   await page.keyboard.press('d');
   await expect(page.locator('#diagnostics')).toBeVisible();
   const initialFrame = await page.evaluate(() => {
@@ -111,7 +111,7 @@ test('renders high-detail terrain, streams, and supports camera controls', async
   expect(after.geometries).toBeLessThan(200);
   expect(after.requestedDistance).toBe(720);
 
-  const canvas = page.locator('canvas');
+  const canvas = page.locator('canvas').first();
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Canvas has no layout box');
   await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.5);
@@ -198,7 +198,7 @@ async function preparePixelBudgetPage(page: Page, path = '/'): Promise<void> {
     }));
   });
   await page.goto(path);
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
 }
 
 async function setPixelBudgetLowPower(page: Page, enabled: boolean): Promise<void> {
@@ -277,7 +277,7 @@ function expectMarkersInRange(snapshot: {
 test('rebases render coordinates while navigation stays in world coordinates', async ({ page }) => {
   const errors = captureErrors(page);
   await page.goto('/?smoke');
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
   const before = await page.evaluate(() => window.__SOARING__.snapshot());
   const pose = await page.evaluate(() => {
     const { renderOrigin, heading } = window.__SOARING__.snapshot();
@@ -302,7 +302,7 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
     localStorage.setItem('soaring.scenic-visit.v1', '0');
   });
   await page.goto('/?smoke');
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
   const setting = page.getByRole('checkbox', { name: 'Show thermal' });
   await openSettings(page);
   await expect(setting).toBeChecked();
@@ -349,6 +349,9 @@ test('persists safe local-terrain height bounds across reloads', async ({ page }
 });
 
 test('visibility and camera distance persist independently', async ({ page }) => {
+  // Twenty cold 3600 m tiles share the frame budget with ground levels. CI's software renderer
+  // builds a tile in about 58 ms of CPU, so they take about 20 s there, not 3 s.
+  test.setTimeout(60_000);
   const errors = captureErrors(page);
   await page.addInitScript(() => {
     if (!localStorage.getItem('soaring.settings.v1')) localStorage.setItem('soaring.settings.v1', JSON.stringify({
@@ -356,7 +359,7 @@ test('visibility and camera distance persist independently', async ({ page }) =>
     }));
   });
   await page.goto('/?smoke');
-  const canvas = page.locator('canvas');
+  const canvas = page.locator('canvas').first();
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Canvas has no layout box');
@@ -426,7 +429,7 @@ test('visibility and camera distance persist independently', async ({ page }) =>
 test('mouse wheel zooms the camera and stays in sync with the slider', async ({ page }) => {
   const errors = captureErrors(page);
   await page.goto('/?smoke');
-  const canvas = page.locator('canvas');
+  const canvas = page.locator('canvas').first();
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Canvas has no layout box');
@@ -450,7 +453,7 @@ test('mouse wheel zooms the camera and stays in sync with the slider', async ({ 
 test('a dragged camera angle stays until a double-click resets it, and a drag never resets', async ({ page }) => {
   const errors = captureErrors(page);
   await page.goto('/?smoke');
-  const canvas = page.locator('canvas');
+  const canvas = page.locator('canvas').first();
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Canvas has no layout box');
@@ -544,7 +547,7 @@ test('fullscreen toggle and F keep the idle scene clear while settings and diagn
   await expect(page.locator('#controls')).not.toHaveClass(/visible/);
   await expect(page.locator('#settings-toggle')).toBeHidden();
 
-  const canvas = page.locator('canvas');
+  const canvas = page.locator('canvas').first();
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Canvas has no layout box');
   await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.4);
@@ -564,7 +567,7 @@ test('defaults terrain visibility to 5 km and streams bounded work at each LOD t
   test.setTimeout(270_000);
   const errors = captureErrors(page);
   await page.goto('/?smoke');
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
   await openSettings(page);
   // A fresh session (no saved settings) still gets the smoke harness's bounded budget, not the
   // 5 km product default - see the smokeMode override in src/main.ts.
@@ -730,7 +733,7 @@ test('suspends hidden audio and bounds the first visible simulation step', async
     };
   });
   await page.goto('/?smoke');
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
   await openSettings(page);
   const mute = page.locator('#mute');
   await mute.click();
@@ -797,7 +800,7 @@ test('captures painted clouds from one seed and viewpoint across the day', async
   await mkdir(artifactDir, { recursive: true });
   await page.addInitScript(() => localStorage.setItem('soaring.world-seed.v1', '5'));
   await page.goto('/?smoke');
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
 
   const initial = await page.evaluate(() => {
     document.querySelector('#intro')?.classList.add('hidden');
@@ -870,7 +873,7 @@ test('renders daytime, aurora, and midnight sky states', async ({ page }) => {
   const errors = captureErrors(page);
   await page.addInitScript(() => localStorage.setItem('soaring.world-seed.v1', '5'));
   await page.goto('/?smoke');
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
   await page.evaluate(() => {
     document.querySelector('#intro')?.classList.add('hidden');
     const toggle = document.querySelector<HTMLElement>('#settings-toggle');
@@ -926,7 +929,7 @@ test('shows sea-level water from altitude without page errors', async ({ page })
   test.setTimeout(270_000);
   const errors = captureErrors(page);
   await page.goto('/?smoke');
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
   await expect(page.locator('#settings-panel')).toBeHidden();
   const landmark = await page.evaluate(() => {
     window.__SOARING__.setTimeOfDay(0.5);

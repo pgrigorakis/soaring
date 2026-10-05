@@ -1,4 +1,4 @@
-// Top-down biome map for review: dominant-weighted colour blend from WorldModel.relief().
+// Top-down biome map for review: biome weights blended from WorldModel.sample(), with water drawn over them.
 // Run: node scripts/biome-map.mjs <seed> [--ref <git-ref>] [--tag <name>] [--size 120000] [--pixel 200] [--out <dir>]
 // Writes <dir>/biome-map-<tag>-<seed>.png (default dir test-results) through a BMP and macOS sips.
 import { build } from 'esbuild';
@@ -25,6 +25,7 @@ await build({ entryPoints: ['src/world.ts'], outfile, bundle: true, platform: 'n
   } }] });
 const { WorldModel } = await import(`../${outfile}`);
 const colours = { hills: [140, 199, 74], woodland: [87, 155, 59], moor: [147, 167, 108], highlands: [158, 165, 154], lakeland: [60, 140, 190] };
+const waterColour = [44, 82, 124];
 const world = new WorldModel(seed);
 const width = Math.round(size / pixel);
 const row = Math.ceil(width * 3 / 4) * 4;
@@ -35,9 +36,9 @@ for (let j = 0; j < width; j += 1) {
   for (let i = 0; i < width; i += 1) {
     const x = -size / 2 + (i + 0.5) * pixel;
     const z = -size / 2 + (j + 0.5) * pixel;
-    const { biome } = world.relief(x, z);
-    const rgb = [0, 0, 0];
-    for (const [name, colour] of Object.entries(colours)) for (let c = 0; c < 3; c += 1) rgb[c] += colour[c] * biome[name];
+    const { biome, water } = world.sample(x, z);
+    const rgb = water ? [...waterColour] : [0, 0, 0];
+    if (!water) for (const [name, colour] of Object.entries(colours)) for (let c = 0; c < 3; c += 1) rgb[c] += colour[c] * biome[name];
     // BMP rows run bottom-up; +z is drawn downward, matching a north-up map with -z at the top.
     const offset = 54 + (width - 1 - j) * row + i * 3;
     data[offset] = rgb[2]; data[offset + 1] = rgb[1]; data[offset + 2] = rgb[0];

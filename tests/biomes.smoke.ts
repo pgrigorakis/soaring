@@ -5,9 +5,12 @@ import { writeFile } from 'node:fs/promises';
 // adjacent meshes disagree on colour/height, pool water floats above dry ground, or rendering fails.
 // Refactor parity also checks exact samples, ground RGB, tree placement/tints, and mesh bytes.
 test('renders blended biome terrain with deterministic shared chunk edges', async ({ page }, testInfo) => {
-  test.setTimeout(60_000);
+  // CI loads this terrain beside a long water test, so a full cold load takes 40 to 60 s there.
+  test.setTimeout(120_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  // The evidence world, not a random one, so every run loads the same start.
+  await page.addInitScript(() => localStorage.setItem('soaring.world-seed.v1', '80231'));
   await page.goto('/?smoke');
   await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0);
   const evidence = await page.evaluate(async () => {
@@ -109,13 +112,13 @@ test('renders varied farmland with physical hedgerows', async ({ page }, testInf
     }
     const scene = new THREE.Scene();
     const terrain = new TerrainStream(scene, new WorldModel(80231));
-    // The old fixture is flooded by the continental field. This dry Hills parcel retains hedges.
-    terrain.update(-6240, -37680, Infinity);
+    // The 7 km continental field floods the old fixture. This dry Hills parcel keeps its hedges.
+    terrain.update(-9600, -39600, Infinity);
     let hedgeInstances = 0;
     scene.traverse((object: any) => { if (object.name === 'hedgerows') hedgeInstances += object.count; });
     terrain.dispose();
     window.__SOARING__.setTimeOfDay(.5);
-    window.__SOARING__.setViewpoint({ x: -6440, y: 220, z: -37180, lookX: -6240, lookY: 80, lookZ: -37980 });
+    window.__SOARING__.setViewpoint({ x: -9800, y: 220, z: -39100, lookX: -9600, lookY: 50, lookZ: -39900 });
     return { fields: fields.size, angles: angles.size, deterministic, hedgeInstances };
   });
   expect(evidence.deterministic).toBe(true);

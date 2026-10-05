@@ -25,7 +25,10 @@ describe('thermal markers within 3.5 km', () => {
   it('keeps the visible thermal field near ten columns', () => {
     const world = new WorldModel(448122);
     const points = [[0, 0], [5000, 5000], [-5000, 7000], [10000, -9000], [-10000, -5000], [14000, 13000]] as const;
-    const counts = points.map(([x, z]) => world.thermalsWithin(x, z, THERMAL_MARKER_RANGE).length);
+    // The eagle flies over land. With 7 km land masses, (10000, -9000) lies at sea, far from thermals.
+    const counts = points.filter(([x, z]) => !world.sample(x, z).water)
+      .map(([x, z]) => world.thermalsWithin(x, z, THERMAL_MARKER_RANGE).length);
+    expect(counts.length).toBe(5);
     const average = counts.reduce((sum, count) => sum + count, 0) / counts.length;
     expect(average).toBeGreaterThanOrEqual(7);
     expect(average).toBeLessThanOrEqual(16);

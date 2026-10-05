@@ -43,7 +43,7 @@ test('production bundle serves from its base path and renders without dev hooks 
 
   const response = await page.goto('/');
   expect(response?.ok()).toBe(true);
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
   await page.waitForFunction(() => (window.__productionPixelProbe?.colors ?? 0) > 8);
   const pixels = await page.evaluate(() => window.__productionPixelProbe);
   expect(pixels?.colors).toBeGreaterThan(8);

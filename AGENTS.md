@@ -8,6 +8,7 @@ This file holds the engine invariants established by #95 and points agents to re
 
 - Keep navigation and world placement in world coordinates; rebase only the rendered scene and camera, so long flights do not alter simulation positions or procedural terrain.
 - Derive terrain colour from world samples and coordinates, so adjacent chunks have matching shared edges.
+- Choose biomes with temperature cooled by the broad continental plate, not the final height, so ridges and summits do not cut biomes into specks.
 - Keep continental terrain height independent of biome profiles; sample water at common sea level and interpolate shore depth on the ground level's triangles.
 - Publish every ground level around one centre snapped to the coarsest spacing, and keep inward skirts on coarser holes, so level joins never expose gaps or cracks.
 - Derive fog coverage from displayed ground levels only, so pending water or tree tiles never hide land that is already drawn.

@@ -26,6 +26,7 @@ test('dusk warmth follows the sun, a rose belt faces it, and the low sun is wide
     api.setTimeOfDay(phase);
     document.querySelector('#intro')?.remove();
     document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
+    document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
     return api.snapshot().sunDirection;
   }, Math.acos(-sunElevation / 52) / (2 * Math.PI));
   const flat = Math.hypot(sun[0]!, sun[2]!);
