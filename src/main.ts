@@ -1265,6 +1265,7 @@ declare global {
       setViewpoint: (pose: { x: number; y: number; z: number; lookX: number; lookY: number; lookZ: number }) => void;
       clearViewpoint: () => void;
       setPuffCloudsVisible: (visible: boolean) => void;
+      setEagleVisible: (visible: boolean) => void;
       setCaptureClear: (on: boolean) => void;
       setCloudCoverage: (coverage: number | null) => void;
       setVisibility: (meters: number) => void;
@@ -1394,6 +1395,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
   setViewpoint: (pose) => { heldViewpoint = pose; },
   clearViewpoint: () => { heldViewpoint = null; },
   setPuffCloudsVisible: (visible: boolean) => puffClouds.setVisible(visible),
+  setEagleVisible: (visible: boolean) => { eagle.group.visible = visible; },
   setCaptureClear: (on: boolean) => { captureClear = on; },
   setCloudCoverage: (coverage: number | null) => { cloudCoverageOverride = coverage; },
   setVisibility: (meters: number) => {

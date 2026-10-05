@@ -16,8 +16,9 @@ describe('procedural eagle', () => {
     const size = bounds.getSize(new THREE.Vector3());
     expect(size.x / size.z).toBeGreaterThan(2);
     expect(Math.abs(bounds.min.x + bounds.max.x)).toBeLessThan(0.05);
-    expect(meshes.length).toBeLessThan(25);
-    expect(meshes.filter((mesh) => mesh.geometry.getAttribute('color'))).toHaveLength(3);
+    // One skinned draw call carries the body, both wings and the tail.
+    expect(meshes).toHaveLength(1);
+    expect(meshes[0]).toBeInstanceOf(THREE.SkinnedMesh);
 
     const geometries = meshes.map((mesh) => mesh.geometry);
     const state: EagleState = { x: 14, y: 70, z: -9, heading: 0.7, bank: -0.25, behavior: 'thermal-riding', flapping: false };
@@ -130,9 +131,9 @@ function pose(overrides: Partial<EagleState> = {}): EagleState {
 
 function wingWorldPositions(eagle: EagleView): { left: THREE.Vector3; right: THREE.Vector3 } {
   eagle.group.updateMatrixWorld(true);
-  const left = eagle.group.children.find((child) => child.position.x < -0.1);
-  const right = eagle.group.children.find((child) => child.position.x > 0.1);
-  if (!left || !right) throw new Error('wing groups missing');
+  const left = eagle.group.getObjectByName('left-wrist');
+  const right = eagle.group.getObjectByName('right-wrist');
+  if (!left || !right) throw new Error('wing bones missing');
   return {
     left: left.getWorldPosition(new THREE.Vector3()),
     right: right.getWorldPosition(new THREE.Vector3()),

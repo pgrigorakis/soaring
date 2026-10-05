@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { globalWind, type Wind } from './wind';
 import { CLOUD_DECK, CLOUD_HEIGHT_SCALE, CLOUD_HIGH_CRUISE } from './cloud-layer';
 import { DAY_SECONDS } from './sky-cycle';
+import { BONE, buildEagleMesh, FINGER_COUNT, sideBones } from './eagle-model';
 import { fbm, hash2, highlandWeight, type Shore, Thermal, WorldModel } from './world';
 
 export type EagleBehavior = 'gliding' | 'thermal-seeking' | 'thermal-riding' | 'ridge-soaring';
@@ -1080,110 +1081,22 @@ export class EagleNavigator {
   }
 }
 
-// All feathers in each surface share one vertex-colored draw call. Coordinates are
-// in the bird's frame: +z is the bill, +y is up, and the wings extend along x.
-type FeatherPoint = [number, number, number];
-
-class Plumage {
-  private readonly positions: number[] = [];
-  private readonly colors: number[] = [];
-
-  polygon(points: FeatherPoint[], color: number): void {
-    const rgb = new THREE.Color(color);
-    const outline = points.map(([x, , z]) => new THREE.Vector2(x, z));
-    for (const triangle of THREE.ShapeUtils.triangulateShape(outline, [])) {
-      for (const index of triangle) {
-        this.positions.push(...points[index]!);
-        this.colors.push(rgb.r, rgb.g, rgb.b);
-      }
-    }
-  }
-
-  mesh(): THREE.Mesh {
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(this.positions, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(this.colors, 3));
-    geometry.computeVertexNormals();
-    return new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.94, flatShading: true }));
-  }
-}
-
-function makeWing(sign: number): THREE.Mesh {
-  const feathers = new Plumage();
-  const point = (x: number, z: number, lift = 0): FeatherPoint => [sign * x, 0.08 + x * 0.065 + lift, z];
-
-  // Overlapping secondaries form the broad, rounded inner trailing edge.
-  for (let i = 0; i < 12; i += 1) {
-    const x = 0.5 + i * 0.39;
-    const back = -1.62 - Math.sin((i / 12) * Math.PI) * 0.45;
-    feathers.polygon([
-      point(x - 0.33, -0.28), point(x + 0.29, -0.39),
-      point(x + 0.36, back + 0.14), point(x + 0.18, back - 0.28), point(x - 0.04, back - 0.31),
-    ], i % 3 === 0 ? 0x483025 : 0x39271f);
-  }
-
-  // The long outer flight feathers spread into individually visible fingers.
-  for (let i = 0; i < 7; i += 1) {
-    const x = 3.85 + i * 0.26;
-    const tipX = 5.45 + i * 0.52;
-    const tipZ = -2.35 + i * 0.44;
-    feathers.polygon([
-      point(x - 0.3, -0.24), point(x + 0.24, -0.18),
-      point(tipX - 0.55, tipZ + 0.1), point(tipX, tipZ + 0.04),
-      point(tipX + 0.06, tipZ - 0.07), point(tipX - 0.55, tipZ - 0.11),
-      point(x - 0.2, -1.48),
-    ], i % 2 ? 0x35241e : 0x442c22);
-  }
-
-  // Broad inner wing, swept at the wrist; it covers the feather roots.
-  feathers.polygon([
-    point(0, 0.43, 0.09), point(1.35, 0.66, 0.13),
-    point(2.95, 0.58, 0.12), point(4.3, 0.15, 0.08),
-    point(5.22, -0.31), point(5.28, -1.05),
-    point(4.2, -1.37), point(2.4, -1.43), point(0.45, -0.97),
-  ], 0x402b21);
-
-  // Two rows of coverts follow the sweep. Contrasting edges stay legible
-  // against the landscape at the default trailing-camera distance.
-  for (let i = 0; i < 12; i += 1) {
-    const x = 0.48 + i * 0.43;
-    const sweep = 0.32 - x * 0.15;
-    feathers.polygon([
-      point(x - 0.38, sweep + 0.15, 0.15), point(x + 0.31, sweep + 0.03, 0.15),
-      point(x + 0.44, sweep - 0.4, 0.15), point(x + 0.12, sweep - 0.54, 0.15),
-    ], i % 3 === 0 ? 0x896039 : 0x70482d);
-    feathers.polygon([
-      point(x - 0.26, sweep - 0.39, 0.17), point(x + 0.29, sweep - 0.48, 0.17),
-      point(x + 0.44, sweep - 0.87, 0.17), point(x + 0.15, sweep - 0.96, 0.17),
-    ], i % 2 ? 0x533526 : 0x62412b);
-  }
-  return feathers.mesh();
-}
-
-function makeTail(): THREE.Mesh {
-  const tail = new Plumage();
-  for (let i = -4; i <= 4; i += 1) {
-    const x = i * 0.22;
-    const tipX = i * 0.31;
-    const end = -4.88 + Math.abs(i) * 0.11;
-    tail.polygon([
-      [x - 0.16, -0.1, -1.8], [x + 0.16, -0.1, -1.8],
-      [tipX + 0.2, -0.2, end + 0.15], [tipX + 0.08, -0.2, end],
-      [tipX - 0.12, -0.2, end], [tipX - 0.2, -0.2, end + 0.15],
-    ], i % 2 ? 0x594438 : 0x654c3b);
-    tail.polygon([
-      [tipX - 0.19, -0.18, end + 0.55], [tipX + 0.19, -0.18, end + 0.55],
-      [tipX + 0.19, -0.18, end + 0.15], [tipX + 0.08, -0.18, end],
-      [tipX - 0.12, -0.18, end], [tipX - 0.19, -0.18, end + 0.15],
-    ], 0x30251e);
-  }
-  return tail.mesh();
-}
+/** Wing and tail shape for each behavior. Flapping and a dive tuck blend over these. */
+type WingPose = { dihedral: number; sweep: number; splay: number; fan: number; tip: number; tailPitch: number };
+const WING_POSES: Record<EagleBehavior, WingPose> = {
+  // Golden eagles glide with a shallow dihedral and the wrists slightly back.
+  gliding: { dihedral: 0.13, sweep: 0.12, splay: 0.45, fan: 0.15, tip: 0.06, tailPitch: 0 },
+  'thermal-seeking': { dihedral: 0.12, sweep: 0.2, splay: 0.35, fan: 0.1, tip: 0.05, tailPitch: 0 },
+  // Circling: wings fully spread, fingers splayed, tail fanned and dipped.
+  'thermal-riding': { dihedral: 0.17, sweep: -0.03, splay: 1, fan: 0.9, tip: 0.1, tailPitch: -0.06 },
+  // Slope soaring in a stronger wind: wrists swept and tail closed.
+  'ridge-soaring': { dihedral: 0.11, sweep: 0.24, splay: 0.3, fan: 0.2, tip: 0.05, tailPitch: 0.02 },
+};
 
 export class EagleView {
   readonly group = new THREE.Group();
-  private readonly leftWing = new THREE.Group();
-  private readonly rightWing = new THREE.Group();
+  private readonly bones: THREE.Bone[];
+  private readonly pose: WingPose = { ...WING_POSES.gliding };
   private time = 0;
   private last: { x: number; y: number; z: number } | null = null;
   private climbAngle = 0;
@@ -1192,46 +1105,13 @@ export class EagleView {
   private tuck = 0;
 
   constructor() {
-    const dark = new THREE.MeshStandardMaterial({ color: 0x392820, roughness: 0.94 });
-    const warm = new THREE.MeshStandardMaterial({ color: 0x65412b, roughness: 0.94 });
-    const gold = new THREE.MeshStandardMaterial({ color: 0x946b3b, roughness: 0.9 });
-    const yellow = new THREE.MeshStandardMaterial({ color: 0xd4a34c, roughness: 0.85 });
-    const black = new THREE.MeshStandardMaterial({ color: 0x1e1b18, roughness: 0.8 });
-    const eye = new THREE.MeshStandardMaterial({ color: 0x17120e, roughness: 0.22 });
-
-    const oval = (material: THREE.Material, position: [number, number, number], scale: [number, number, number]): THREE.Mesh => {
-      const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), material);
-      mesh.position.set(...position);
-      mesh.scale.set(...scale);
-      this.group.add(mesh);
-      return mesh;
-    };
-    oval(dark, [0, 0, 0], [1.04, 0.7, 2.23]);
-    oval(warm, [0, -0.12, 1.25], [0.82, 0.67, 1.17]);
-    // Golden hackles drape over the shoulders and back of the neck.
-    oval(gold, [0, 0.32, 2.0], [0.65, 0.57, 1.02]);
-    oval(dark, [0, 0.33, 2.84], [0.55, 0.52, 0.64]);
-    oval(yellow, [0, 0.17, 3.37], [0.31, 0.24, 0.26]);
-    const bill = oval(black, [0, 0.12, 3.61], [0.23, 0.19, 0.35]);
-    bill.rotation.x = -0.32;
-    for (const side of [-1, 1]) {
-      oval(eye, [side * 0.49, 0.48, 3.03], [0.075, 0.075, 0.075]);
-      oval(yellow, [side * 0.37, -0.65, -1.08], [0.22, 0.37, 0.24]);
-      for (let toe = -1; toe <= 1; toe += 1) {
-        const claw = oval(black, [side * 0.37 + toe * 0.16, -0.97, -0.83], [0.07, 0.09, 0.28]);
-        claw.rotation.x = -0.25;
-      }
-    }
-
-    this.leftWing.position.set(-0.8, 0.12, 0.4);
-    this.rightWing.position.set(0.8, 0.12, 0.4);
-    this.leftWing.add(makeWing(-1));
-    this.rightWing.add(makeWing(1));
-    this.group.add(this.leftWing, this.rightWing, makeTail());
+    const { mesh, bones } = buildEagleMesh();
+    mesh.castShadow = true;
+    // The bones move the wings outside the rest-pose bounds.
+    mesh.frustumCulled = false;
+    this.bones = bones;
+    this.group.add(mesh);
     this.group.scale.setScalar(1.15);
-    this.group.traverse((object) => {
-      if (object instanceof THREE.Mesh) object.castShadow = true;
-    });
   }
 
   update(state: EagleState, deltaSeconds: number): void {
@@ -1262,15 +1142,41 @@ export class EagleView {
     // Positive X rotation lowers the bill. A climb lifts it a little; a dive drops it a lot.
     this.group.rotation.x = clamp(-this.climbAngle * 0.8, -0.18, 0.55) + this.tuck * 0.25;
     this.group.rotation.z = state.bank;
-    // Fast downstroke, slower swept upstroke; a gliding wing holds a shallow dihedral with a slight flex.
+
+    // The behavior's wing shape eases in over about a second.
+    const pose = this.pose;
+    const target = WING_POSES[state.behavior];
+    const ease = 1 - Math.exp(-dt * 1.4);
+    for (const key of Object.keys(target) as (keyof WingPose)[]) pose[key] += (target[key] - pose[key]) * ease;
+    const flap = this.flapAmount;
+    const glide = 1 - flap;
+    const tuck = this.tuck;
+    // Fast downstroke, slower swept upstroke; a gliding wing holds its dihedral with a slight flex.
     const stroke = Math.sin(this.flapPhase) + 0.22 * Math.sin(this.flapPhase * 2);
-    const glide = 0.06 + Math.sin(this.time * 1.15) * 0.02 + Math.sin(this.time * 3.1) * Math.sin(this.time * 1.7) * 0.012;
-    const lift = this.flapAmount * stroke * 0.5 + (1 - this.flapAmount) * glide - this.tuck * 0.1;
-    const sweep = this.flapAmount * Math.max(0, Math.cos(this.flapPhase)) * 0.3 + this.tuck * 0.75;
-    this.leftWing.rotation.z = -lift;
-    this.rightWing.rotation.z = lift;
-    this.leftWing.rotation.y = -sweep;
-    this.rightWing.rotation.y = sweep;
-    this.leftWing.scale.x = this.rightWing.scale.x = 1 - this.tuck * 0.3;
+    const gust = Math.sin(this.time * 1.15) * 0.02 + Math.sin(this.time * 3.1) * Math.sin(this.time * 1.7) * 0.012;
+    const lift = flap * stroke * 0.5 + glide * (pose.dihedral + gust) - tuck * 0.1;
+    // The hand lags the beat; the upstroke folds it back at the wrist.
+    const hand = pose.tip + Math.sin(this.time * 1.7) * 0.015 + flap * 0.38 * Math.sin(this.flapPhase - 0.9);
+    const fold = flap * Math.max(0, Math.cos(this.flapPhase));
+    const splay = (glide * pose.splay + flap * 0.75) * (1 - tuck);
+    const bones = this.bones;
+    for (const sign of [-1, 1]) {
+      const side = sideBones(sign);
+      // Positive z-rotation raises the right (+x) wing; the left mirrors it.
+      bones[side.shoulder]!.rotation.set(0, sign * (glide * pose.sweep * 0.25 + tuck * 0.35), sign * lift);
+      bones[side.elbow]!.rotation.set(0, -sign * fold * 0.3, sign * 0.02);
+      bones[side.wrist]!.rotation.set(0, sign * (glide * pose.sweep * 0.7 + fold * 0.85 + tuck * 0.9), sign * hand);
+      for (let i = 0; i < FINGER_COUNT; i += 1) {
+        // Leading fingers swing forward, trailing ones back; outer ones curl up most.
+        const spread = (i - 3) * 0.075 * (splay - 0.5) - fold * 0.04 * (i - 3);
+        const flicker = Math.sin(this.time * 7 + i * 1.3) * 0.012 * glide;
+        bones[side.finger(i)]!.rotation.set(0, sign * spread, sign * (0.03 * (6 - i) * splay + flicker));
+      }
+    }
+    bones[BONE.tail]!.rotation.set(pose.tailPitch, 0, state.bank * 0.35);
+    bones[BONE.tailL]!.rotation.y = pose.fan * 0.42 * (1 - tuck);
+    bones[BONE.tailR]!.rotation.y = -pose.fan * 0.42 * (1 - tuck);
+    // The head turns into the bank.
+    bones[BONE.head]!.rotation.set(0, -state.bank * 0.45, 0);
   }
 }

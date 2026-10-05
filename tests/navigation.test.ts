@@ -1,4 +1,3 @@
-import { Group } from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, GLIDE_SINK_RATE, normalizeFlightHeight,
@@ -154,7 +153,7 @@ describe('autonomous eagle navigation', () => {
     const view = new EagleView();
     const world = new WorldModel(448122);
     const state = new EagleNavigator(world, world.scenicStart(2)).state;
-    const wing = view.group.children.find((child) => child instanceof Group && child.position.x < 0);
+    const wing = view.group.getObjectByName('left-shoulder');
     expect(wing).toBeDefined();
     // Flaps ease in and out, so sample a second of each.
     const stroke = (flapping: boolean) => {
@@ -169,7 +168,7 @@ describe('autonomous eagle navigation', () => {
     expect(stroke(true)).toBeGreaterThan(0.4);
     stroke(false);
     // A gliding wing holds only its shallow dihedral.
-    expect(stroke(false)).toBeLessThan(0.1);
+    expect(stroke(false)).toBeLessThan(0.2);
   });
 
   it('circles a thermal with varying radius and bank, climbing without flapping',
