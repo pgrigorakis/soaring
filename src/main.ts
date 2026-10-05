@@ -922,6 +922,7 @@ const sunDir = new THREE.Vector3();
 const moonDir = new THREE.Vector3();
 const puffSkyLight = new THREE.Color();
 const puffNightLight = new THREE.Color(0.16, 0.2, 0.3);
+const puffKeyLight = new THREE.Color();
 const skyAim = new THREE.Vector3();
 const keyDir = new THREE.Vector3();
 const veil = document.querySelector<HTMLElement>('#veil')!;
@@ -1003,6 +1004,7 @@ function applyDaylight(body: Daylight, delta: number): void {
   terrain.setWaterLighting(keyDir, body.sun.y, body.moon.y, body.moonShine, dominantSun, delta, renderOrigin);
   keyLight.color.setRGB(keyColor.r, keyColor.g, keyColor.b);
   keyLight.intensity = keyIntensity;
+  puffKeyLight.setRGB(keyColor.r, keyColor.g, keyColor.b).multiplyScalar(keyIntensity / Math.PI);
   hemisphere.color.setRGB(0.16 + day * 0.68, 0.2 + day * 0.68, 0.36 + day * 0.5);
   hemisphere.groundColor.setRGB(0.08 + day * 0.27, 0.09 + day * 0.3, 0.08 + day * 0.2);
   hemisphere.intensity = 0.65 + day * 1.55;
@@ -1160,8 +1162,9 @@ function frame(now: number): void {
   minimap.update(state.x, state.z, state.heading, rawDelta);
   const body = currentDaylight();
   applyDaylight(body, rawDelta);
-  puffClouds.update(state, navigator.wind, reviewFlightPaused ? 0 : delta, cameraPosition, fogGoal, puffSkyLight,
-    cloudSea.snapshot().bodies, cloudSea.fogUniforms.whiteout.value);
+  puffClouds.update(state, navigator.wind, reviewFlightPaused ? 0 : delta, cameraPosition, { horizon: fogGoal,
+    skyLight: puffSkyLight, keyDir, keyLight: puffKeyLight, bodies: cloudSea.snapshot().bodies,
+    whiteout: cloudSea.fogUniforms.whiteout.value });
   thermalMarker.setWhiteout(cloudSea.fogUniforms.whiteout.value);
 
   keyLight.target.position.set(cameraPosition.x, world.sample(cameraPosition.x, cameraPosition.z).height, cameraPosition.z);
@@ -1206,7 +1209,7 @@ function frame(now: number): void {
       `quality step ${qualityStep}/3 · pixel ${renderer.getPixelRatio().toFixed(2)}`,
       `render       ${renderer.domElement.width} × ${renderer.domElement.height} · ${renderer.domElement.width * renderer.domElement.height} px`,
       `draw calls   ${sceneDrawCalls}`,
-      `puff clouds  ${puffClouds.count} instances · 1 draw call`,
+      `puff clouds  ${puffClouds.count} clouds · ${puffClouds.spriteCount} sprites · 1 draw call`,
       `geometries   ${renderer.info.memory.geometries}`,
       `behavior     ${state.behavior}${state.flapping ? ' (flapping)' : ''}`,
       `wind         ${navigator.wind.x.toFixed(1)}, ${navigator.wind.z.toFixed(1)} m/s (${navigator.wind.speed.toFixed(1)} m/s)`,
