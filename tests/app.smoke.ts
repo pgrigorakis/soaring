@@ -514,7 +514,9 @@ test('fullscreen toggle and F keep the idle scene clear while settings and diagn
 });
 
 test('defaults terrain visibility to 8 km and streams bounded work at each LOD tier out to the 8 km max', async ({ page }) => {
-  test.setTimeout(270_000);
+  // On CI's software renderer the far tier took more than 4 min to start at 8 km (under 3 min at 5 km): far water
+  // tiles wait for the larger coarsest ground level, which shares the build budget with the tiles.
+  test.setTimeout(540_000);
   const errors = captureErrors(page);
   await page.goto('/?smoke');
   await expect(page.locator('canvas').first()).toBeVisible();
@@ -542,7 +544,9 @@ test('defaults terrain visibility to 8 km and streams bounded work at each LOD t
   // real per-frame time budget (4 ms/frame) can take a while to fully drain hundreds of
   // chunks, so this only waits for every tier to start populating - bounded progress, not
   // completion.
-  await page.waitForFunction(() => window.__SOARING__.snapshot().tiers.far > 0, undefined, { timeout: 240_000 });
+  const farStart = Date.now();
+  await page.waitForFunction(() => window.__SOARING__.snapshot().tiers.far > 0, undefined, { timeout: 480_000 });
+  console.log(`far tier started after ${((Date.now() - farStart) / 1000).toFixed(1)} s`);
   const snapshot = await page.evaluate(() => window.__SOARING__.snapshot());
   expect(snapshot.requestedDistance).toBe(8000);
   expect(snapshot.tiers.near).toBeGreaterThan(0);
