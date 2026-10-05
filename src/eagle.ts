@@ -46,6 +46,19 @@ const CRUISE_SPEED = 32;
 const MAX_GLIDE_SECONDS = 200;
 const MAX_TURN_RATE = 0.48;
 
+/** Roll rate limit, so entries and exits bank in rather than snap. */
+const BANK_RATE = 45 * Math.PI / 180;
+/** A thermal column leans downwind: the circle drifts with this share of the wind. */
+const THERMAL_WIND_DRIFT = 0.7;
+/**
+ * Arrow-key nudge. A turn bends the course; a turn of `adoptMin` or more becomes the compass
+ * bearing for `adoptSeconds`. A smaller bend holds for `holdSeconds`, then eases back.
+ */
+export const NUDGE = { turnRate: 30 * Math.PI / 180, maxBias: 110 * Math.PI / 180, holdSeconds: 2, decaySeconds: 3,
+  adoptMin: 20 * Math.PI / 180, adoptSeconds: 180, leaveSeconds: 0.8, diveSink: 4 } as const;
+export type NudgeInput = { turn: number; climb: number };
+export type NudgeStatus = { turn: number; climb: number; bias: number; resumeIn: number; adopted: number };
+
 const DEGREE = Math.PI / 180;
 /** Settled ridge model for issue #60; see the PR description for the sources behind each number. */
 export const RIDGE = {
@@ -214,6 +227,15 @@ export class EagleNavigator {
   private opening: 'abeam' | 'climb' | 'hold' | 'dive' | null = null;
   private openingSince = 0;
   private openingBearing = 0;
+  private airspeed = CRUISE_SPEED;
+  private orbitSign: 1 | -1 = 1;
+  private circleSpeed = THERMAL_CIRCLE_SPEED;
+  private circleCentre = { x: 0, z: 0 };
+  private nudgeInput: NudgeInput = { turn: 0, climb: 0 };
+  private headingBias = 0;
+  private nudgeIdle = Infinity;
+  private turnHeld = 0;
+  private nudgedBearing: { bearing: number; until: number } | null = null;
 
   constructor(world: WorldModel, start: { x: number; z: number; heading: number }, heightRange = DEFAULT_FLIGHT_HEIGHT, openingBearing?: number) {
     this.world = world;
@@ -250,6 +272,11 @@ export class EagleNavigator {
     return this.thermal;
   }
 
+  /** The centre of the circle being flown. It starts tangent to the entry and eases onto the thermal. */
+  get orbitCentre(): { x: number; z: number } | null {
+    return this.state.behavior === 'thermal-riding' ? { ...this.circleCentre } : null;
+  }
+
   /** The global wind at this navigator's simulation time. */
   get wind(): Wind {
     return globalWind(this.world.seed, this.totalTime);
@@ -258,6 +285,44 @@ export class EagleNavigator {
   /** Predicted orographic climb of the face being watched or flown, in m/s. */
   get ridgeLift(): number {
     return this.liftRate;
+  }
+
+  setNudge(input: NudgeInput): void {
+    this.nudgeInput = input;
+  }
+
+  get nudgeStatus(): NudgeStatus {
+    const resumeIn = this.nudgeIdle === Infinity ? 0 : Math.max(0, NUDGE.holdSeconds + NUDGE.decaySeconds - this.nudgeIdle);
+    return { ...this.nudgeInput, bias: this.headingBias, resumeIn: Math.abs(this.headingBias) > 0.02 ? resumeIn : 0,
+      adopted: this.nudgedBearing ? Math.max(0, this.nudgedBearing.until - this.totalTime) : 0 };
+  }
+
+  /** Arrow keys bias the autopilot; terrain safety and the height floor still win. */
+  private applyNudge(dt: number): void {
+    const { turn, climb } = this.nudgeInput;
+    const active = turn !== 0 || climb !== 0;
+    const wasTurning = this.turnHeld > 0;
+    this.turnHeld = turn !== 0 ? this.turnHeld + dt : 0;
+    if (active) this.nudgeIdle = 0;
+    else this.nudgeIdle += dt;
+    if (turn !== 0) {
+      this.headingBias = clamp(this.headingBias + turn * NUDGE.turnRate * dt, -NUDGE.maxBias, NUDGE.maxBias);
+      // Holding a turn while circling or beating a ridge leaves it toward the new side.
+      if ((this.state.behavior === 'thermal-riding' || this.state.behavior === 'ridge-soaring') && this.turnHeld >= NUDGE.leaveSeconds) {
+        const heading = this.state.heading + turn * 0.6;
+        this.leaveRidge({ x: this.state.x + Math.sin(heading) * 1500, z: this.state.z + Math.cos(heading) * 1500 });
+        this.headingBias = 0;
+      }
+      if (this.state.behavior === 'thermal-seeking') this.enterGliding();
+    } else if (wasTurning && Math.abs(this.headingBias) >= NUDGE.adoptMin) {
+      // The compass follows the new heading for three minutes, then drifts home.
+      this.nudgedBearing = { bearing: this.state.heading, until: this.totalTime + NUDGE.adoptSeconds };
+      this.headingBias = 0;
+      this.target = this.scenicCandidate();
+    } else if (this.nudgeIdle > NUDGE.holdSeconds) {
+      this.headingBias *= Math.exp(-dt / NUDGE.decaySeconds * 2);
+    }
+    if (this.nudgedBearing && this.totalTime > this.nudgedBearing.until) this.nudgedBearing = null;
   }
 
   setFlightHeightRange(range: FlightHeightRange): void {
@@ -272,6 +337,10 @@ export class EagleNavigator {
     this.behaviorTime += dt;
     this.totalTime += dt;
     this.updateCloudSchedule(dt);
+    this.applyNudge(dt);
+    if (this.state.behavior !== 'thermal-riding') {
+      this.airspeed += (CRUISE_SPEED - this.airspeed) * (1 - Math.exp(-dt / 4));
+    }
     this.groundSampleAge += dt;
     if (this.groundSampleAge >= 0.5) {
       this.groundEnvelope = this.highestGround(this.state.x, this.state.z);
@@ -339,12 +408,13 @@ export class EagleNavigator {
       this.opening = null;
       this.cloudOrigin = this.totalTime;
     }
-    const high = this.opening ? this.opening === 'climb' || this.opening === 'hold'
+    let high = this.opening ? this.opening === 'climb' || this.opening === 'hold'
       : (this.totalTime - this.cloudOrigin) % (300 * timing) > 200 * timing;
     this.cloudBlend += (Number(high) - this.cloudBlend) * (1 - Math.exp(-dt * 0.5));
     if (this.opening) {
       // Fly abeam for five reference seconds, then turn toward the sunrise.
-      const bearing = this.openingBearing + (this.totalTime < 5 * timing ? Math.PI / 2 : 0);
+      // A course the viewer chose outranks the scripted sunrise turn.
+      const bearing = this.nudgedBearing?.bearing ?? this.openingBearing + (this.totalTime < 5 * timing ? Math.PI / 2 : 0);
       this.target = { x: this.state.x + Math.sin(bearing) * 2000,
         z: this.state.z + Math.cos(bearing) * 2000 };
     }
@@ -420,14 +490,14 @@ export class EagleNavigator {
   }
 
   private flyTowardTarget(dt: number, ground: number): void {
-    const desiredHeading = Math.atan2(this.target.x - this.state.x, this.target.z - this.state.z);
+    const desiredHeading = wrapAngle(Math.atan2(this.target.x - this.state.x, this.target.z - this.state.z) + this.headingBias);
     // Height is independent of biome selection now. Check every flight route.
     this.aheadAge += dt;
     if (this.aheadAge >= CLIMB_AHEAD.seconds) {
       this.aheadAge = 0;
       this.planAhead(desiredHeading);
     }
-    const headingError = wrapAngle((this.detour ?? desiredHeading) - this.state.heading);
+    const headingError = wrapAngle((this.detour !== null && Math.abs(this.headingBias) < 0.02 ? this.detour : desiredHeading) - this.state.heading);
     this.steer(headingError, dt);
 
     const aheadX = Math.sin(this.state.heading);
@@ -500,8 +570,9 @@ export class EagleNavigator {
 
   private steer(headingError: number, dt: number): void {
     this.state.heading = wrapAngle(this.state.heading + clamp(headingError, -MAX_TURN_RATE, MAX_TURN_RATE) * dt);
-    this.state.bank += (clamp(-headingError * 0.78, -0.48, 0.48) - this.state.bank) * Math.min(1, dt * 2.2);
-    this.moveAboveTerrain(Math.sin(this.state.heading) * CRUISE_SPEED * dt, Math.cos(this.state.heading) * CRUISE_SPEED * dt);
+    const bankStep = (clamp(-headingError * 0.78, -0.48, 0.48) - this.state.bank) * Math.min(1, dt * 2.2);
+    this.state.bank += clamp(bankStep, -BANK_RATE * dt, BANK_RATE * dt);
+    this.moveAboveTerrain(Math.sin(this.state.heading) * this.airspeed * dt, Math.cos(this.state.heading) * this.airspeed * dt);
   }
 
   /** Slope and upslope angle on an 80 m baseline. The angle uses the wind convention: 0 is +x, toward +z. */
@@ -781,6 +852,15 @@ export class EagleNavigator {
       this.state.flapping = true;
       this.flapTimer = FLAP_BURST_SECONDS;
     }
+    const climbNudge = this.nudgeInput.climb;
+    if (climbNudge > 0 && !this.state.flapping && clearance < this.heightRange.max) {
+      this.state.flapping = true;
+      this.flapTimer = FLAP_BURST_SECONDS;
+    }
+    if (climbNudge < 0 && !this.state.flapping && clearance > floorTrigger + 10 && aheadClearance > floorTrigger + 10) {
+      this.state.y -= NUDGE.diveSink * dt;
+      this.airspeed = Math.min(CRUISE_SPEED * 1.25, this.airspeed + 2 * dt);
+    }
     if (this.state.flapping) {
       this.state.y += FLAP_CLIMB_RATE * dt;
       this.flapTimer -= dt;
@@ -801,6 +881,22 @@ export class EagleNavigator {
     ) * (THERMAL_RADIUS_RANGE.max - THERMAL_RADIUS_RANGE.min);
     this.circleDrift = 0;
     this.rideLift = 1;
+    // Roll into a circle tangent to the current heading, on the thermal's side, at the arrival speed.
+    // The circle then slides onto the core: the bird centres the lift instead of snapping to it.
+    const side = inwardThermalBankSign(this.state.heading, this.state.x, this.state.z, this.thermal.x, this.thermal.z) < 0 ? 1 : -1;
+    const radius = this.orbitRadius;
+    this.circleCentre = { x: this.state.x + Math.cos(this.state.heading) * side * radius,
+      z: this.state.z - Math.sin(this.state.heading) * side * radius };
+    this.circleAngle = Math.atan2(this.state.z - this.circleCentre.z, this.state.x - this.circleCentre.x);
+    const plus = Math.abs(wrapAngle(-this.circleAngle - this.state.heading));
+    const minus = Math.abs(wrapAngle(Math.PI - this.circleAngle - this.state.heading));
+    this.orbitSign = plus <= minus ? 1 : -1;
+    this.circleSpeed = this.airspeed;
+  }
+
+  /** The circle radius breathes a little around its eased target. */
+  private get orbitRadius(): number {
+    return clamp(this.circleRadius + Math.sin(this.totalTime * 0.35) * 2.5, THERMAL_RADIUS_RANGE.min, THERMAL_RADIUS_RANGE.max);
   }
 
   private updateCircle(dt: number, ground: number): void {
@@ -813,18 +909,36 @@ export class EagleNavigator {
     this.rideLift = Math.max(0, this.rideLift - dt * (0.008 - 0.0055 * strengthT));
 
     this.circleDrift += dt * 0.07;
+    const wind = this.wind;
+    const driftX = wind.x * THERMAL_WIND_DRIFT * dt;
+    const driftZ = wind.z * THERMAL_WIND_DRIFT * dt;
+    this.thermalCore.x += driftX;
+    this.thermalCore.z += driftZ;
+    // The circle drifts with the air too, so centring closes only the entry offset.
+    this.circleCentre.x += driftX;
+    this.circleCentre.z += driftZ;
+    this.circleSpeed += (THERMAL_CIRCLE_SPEED - this.circleSpeed) * (1 - Math.exp(-dt / 3));
+    this.airspeed = this.circleSpeed;
     const driftRadius = 6 + (1 - strengthT) * 4;
     this.thermal.x = this.thermalCore.x + Math.cos(this.circleDrift) * driftRadius;
     this.thermal.z = this.thermalCore.z + Math.sin(this.circleDrift) * driftRadius;
 
     this.circleRadius += (this.targetRadius - this.circleRadius) * Math.min(1, dt * 0.35);
-    const radius = clamp(this.circleRadius + Math.sin(this.totalTime * 0.35) * 2.5, THERMAL_RADIUS_RANGE.min, THERMAL_RADIUS_RANGE.max);
-    this.circleAngle += dt * (THERMAL_CIRCLE_SPEED / radius);
-    const desiredX = this.thermal.x + Math.cos(this.circleAngle) * radius;
-    const desiredZ = this.thermal.z + Math.sin(this.circleAngle) * radius;
-    const follow = Math.min(1, dt * 1.6);
-    this.moveAboveTerrain((desiredX - this.state.x) * follow, (desiredZ - this.state.z) * follow);
-    const tangent = wrapAngle(-this.circleAngle);
+    const radius = this.orbitRadius;
+    const centre = this.circleCentre;
+    const core = 1 - Math.exp(-dt / 8);
+    centre.x += (this.thermal.x - centre.x) * core;
+    centre.z += (this.thermal.z - centre.z) * core;
+    // Advance from the bird's own bearing, so moving the circle bends the path instead of adding speed.
+    this.circleAngle = Math.atan2(this.state.z - centre.z, this.state.x - centre.x)
+      + dt * this.orbitSign * (this.circleSpeed / radius);
+    const desiredX = centre.x + Math.cos(this.circleAngle) * radius;
+    const desiredZ = centre.z + Math.sin(this.circleAngle) * radius;
+    // A blocked step must catch up at flight speed, never in one jump.
+    const step = Math.hypot(desiredX - this.state.x, desiredZ - this.state.z);
+    const limit = Math.min(1, this.circleSpeed * 1.3 * dt / Math.max(step, 1e-6));
+    this.moveAboveTerrain((desiredX - this.state.x) * limit, (desiredZ - this.state.z) * limit);
+    const tangent = wrapAngle(this.orbitSign > 0 ? -this.circleAngle : Math.PI - this.circleAngle);
     this.state.heading = wrapAngle(this.state.heading + wrapAngle(tangent - this.state.heading) * Math.min(1, dt * 2.4));
 
     const span = THERMAL_RADIUS_RANGE.max - THERMAL_RADIUS_RANGE.min;
@@ -832,10 +946,11 @@ export class EagleNavigator {
     const bankMag = THERMAL_BANK_RANGE.max - ((radius - THERMAL_RADIUS_RANGE.min) / span) * bankSpan
       + Math.sin(this.totalTime * 0.5) * ((1.5 * Math.PI) / 180);
     const bankSign = inwardThermalBankSign(
-      this.state.heading, this.state.x, this.state.z, this.thermal.x, this.thermal.z,
+      this.state.heading, this.state.x, this.state.z, centre.x, centre.z,
     );
     const targetBank = bankSign * clamp(bankMag, THERMAL_BANK_RANGE.min, THERMAL_BANK_RANGE.max);
-    this.state.bank += (targetBank - this.state.bank) * Math.min(1, dt * 1.4);
+    const bankStep = (targetBank - this.state.bank) * Math.min(1, dt * 1.4);
+    this.state.bank += clamp(bankStep, -BANK_RATE * dt, BANK_RATE * dt);
 
     // A falling reference must not teleport the bird down when crossing a crest.
     this.state.y += Math.min(climbRate * dt, Math.max(0, this.flightGround + this.heightRange.max - this.state.y));
@@ -850,7 +965,7 @@ export class EagleNavigator {
   private seekThermal(): void {
     // Two 1.8 km cells give the eagle a 3.6 km thermal search reach.
     const thermals = this.world.nearbyThermals(this.state.x, this.state.z, 2);
-    const bearing = this.seedAngle + fbm1d(this.totalTime / 300, this.world.seed + COMPASS_SEED) * Math.PI / 2;
+    const bearing = this.compassBearing;
     const aheadX = Math.sin(bearing);
     const aheadZ = Math.cos(bearing);
     thermals.sort((a, b) => {
@@ -893,6 +1008,7 @@ export class EagleNavigator {
   }
 
   private get compassBearing(): number {
+    if (this.nudgedBearing) return this.nudgedBearing.bearing;
     return this.seedAngle + fbm1d(this.totalTime / 300, this.world.seed + COMPASS_SEED) * Math.PI / 2;
   }
 
@@ -1069,6 +1185,11 @@ export class EagleView {
   private readonly leftWing = new THREE.Group();
   private readonly rightWing = new THREE.Group();
   private time = 0;
+  private last: { x: number; y: number; z: number } | null = null;
+  private climbAngle = 0;
+  private flapAmount = 0;
+  private flapPhase = 0;
+  private tuck = 0;
 
   constructor() {
     const dark = new THREE.MeshStandardMaterial({ color: 0x392820, roughness: 0.94 });
@@ -1115,12 +1236,41 @@ export class EagleView {
 
   update(state: EagleState, deltaSeconds: number): void {
     this.time += deltaSeconds;
+    this.updateBody(state, deltaSeconds);
+  }
+
+  /**
+   * Body language from the flight path. Pitch follows the climb angle, flaps ease in and out
+   * at about 2.7 Hz with a swept upstroke, and a fast descent tucks the wings.
+   */
+  private updateBody(state: EagleState, dt: number): void {
+    const last = this.last ?? state;
+    const ground = dt > 0 ? Math.hypot(state.x - last.x, state.z - last.z) / dt : 0;
+    // A review jump moves the bird far in one frame. It is not a flight path.
+    if (dt > 0 && ground < 200) {
+      const vertical = (state.y - last.y) / dt;
+      const angle = Math.atan2(vertical, Math.max(ground, 8));
+      this.climbAngle += (angle - this.climbAngle) * (1 - Math.exp(-dt / 0.6));
+      this.tuck += ((vertical < -6 ? clamp((-vertical - 6) / 6, 0, 1) : 0) - this.tuck) * (1 - Math.exp(-dt / 0.8));
+    }
+    this.last = { x: state.x, y: state.y, z: state.z };
+    this.flapAmount += ((state.flapping ? 1 : 0) - this.flapAmount) * (1 - Math.exp(-dt / 0.18));
+    this.flapPhase += dt * Math.PI * 2 * (2.7 * this.flapAmount + 0.18 * (1 - this.flapAmount));
     this.group.position.set(state.x, state.y, state.z);
     this.group.rotation.order = 'YXZ';
     this.group.rotation.y = state.heading + (state.crab ?? 0);
+    // Positive X rotation lowers the bill. A climb lifts it a little; a dive drops it a lot.
+    this.group.rotation.x = clamp(-this.climbAngle * 0.8, -0.18, 0.55) + this.tuck * 0.25;
     this.group.rotation.z = state.bank;
-    const flap = state.flapping ? Math.sin(this.time * 8) * 0.28 : Math.sin(this.time * 1.15) * 0.025;
-    this.leftWing.rotation.z = -flap;
-    this.rightWing.rotation.z = flap;
+    // Fast downstroke, slower swept upstroke; a gliding wing holds a shallow dihedral with a slight flex.
+    const stroke = Math.sin(this.flapPhase) + 0.22 * Math.sin(this.flapPhase * 2);
+    const glide = 0.06 + Math.sin(this.time * 1.15) * 0.02 + Math.sin(this.time * 3.1) * Math.sin(this.time * 1.7) * 0.012;
+    const lift = this.flapAmount * stroke * 0.5 + (1 - this.flapAmount) * glide - this.tuck * 0.1;
+    const sweep = this.flapAmount * Math.max(0, Math.cos(this.flapPhase)) * 0.3 + this.tuck * 0.75;
+    this.leftWing.rotation.z = -lift;
+    this.rightWing.rotation.z = lift;
+    this.leftWing.rotation.y = -sweep;
+    this.rightWing.rotation.y = sweep;
+    this.leftWing.scale.x = this.rightWing.scale.x = 1 - this.tuck * 0.3;
   }
 }

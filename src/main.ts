@@ -4,7 +4,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { milkyWayComposite, milkyWayDeclarations, milkyWayFunctions, milkyWayUniforms } from './milky-way';
 import './style.css';
 import { Soundscape } from './audio';
-import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS, normalizeFlightHeight } from './eagle';
+import { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, EagleView, FLIGHT_HEIGHT_LIMITS, normalizeFlightHeight, type NudgeStatus } from './eagle';
 import { DEFAULT_VISIBILITY, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
 import { THERMAL_MARKER_RANGE, ThermalMarker } from './thermal-marker';
 import { CloudSea, bindCloudFog } from './cloud-sea';
@@ -576,7 +576,8 @@ renderer.domElement.addEventListener('wheel', (event) => {
 
 app.insertAdjacentHTML('beforeend', `
   <div id="veil"></div>
-  <div class="intro" id="intro">drag to look around · press D for flight diagnostics</div>
+  <div class="intro" id="intro">drag to look around · arrow keys nudge the eagle · press D for flight diagnostics</div>
+  <div class="nudge-hint" id="nudge-hint" aria-live="polite"><span class="nudge-keys"><i data-key="left">←</i><i data-key="up">↑</i><i data-key="down">↓</i><i data-key="right">→</i></span><span class="nudge-text"></span></div>
   <div class="controls visible" id="controls">
     <section class="settings-panel" id="settings-panel" aria-label="Settings">
       <h1>Soaring</h1>
@@ -1041,9 +1042,40 @@ function currentDaylight(): Daylight {
   return daylight(skySeconds);
 }
 
+// Arrow keys nudge the autopilot. Focused form controls keep their own arrow keys.
+const heldArrows = new Set<string>();
+const ARROWS: Record<string, string> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
+window.addEventListener('keydown', (event) => {
+  if (!ARROWS[event.key] || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.target instanceof HTMLElement && event.target.closest('input, select, textarea, button')) return;
+  event.preventDefault();
+  heldArrows.add(ARROWS[event.key]!);
+});
+window.addEventListener('keyup', (event) => { if (ARROWS[event.key]) heldArrows.delete(ARROWS[event.key]!); });
+window.addEventListener('blur', () => heldArrows.clear());
+const nudgeHint = document.querySelector<HTMLElement>('#nudge-hint')!;
+const nudgeText = nudgeHint.querySelector<HTMLElement>('.nudge-text')!;
+let nudgeHintText = '';
+function updateNudgeHint(): void {
+  const status = navigator.nudgeStatus;
+  for (const key of nudgeHint.querySelectorAll<HTMLElement>('[data-key]')) key.classList.toggle('held', heldArrows.has(key.dataset.key!));
+  let text = '';
+  if (status.turn || status.climb) {
+    const parts = [status.turn < 0 ? 'bearing left' : status.turn > 0 ? 'bearing right' : '',
+      status.climb > 0 ? 'climbing' : status.climb < 0 ? 'diving' : ''].filter(Boolean);
+    text = parts.join(' · ');
+  } else if (status.resumeIn > 0) text = `autopilot takes over in ${Math.ceil(status.resumeIn)} s`;
+  else if (status.adopted > 0) text = `holding your course · ${Math.floor(status.adopted / 60)}:${String(Math.floor(status.adopted % 60)).padStart(2, '0')}`;
+  nudgeHint.classList.toggle('visible', text !== '');
+  if (text && text !== nudgeHintText) nudgeText.textContent = text;
+  nudgeHintText = text;
+}
+
 function updateFlight(delta: number, now: number): void {
   const substeps = Math.ceil(delta / 0.1);
   let state = navigator.state;
+  navigator.setNudge({ turn: (heldArrows.has('right') ? 1 : 0) - (heldArrows.has('left') ? 1 : 0),
+    climb: (heldArrows.has('up') ? 1 : 0) - (heldArrows.has('down') ? 1 : 0) });
   if (!reviewFlightPaused) {
     for (let step = 0; step < substeps; step += 1) {
       state = navigator.update(delta / substeps);
@@ -1051,6 +1083,7 @@ function updateFlight(delta: number, now: number): void {
     }
   }
   eagle.update(state, delta);
+  updateNudgeHint();
   thermalMarker.update(state, navigator.activeThermal, settings.showThermal, now / 1000);
   const audioBiome = soundscape.isMuted ? undefined : world.sample(state.x, state.z).biome;
   soundscape.update(state.behavior, state.flapping, audioBiome);
@@ -1216,7 +1249,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; ground: string; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; moonLit: number; moonIntensity: number; dominant: 'sun' | 'moon'; starAmount: number; milkyWayAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; cloudLayer: ReturnType<CloudSea['snapshot']> };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; ground: string; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; moonLit: number; moonIntensity: number; dominant: 'sun' | 'moon'; starAmount: number; milkyWayAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; lowPower: boolean; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; cloudLayer: ReturnType<CloudSea['snapshot']>; nudge: NudgeStatus };
       puffCloudSnapshot: () => PuffCloudSnapshot;
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
@@ -1302,6 +1335,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       flapping: navigator.state.flapping,
       bank: navigator.state.bank,
       heading: navigator.state.heading,
+      nudge: navigator.nudgeStatus,
       position: [navigator.state.x, navigator.state.y, navigator.state.z],
       renderOrigin: [renderOrigin.x, renderOrigin.y, renderOrigin.z],
       geometries: renderer.info.memory.geometries,

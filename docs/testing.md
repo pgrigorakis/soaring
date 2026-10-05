@@ -33,8 +33,9 @@ Development builds also expose `reviewFlight({ x, y?, z, heading })` to freeze n
 Relevant browser checks include:
 
 - `tests/app.smoke.ts` checks rendering, streaming, controls, and app behavior.
-- `tests/highlands.smoke.ts` records a one-hour Highlands flight with terrain clearance, climb limits, and behavior-duration checks. Total flap time is recorded, not limited.
+- `tests/highlands.smoke.ts` records three one-hour Highlands flights from nearby starts with terrain clearance, climb limits, and behavior-duration checks. Ridge soaring must occur in at least one flight. Total flap time is recorded, not limited.
 - `tests/highlands-cover.smoke.ts` captures noon and golden-hour snow cover from the default chase camera.
+- `tests/nudge.smoke.ts` holds arrow keys in simulated time. It checks the course bend, the adopted heading, the hint text, focused sliders, and window blur. It saves screenshots and `evidence.json` in `test-results/nudge/`.
 - `tests/cloud-layer.smoke.ts` captures matched below/inside/above views from the default chase camera, checks rendered whiteout, and records a safe opening and scheduled crossing. Evidence and baseline failure proof live in `evidence/fwm-cloud-layer/`.
 - `tests/cloud-puff-deck.smoke.ts` compares frames with and without puffs. Above the deck, at noon and at night, no puff may show. Below the deck, puffs must show. Evidence lives in `evidence/cumulus-fog-popthrough/`.
 - `tests/continental.smoke.ts` checks hashed continental fields, common sea level, height independent of biome profiles, continuous shelves, and dry trees/thermals. It writes repeatable JSON evidence.

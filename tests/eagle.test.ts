@@ -90,7 +90,8 @@ describe('procedural eagle', () => {
       }
       expect(navigator.state.behavior).toBe('thermal-riding');
       const ridden = navigator.state;
-      const center = navigator.activeThermal;
+      // The bird banks toward the circle it flies, which eases from the entry tangent onto the thermal.
+      const center = navigator.orbitCentre;
       expect(center).not.toBeNull();
       const sign = inwardThermalBankSign(ridden.heading, ridden.x, ridden.z, center!.x, center!.z);
       expect(Math.sign(ridden.bank)).toBe(sign);

@@ -13,6 +13,7 @@ Use a current desktop version of Chrome, Edge, or Firefox.
 - Drag on the landscape to orbit the camera. Release to let it return slowly to the trailing view.
 - Move the pointer to reveal the settings control. The cursor and control hide after 3 seconds without pointer movement.
 - Settings provide fullscreen, sound and volume controls, terrain visibility, Low power, Show thermal, flight-height bounds, camera distance, and a new-world action. Show thermal marks thermals within 3.5 km of the eagle; the selected thermal stays hotter. Height bounds persist across reloads. They guide low flight and cap thermal climbs. Scheduled cloud crossings can climb above them, but terrain safety always takes priority.
+- Hold the left or right arrow key to nudge the eagle's course. If the course turns 20° or more, the eagle keeps it for three minutes and still picks its own thermals along it. Hold the up arrow to flap and the down arrow to dive more steeply. A small hint names the nudge and counts down to the autopilot. Holding left or right while the eagle circles a thermal or soars a ridge sends it away toward that side.
 - The map in the lower-right corner shows the land and the last four days of flight, north up. Click it to step the zoom through 6, 20 and 70 km.
 - Press `M` to open the biome map of the whole trail, or 40 km or 120 km around the eagle. Export PNG saves it with a legend and a scale. Press `M` or `Esc` to close it.
 - Press `F` to toggle fullscreen. Press `D` to show or hide diagnostics.
