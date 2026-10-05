@@ -49,7 +49,7 @@ test('keeps forty seeded puffs, drifts and wraps them, and adds one draw call', 
   expect(initial.puffClouds.layout.every((puff) => puff.width >= 55 && puff.width <= 150)).toBe(true);
   expect(initial.puffClouds.layout.every((puff) => puff.driftSpeed >= 2.4 && puff.driftSpeed <= 5.6)).toBe(true);
   await page.keyboard.press('d');
-  await expect(page.locator('#diagnostics')).toContainText('puff clouds  40 instances · 1 draw call');
+  await expect(page.locator('#diagnostics')).toContainText('puff clouds  40 clouds · 1200 sprites · 1 draw call');
 
   const beforeHide = await page.evaluate(() => {
     const api = window.__SOARING__ as unknown as CloudHarness;
@@ -96,6 +96,83 @@ test('keeps forty seeded puffs, drifts and wraps them, and adds one draw call', 
       && placements.every((puff) => Math.abs(puff.x - state.position[0]!) <= 3200
         && Math.abs(puff.z - state.position[2]!) <= 3200);
   });
+});
+
+test('frames one cumulus close up from its sunny side at noon and golden hour', async ({ page }, testInfo) => {
+  test.setTimeout(300_000);
+  await page.addInitScript(() => {
+    localStorage.setItem('soaring.world-seed.v1', '5');
+    localStorage.setItem('soaring.scenic-visit.v1', '0');
+  });
+  await page.goto('/?smoke&profile');
+  await page.evaluate(() => {
+    const api = window.__SOARING__;
+    const state = api.snapshot();
+    // A 470 m camera sits inside the puff band, below the deck's whiteout.
+    api.reviewFlight!({ x: state.position[0]!, y: 470 - 178 * 0.31 / 3, z: state.position[2]!, heading: state.heading });
+    document.querySelector('#intro')?.remove();
+    document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
+    document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
+  });
+  await page.waitForFunction(() => window.__SOARING__.snapshot().pending === 0, undefined, { timeout: 120_000 });
+
+  for (const [phase, time] of [[0.5, 'noon'], [0.715, 'golden-hour']] as const) {
+    const start = await page.evaluate((phase) => {
+      const api = window.__SOARING__;
+      const { renderedFrames, fog } = api.snapshot();
+      api.setTimeOfDay(phase);
+      return { renderedFrames, samples: fog.samples };
+    }, phase);
+    await page.waitForFunction((start) => {
+      const state = window.__SOARING__.snapshot();
+      return state.renderedFrames > start.renderedFrames && state.fog.samples > start.samples && state.pending === 0
+        && Math.hypot(...state.fog.color.map((value, index) => value - state.fog.targetColor[index]!)) < 1e-3;
+    }, start, { timeout: 120_000 });
+    // Stand 260 m from the widest nearby puff, 40 degrees off the sun's azimuth, looking up at its body.
+    const puff = await page.evaluate(() => {
+      const api = window.__SOARING__ as unknown as CloudHarness & { setViewpoint: (pose: object) => void };
+      const state = api.snapshot();
+      const { layout, placements } = api.puffCloudSnapshot();
+      const near = placements.map((placement, index) => ({ ...placement, width: layout[index]!.width }))
+        .filter((puff) => Math.hypot(puff.x - state.position[0]!, puff.z - state.position[2]!) < 1500)
+        .sort((a, b) => b.width - a.width)[0]!;
+      const sun = state.sunDirection;
+      const azimuth = Math.atan2(sun[0]!, sun[2]!) + 40 * Math.PI / 180;
+      const dx = Math.sin(azimuth), dz = Math.cos(azimuth);
+      api.setViewpoint({ x: near.x + dx * 260, y: 470, z: near.z + dz * 260, lookX: near.x, lookY: near.y - 20, lookZ: near.z });
+      return near;
+    });
+    const shot = async (visible: boolean) => {
+      const frame = await page.evaluate((visible) => {
+        (window.__SOARING__ as unknown as CloudHarness).setPuffCloudsVisible(visible);
+        window.__SOARING__.setCapturePixelRatio(1);
+        return window.__SOARING__.snapshot().renderedFrames;
+      }, visible);
+      await page.waitForFunction((frame) => window.__SOARING__.snapshot().renderedFrames > frame + 8, frame);
+      return page.screenshot({ path: `test-results/puff-clouds-close-${time}${visible ? '' : '-no-puffs'}.png` });
+    };
+    const withPuffs = await shot(true);
+    const withoutPuffs = await shot(false);
+    await page.evaluate(() => (window.__SOARING__ as unknown as CloudHarness).setPuffCloudsVisible(true));
+    await testInfo.attach(`puff-clouds-close-${time}`, { body: withPuffs, contentType: 'image/png' });
+    const changed = await page.evaluate(async ([a, b]) => {
+      const read = async (data: string) => {
+        const image = new Image(); image.src = `data:image/png;base64,${data}`; await image.decode();
+        const context = new OffscreenCanvas(image.width, image.height).getContext('2d')!;
+        context.drawImage(image, 0, 0);
+        return context.getImageData(0, 0, image.width, image.height).data;
+      };
+      const p = await read(a!), q = await read(b!);
+      let count = 0;
+      for (let i = 0; i < p.length; i += 4) {
+        if (Math.max(Math.abs(p[i]! - q[i]!), Math.abs(p[i + 1]! - q[i + 1]!), Math.abs(p[i + 2]! - q[i + 2]!)) > 6) count += 1;
+      }
+      return count;
+    }, [withPuffs.toString('base64'), withoutPuffs.toString('base64')]);
+    // A cloud at least 55 m wide, 260 m away, covers tens of thousands of pixels.
+    expect(puff.opacity).toBeGreaterThan(0.5);
+    expect(changed).toBeGreaterThan(20_000);
+  }
 });
 
 test('captures the puff deck from low, mid, and high chase flights at noon and golden hour', async ({ page }, testInfo) => {
