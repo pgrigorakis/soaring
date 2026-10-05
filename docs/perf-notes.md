@@ -4,7 +4,7 @@ This ledger records measured render costs and results. Add new results at the bo
 
 ## Render resolution
 
-Normal rendering caps its pixel ratio at the lower of the device ratio, 1.5, and the value needed to stay within a 2-million-pixel budget. Low power uses the lower of 1.0 and that budget ratio. Adaptive quality can lower the normal ratio through steps of 1.5, 1.25, and 1.0, and the ratio updates when the viewport or device-pixel ratio changes.
+Normal rendering caps its pixel ratio at the lower of the device ratio, 1.5, and the value needed to stay within a 2-million-pixel budget. Adaptive quality can lower the normal ratio through steps of 1.5, 1.25, and 1.0, and the ratio updates when the viewport or device-pixel ratio changes.
 
 ## What the bench measures
 

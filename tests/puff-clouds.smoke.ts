@@ -180,21 +180,22 @@ test('captures the puff deck from low, mid, and high chase flights at noon and g
   await page.addInitScript(() => {
     localStorage.setItem('soaring.world-seed.v1', '5');
     localStorage.setItem('soaring.scenic-visit.v1', '0');
-    const query = new URL(location.href).searchParams;
-    const range = query.get('flight') === 'low' ? [50, 80]
-      : query.get('flight') === 'mid' ? [230, 260] : [470, 500];
     localStorage.setItem('soaring.settings.v1', JSON.stringify({
-      ambienceVolume: 0.52, musicVolume: 0.52, muted: true, lowPower: false,
+      ambienceVolume: 0.52, musicVolume: 0.52, muted: true,
       cameraDistance: 100, terrainVisibility: 720, showThermal: false,
-      minFlightHeight: range[0], maxFlightHeight: range[1],
     }));
   });
 
-  for (const flight of ['low', 'mid', 'high'] as const) {
+  for (const [flight, height] of [['low', 80], ['mid', 230], ['high', 470]] as const) {
     // The paused flight keeps one view, so noon and golden hour share a load: the slow
     // software renderer in CI spends most of this test streaming terrain.
-    await page.goto(`/?smoke&profile&flight=${flight}`);
-    await page.evaluate(() => window.__SOARING__.pauseFlight());
+    await page.goto('/?smoke&profile');
+    await page.evaluate((height) => {
+      const api = window.__SOARING__;
+      const { position, heading } = api.snapshot();
+      api.reviewFlight!({ x: position[0]!, y: api.sample(position[0]!, position[2]!).height + height, z: position[2]!, heading });
+      api.pauseFlight();
+    }, height);
     await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0, undefined, { timeout: 120_000 });
     await page.evaluate(() => {
       window.__SOARING__.setCapturePixelRatio(1);

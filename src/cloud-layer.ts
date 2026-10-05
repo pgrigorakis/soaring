@@ -2,7 +2,6 @@
 export const CLOUD_HEIGHT_SCALE = 600 / 520;
 export const CLOUD_DECK = 600;
 export const CLOUD_SURFACE = CLOUD_DECK - 55 * CLOUD_HEIGHT_SCALE;
-export const CLOUD_HIGH_CRUISE = CLOUD_DECK + 190 * CLOUD_HEIGHT_SCALE;
 
 export function smoothstep(a: number, b: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));

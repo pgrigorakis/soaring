@@ -128,11 +128,9 @@ test('caps normal rendering at two million pixels through viewport and DPR chang
   test.setTimeout(45_000);
   await preparePixelBudgetPage(page, '/?profile');
   const cdp = await page.context().newCDPSession(page);
-  await setPixelBudgetLowPower(page, false);
   await setPixelBudgetMetrics(page, cdp, 1000, 700, 2);
   let measured = await readPixelBudgetMetrics(page);
   expect(measured.css).toEqual([1000, 700]);
-  expect(measured.lowPower).toBe(false);
   expect(measured.ratio).toBeLessThanOrEqual(1.5);
   expectRenderWithinPixelBudget(measured);
 
@@ -140,7 +138,6 @@ test('caps normal rendering at two million pixels through viewport and DPR chang
   measured = await readPixelBudgetMetrics(page);
   expect(measured.css).toEqual([1512, 982]);
   const ratioLimit = Math.sqrt(2_000_000 / (measured.css[0]! * measured.css[1]!));
-  expect(measured.lowPower).toBe(false);
   expect(measured.ratio).toBeLessThanOrEqual(Math.min(1.5, ratioLimit));
   expectRenderWithinPixelBudget(measured);
 
@@ -150,27 +147,6 @@ test('caps normal rendering at two million pixels through viewport and DPR chang
   measured = await readPixelBudgetMetrics(page);
   expect(measured.css).toEqual([1512, 982]);
   expect(measured.ratio).toBeLessThanOrEqual(1);
-  expectRenderWithinPixelBudget(measured);
-  await cdp.detach();
-});
-
-test('caps Low power rendering during DPR and large viewport changes', async ({ page }) => {
-  test.setTimeout(45_000);
-  await preparePixelBudgetPage(page);
-  const cdp = await page.context().newCDPSession(page);
-  await setPixelBudgetMetrics(page, cdp, 1512, 982, 2);
-
-  let measured = await readPixelBudgetMetrics(page);
-  expect(measured.css).toEqual([1512, 982]);
-  expect(measured.lowPower).toBe(true);
-  expect(measured.ratio).toBe(1);
-  expectRenderWithinPixelBudget(measured);
-
-  await setPixelBudgetMetrics(page, cdp, 1600, 1400, 2);
-  measured = await readPixelBudgetMetrics(page);
-  expect(measured.css).toEqual([1600, 1400]);
-  expect(measured.lowPower).toBe(true);
-  expect(measured.ratio).toBeLessThanOrEqual(Math.min(1, Math.sqrt(2_000_000 / (measured.css[0]! * measured.css[1]!))));
   expectRenderWithinPixelBudget(measured);
   await cdp.detach();
 });
@@ -193,22 +169,12 @@ async function preparePixelBudgetPage(page: Page, path = '/'): Promise<void> {
     localStorage.setItem('soaring.world-seed.v1', '123456789');
     localStorage.setItem('soaring.scenic-visit.v1', '0');
     localStorage.setItem('soaring.settings.v1', JSON.stringify({
-      ambienceVolume: 0.52, musicVolume: 0.52, muted: true, lowPower: true,
-      cameraDistance: 100, terrainVisibility: 720, showThermal: true, minFlightHeight: 45, maxFlightHeight: 180,
+      ambienceVolume: 0.52, musicVolume: 0.52, muted: true,
+      cameraDistance: 100, terrainVisibility: 720, showThermal: true,
     }));
   });
   await page.goto(path);
   await expect(page.locator('canvas').first()).toBeVisible();
-}
-
-async function setPixelBudgetLowPower(page: Page, enabled: boolean): Promise<void> {
-  await page.evaluate((lowPower) => {
-    const input = document.querySelector<HTMLInputElement>('#low-power')!;
-    if (!lowPower && !input.checked) throw new Error('Expected Low power during light-weight startup');
-    input.checked = lowPower;
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  }, enabled);
-  await page.waitForFunction((lowPower) => window.__SOARING__.snapshot().lowPower === lowPower, enabled);
 }
 
 async function setPixelBudgetMetrics(page: Page, cdp: CDPSession, width: number, height: number, deviceScaleFactor: number, dispatchResize = true): Promise<void> {
@@ -230,7 +196,7 @@ async function readPixelBudgetMetrics(page: Page) {
     const canvas = document.querySelector('canvas')!;
     const snapshot = window.__SOARING__.snapshot();
     return { css: [innerWidth, innerHeight], render: [canvas.width, canvas.height],
-      pixels: canvas.width * canvas.height, ratio: snapshot.pixelRatio, lowPower: snapshot.lowPower,
+      pixels: canvas.width * canvas.height, ratio: snapshot.pixelRatio,
       diagnosticRender: [snapshot.renderWidth, snapshot.renderHeight], diagnosticPixels: snapshot.renderPixels };
   });
 }
@@ -326,25 +292,27 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
   expect(errors).toEqual([]);
 });
 
-test('persists safe local-terrain height bounds across reloads', async ({ page }) => {
+test('loads legacy settings without flight-height, Low power or camera-distance controls', async ({ page }) => {
   const errors = captureErrors(page);
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('soaring.settings.v1')) localStorage.setItem('soaring.settings.v1', JSON.stringify({
+      terrainVisibility: 5000, lowPower: true, minFlightHeight: 90, maxFlightHeight: 145, cameraDistance: 150,
+    }));
+  });
   await page.goto('/?smoke');
   await openSettings(page);
-  await page.locator('#min-height').evaluate((input: HTMLInputElement) => {
-    input.value = '90';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-  await page.locator('#max-height').evaluate((input: HTMLInputElement) => {
-    input.value = '145';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-  await expect(page.locator('#min-height-value')).toHaveText('90 m');
-  await expect(page.locator('#max-height-value')).toHaveText('145 m');
-  await page.reload();
-  await expect(page.locator('#min-height')).toHaveValue('90');
-  await expect(page.locator('#max-height')).toHaveValue('145');
+  for (const id of ['min-height', 'max-height', 'low-power', 'distance']) await expect(page.locator(`#${id}`)).toHaveCount(0);
+  // The old 5 km maximum becomes the new 8 km maximum.
+  await expect(page.locator('#visibility')).toHaveValue('8000');
+  const snapshot = await page.evaluate(() => window.__SOARING__.snapshot());
+  expect(snapshot.requestedDistance).toBe(8000);
+  expect(snapshot.cameraDistance).toBe(150);
+  expect(snapshot.chunkBuildBudget).toBe(4);
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).frameCap).toBeNull();
+  await page.getByRole('checkbox', { name: 'Show thermal' }).uncheck();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1') ?? '{}'));
-  expect([saved.minFlightHeight, saved.maxFlightHeight]).toEqual([90, 145]);
+  expect(Object.keys(saved).sort()).toEqual(['ambienceVolume', 'cameraDistance', 'musicVolume', 'muted', 'showThermal', 'terrainVisibility']);
   expect(errors).toEqual([]);
 });
 
@@ -355,7 +323,7 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   const errors = captureErrors(page);
   await page.addInitScript(() => {
     if (!localStorage.getItem('soaring.settings.v1')) localStorage.setItem('soaring.settings.v1', JSON.stringify({
-      ambienceVolume: 0.4, musicVolume: 0.4, muted: false, terrainVisibility: 1080, cameraDistance: 220,
+      ambienceVolume: 0.4, musicVolume: 0.4, muted: false, terrainVisibility: 1120, cameraDistance: 220,
     }));
   });
   await page.goto('/?smoke');
@@ -379,19 +347,20 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   await expect(settingsToggle).toHaveAttribute('aria-expanded', 'true');
   await expect(settingsToggle).toHaveAccessibleName('Close settings');
   await expect(page.locator('#quality')).toHaveCount(0);
-  await expect(page.locator('#distance')).toHaveValue('100');
-  expect(await page.locator('#distance').getAttribute('min')).toBe('10');
-  expect(await page.locator('#distance').getAttribute('max')).toBe('100');
+  // A saved 220 m distance is clamped to the 200 m maximum.
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).cameraDistance).toBe(200);
   await expect(page.locator('#ambience')).toHaveValue('0.4');
   await expect(page.locator('#music')).toHaveValue('0.4');
-  await expect(page.locator('#visibility')).toHaveValue('1080');
-  expect(await page.locator('#visibility').getAttribute('max')).toBe('5000');
+  await expect(page.locator('#visibility')).toHaveValue('1120');
+  expect(await page.locator('#visibility').getAttribute('max')).toBe('8000');
   await page.locator('#visibility').fill('3600');
-  await expect(page.locator('#distance')).toHaveValue('100');
-  await page.locator('#distance').fill('10');
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).cameraDistance).toBe(200);
+  await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
+  await page.mouse.wheel(0, -3000);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 10);
   await page.reload();
+  await openSettings(page);
   await expect(page.locator('#visibility')).toHaveValue('3600');
-  await expect(page.locator('#distance')).toHaveValue('10');
   await page.waitForFunction(() => {
     const { cameraDistance, cameraHeight } = window.__SOARING__.snapshot();
     return cameraDistance === 10 && cameraHeight > 0 && cameraHeight < 10;
@@ -404,12 +373,9 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   expect(snapshot.cameraDistance).toBe(10);
   expect(snapshot.cameraHeight).toBeLessThan(10);
   expect(snapshot.visibleDistance).toBeLessThanOrEqual(3600);
-  await openSettings(page);
   const firstFrame = await page.evaluate(async () => {
     const startingHeight = window.__SOARING__.snapshot().cameraHeight;
-    const input = document.querySelector<HTMLInputElement>('#distance')!;
-    input.value = '100';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('canvas')!.dispatchEvent(new WheelEvent('wheel', { deltaY: 20_000, cancelable: true }));
     const cameraHeight = await new Promise<number>((resolve) => {
       requestAnimationFrame(() => resolve(window.__SOARING__.snapshot().cameraHeight));
     });
@@ -417,16 +383,21 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   });
   // A single render frame must ease toward the new height, not teleport to it.
   expect(Math.abs(firstFrame.cameraHeight - firstFrame.startingHeight)).toBeLessThan(12);
-  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraHeight > 15);
+  // At the 200 m maximum the camera sits 36 m above the bird.
+  // Hold the bird still: the camera trails a climb or dive, so it settles only on a fixed pose.
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 200);
+  await page.evaluate(() => {
+    const s = window.__SOARING__.snapshot();
+    window.__SOARING__.reviewFlight!({ x: s.position[0]!, y: s.position[1]!, z: s.position[2]!, heading: s.heading });
+  });
+  await page.waitForFunction(() => Math.abs(window.__SOARING__.snapshot().cameraHeight - 36) < 0.01);
   const farCamera = await page.evaluate(() => window.__SOARING__.snapshot());
-  expect(farCamera.cameraDistance).toBe(100);
-  expect(farCamera.cameraHeight).toBeGreaterThan(15);
-  expect(farCamera.cameraHeight).toBeLessThan(24);
+  expect(farCamera.cameraHeight).toBeCloseTo(36, 1);
   expect(snapshot.chunks + snapshot.pending).toBeLessThan(700);
   expect(errors).toEqual([]);
 });
 
-test('mouse wheel zooms the camera and stays in sync with the slider', async ({ page }) => {
+test('mouse wheel zooms the camera between 10 m and 200 m and persists the distance', async ({ page }) => {
   const errors = captureErrors(page);
   await page.goto('/?smoke');
   const canvas = page.locator('canvas').first();
@@ -436,17 +407,15 @@ test('mouse wheel zooms the camera and stays in sync with the slider', async ({ 
   await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
   await page.mouse.wheel(0, -2000);
   await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 10);
-  await expect(page.locator('#distance')).toHaveValue('10');
-  await expect(page.locator('#distance-value')).toHaveText('10 m');
   await page.mouse.wheel(0, 300);
   await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance > 12);
   await page.waitForTimeout(1000);
   const zoomed = await page.evaluate(() => window.__SOARING__.snapshot().cameraDistance);
   expect(zoomed).toBeGreaterThan(12);
-  expect(zoomed).toBeLessThan(100);
+  expect(zoomed).toBeLessThan(200);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1') ?? '{}').cameraDistance)).toBe(zoomed);
   await page.mouse.wheel(0, 20_000);
-  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 100);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 200);
   expect(errors).toEqual([]);
 });
 
@@ -481,13 +450,10 @@ test('a dragged camera angle stays until a double-click resets it, and a drag ne
   expect(errors).toEqual([]);
 });
 
-test('low-power mode persists, uses its work budget, and focus always caps at 30 fps', async ({ page }) => {
+test('window focus caps at 30 fps only while blurred, with the full work budget', async ({ page }) => {
   test.setTimeout(30_000);
   const errors = captureErrors(page);
   await page.goto('/?smoke');
-  await openSettings(page);
-  const lowPower = page.getByRole('checkbox', { name: 'Low power' });
-  await expect(lowPower).not.toBeChecked();
 
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).frameCap).toBeNull();
@@ -504,27 +470,11 @@ test('low-power mode persists, uses its work budget, and focus always caps at 30
   const afterFocus = await page.evaluate(() => window.__SOARING__.snapshot());
   expect(Math.hypot(afterFocus.position[0]! - beforeFocus.position[0]!, afterFocus.position[2]! - beforeFocus.position[2]!)).toBeLessThan(10);
 
-  await lowPower.check();
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1')!).lowPower)).toBe(true);
-  const previousRender = await page.evaluate(() => window.__SOARING__.snapshot().renderedFrames);
-  await page.waitForFunction((frames) => window.__SOARING__.snapshot().renderedFrames > frames, previousRender);
-  const enabled = await page.evaluate(() => window.__SOARING__.snapshot());
-  expect(enabled.lowPower).toBe(true);
-  expect(enabled.frameCap).toBe(30);
-  expect(enabled.chunkBuildBudget).toBe(2);
+  expect(afterFocus.chunkBuildBudget).toBe(4);
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
   await page.keyboard.press('d');
   await expect(page.locator('#diagnostics')).toContainText('cap          30 fps');
   await expect(page.locator('#diagnostics')).toContainText('quality step');
-
-  await page.reload();
-  await openSettings(page);
-  await expect(lowPower).toBeChecked();
-  expect((await page.evaluate(() => window.__SOARING__.snapshot())).lowPower).toBe(true);
-  await page.waitForFunction(() => window.__SOARING__.snapshot().qualityStep === 3, undefined, { timeout: 15_000 });
-  expect((await page.evaluate(() => window.__SOARING__.snapshot())).frameCap).toBe(30);
-  await lowPower.uncheck();
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1')!).lowPower)).toBe(false);
-  expect((await page.evaluate(() => window.__SOARING__.snapshot())).chunkBuildBudget).toBe(4);
   expect(errors).toEqual([]);
 });
 
@@ -563,14 +513,14 @@ test('fullscreen toggle and F keep the idle scene clear while settings and diagn
   expect(errors).toEqual([]);
 });
 
-test('defaults terrain visibility to 5 km and streams bounded work at each LOD tier out to the 5 km max', async ({ page }) => {
+test('defaults terrain visibility to 8 km and streams bounded work at each LOD tier out to the 8 km max', async ({ page }) => {
   test.setTimeout(270_000);
   const errors = captureErrors(page);
   await page.goto('/?smoke');
   await expect(page.locator('canvas').first()).toBeVisible();
   await openSettings(page);
   // A fresh session (no saved settings) still gets the smoke harness's bounded budget, not the
-  // 5 km product default - see the smokeMode override in src/main.ts.
+  // 8 km product default - see the smokeMode override in src/main.ts.
   await expect(page.locator('#visibility')).toHaveValue('720');
   await page.evaluate(() => localStorage.removeItem('soaring.settings.v1'));
   await page.reload();
@@ -582,9 +532,9 @@ test('defaults terrain visibility to 5 km and streams bounded work at each LOD t
     const s = window.__SOARING__.snapshot();
     window.__SOARING__.reviewFlight!({ x: s.position[0]!, z: s.position[2]!, heading: s.heading });
   });
-  // Push the slider to the 5 km max and confirm all three LOD tiers populate with bounded work.
+  // Push the slider to the 8 km max and confirm all three LOD tiers populate with bounded work.
   await page.locator('#visibility').evaluate((input: HTMLInputElement) => {
-    input.value = '5000';
+    input.value = '8000';
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.evaluate(() => window.__SOARING__.setTimeScale(1));
@@ -594,14 +544,14 @@ test('defaults terrain visibility to 5 km and streams bounded work at each LOD t
   // completion.
   await page.waitForFunction(() => window.__SOARING__.snapshot().tiers.far > 0, undefined, { timeout: 240_000 });
   const snapshot = await page.evaluate(() => window.__SOARING__.snapshot());
-  expect(snapshot.requestedDistance).toBeGreaterThanOrEqual(4900);
+  expect(snapshot.requestedDistance).toBe(8000);
   expect(snapshot.tiers.near).toBeGreaterThan(0);
   expect(snapshot.tiers.mid).toBeGreaterThan(0);
   expect(snapshot.tiers.far).toBeGreaterThan(0);
-  // Bounded chunk/mesh work even at the 5 km max: the coarse far grid keeps total tile count low,
-  // and the total (built + still queued) stays bounded even before the stream fully drains.
+  // Bounded chunk/mesh work even at the 8 km max: the coarse far grid plans at most 640 tiles
+  // at any pose. A queued tile may still replace a built one, so bound each count on its own.
   expect(snapshot.chunks).toBeLessThan(700);
-  expect(snapshot.chunks + snapshot.pending).toBeLessThan(700);
+  expect(snapshot.pending).toBeLessThanOrEqual(640);
   expect(errors).toEqual([]);
 });
 

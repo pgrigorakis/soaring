@@ -12,6 +12,9 @@ import { expect, test } from '@playwright/test';
 // flight-height ceiling, and no behaviour episode may exceed four minutes.
 // #139 biomes and the energy-consistent thermal circles shift the route again. One start can
 // miss every ridge by chance, so ridge episodes count over the start and two starts further west.
+// #140's flight cycle cruises 300 s after each dive, so one glide lasts up to the dive plus the
+// cruise, and an hour covers more ground. The starts at -84000, -86000 and -87000 each spend about
+// half the hour over Highlands; the total counts over all three flights.
 // Every other check applies to each flight.
 const baseline = { commit: '184df89de4f05087194fdc25e36ddd83a7ba0181', start: { x: -24000, z: 3750 }, peakVerticalSpeed: 511.63911809568475, flappingSeconds: 164.8 };
 
@@ -22,7 +25,7 @@ test('one hour through Highlands keeps clearance and climb behavior safe', async
     const worldPath = '/src/world.ts';
     const eaglePath = '/src/eagle.ts';
     const { WorldModel } = await import(/* @vite-ignore */ worldPath) as typeof import('../src/world');
-    const { DEFAULT_FLIGHT_HEIGHT, EagleNavigator, TERRAIN_SAFETY_MARGIN } = await import(/* @vite-ignore */ eaglePath) as typeof import('../src/eagle');
+    const { CYCLE, FLIGHT_HEIGHT, EagleNavigator, TERRAIN_SAFETY_MARGIN } = await import(/* @vite-ignore */ eaglePath) as typeof import('../src/eagle');
     return starts.map((start) => {
       const world = new WorldModel(57);
       const nav = new EagleNavigator(world, start);
@@ -59,29 +62,31 @@ test('one hour through Highlands keeps clearance and climb behavior safe', async
           ridgeSeconds += 0.1;
           ridgeClimb += state.y - y;
           if (state.flapping) ridgeFlappingTicks += 1;
-          if (state.y > Math.max(y, nav.flightGround + DEFAULT_FLIGHT_HEIGHT.max) + 0.001) ridgeCeilingBreaches += 1;
+          if (state.y > Math.max(y, nav.flightGround + FLIGHT_HEIGHT.max) + 0.001) ridgeCeilingBreaches += 1;
           ridgeMinClearance = Math.min(ridgeMinClearance, clearance);
         }
         if (step % 100 === 0) world.trim(20000);
       }
       longestEpisode[episode.behavior] = Math.max(longestEpisode[episode.behavior] ?? 0, episode.seconds);
       return {
-        seed: 57, start, seconds: 3600, minClearance, peakVerticalSpeed, flappingSeconds, safetyCorrections, highlandSeconds,
+        seed: 57, start, seconds: 3600, cruiseSeconds: CYCLE.cruiseSeconds, minClearance, peakVerticalSpeed, flappingSeconds, safetyCorrections, highlandSeconds,
         ridgeEpisodes, ridgeSeconds, ridgeMeanClimb: ridgeSeconds > 0 ? ridgeClimb / ridgeSeconds : 0, ridgeFlappingTicks, ridgeCeilingBreaches, ridgeMinClearance, longestEpisode,
       };
     });
-  }, [-85000, -85500, -86000].map((x) => ({ x, z: 122000, heading: 0 })));
+  }, [-84000, -86000, -87000].map((x) => ({ x, z: 122000, heading: 0 })));
   await writeFile('test-results/highlands-navigation.json', JSON.stringify({ baseline, flights }, null, 2));
   await testInfo.attach('highlands-navigation', { body: JSON.stringify({ baseline, flights }), contentType: 'application/json' });
   for (const metrics of flights) {
     expect(metrics.minClearance).toBeGreaterThan(6);
     expect(metrics.safetyCorrections).toBe(0);
-    expect(metrics.highlandSeconds).toBeGreaterThan(1800);
+    expect(metrics.highlandSeconds).toBeGreaterThan(900);
     expect(metrics.peakVerticalSpeed).toBeLessThan(baseline.peakVerticalSpeed);
     expect(metrics.ridgeFlappingTicks).toBe(0);
     expect(metrics.ridgeCeilingBreaches).toBe(0);
     expect(metrics.ridgeMinClearance).toBeGreaterThan(6);
-    for (const seconds of Object.values(metrics.longestEpisode)) expect(seconds).toBeLessThanOrEqual(240);
+    // A glide covers a dive of at most 160 s (800 m at 5 m/s) and the cruise.
+    for (const [behavior, seconds] of Object.entries(metrics.longestEpisode)) expect(seconds).toBeLessThanOrEqual(behavior === 'gliding' ? metrics.cruiseSeconds + 160 : 240);
   }
   expect(flights.reduce((sum, metrics) => sum + metrics.ridgeEpisodes, 0)).toBeGreaterThan(0);
+  expect(flights.reduce((sum, metrics) => sum + metrics.highlandSeconds, 0)).toBeGreaterThan(4500);
 });

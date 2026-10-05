@@ -62,7 +62,7 @@ describe('terrain streaming', () => {
     terrain.setReach(reach);
     expect(terrain.coveredDistance(x, z)).toBeLessThan(reach);
     // Test-only: a larger millisecond budget reduces test bookkeeping.
-    // Production frames use 4 ms, or 2 ms in Low power.
+    // Production frames use 4 ms.
     const testBuildBudget = 50;
     let iterations = 0;
     while (terrain.pendingCount) {

@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { globalWind, type Wind } from './wind';
-import { CLOUD_DECK, CLOUD_HEIGHT_SCALE, CLOUD_HIGH_CRUISE } from './cloud-layer';
-import { DAY_SECONDS } from './sky-cycle';
+import type { Daylight, Vec3 } from './sky-cycle';
 import { BONE, buildEagleMesh, FINGER_COUNT, sideBones } from './eagle-model';
 import { fbm, hash2, highlandWeight, type Shore, Thermal, WorldModel } from './world';
 
@@ -29,8 +28,43 @@ function fbm1d(x: number, seed: number): number {
 }
 
 export type FlightHeightRange = { min: number; max: number };
-export const FLIGHT_HEIGHT_LIMITS = { min: 50, max: 500, gap: 20 } as const;
-export const DEFAULT_FLIGHT_HEIGHT: FlightHeightRange = { min: 65, max: 210 };
+/** Fixed height band above local ground: it guides low flight and caps thermal and ridge climbs. */
+export const FLIGHT_HEIGHT: FlightHeightRange = { min: 50, max: 800 };
+
+/**
+ * Fly With Me's cycle: ride a thermal to a top near 700 m above sea level, dive at 5–6 m/s to a cruise
+ * height of 50–150 m, hold it ±30 m by flapping for 300 s, then seek the next thermal.
+ * Each cycle draws its own top, dive rate and cruise height.
+ */
+export const CYCLE = {
+  top: 700,
+  topVariation: 50,
+  diveRate: { min: 5, max: 6 },
+  cruise: { min: 50, max: 150 },
+  cruiseWander: 30,
+  cruiseSeconds: 300,
+  /** The first cruise is short, so a new flight soon shows a climb. */
+  firstCruiseSeconds: 30,
+  /** Lift that fades this far below the top sends the bird to the next thermal, not into a dive. */
+  reseekBelowTop: 150,
+  /** A climb over high ground still rises at least this far. */
+  minRide: 250,
+} as const;
+export type FlightPhase = 'lift' | 'dive' | 'cruise';
+
+const SKY_LOW = { min: Math.sin(-4 * Math.PI / 180), max: Math.sin(12 * Math.PI / 180) } as const;
+
+/**
+ * Bearing to the show in the sky, as Fly With Me heads for it: a low sun at sunrise or
+ * sunset, a low moon after dark, or the galaxy core on a dark night. Null when none is up.
+ */
+export function skyBearing(body: Daylight, milkyWay: number, core: Vec3): number | null {
+  const low = (y: number) => y > SKY_LOW.min && y < SKY_LOW.max;
+  if (low(body.sun.y)) return Math.atan2(body.sun.x, body.sun.z);
+  if (body.sun.y < 0 && low(body.moon.y) && body.moonLit > 0.25) return Math.atan2(body.moon.x, body.moon.z);
+  if (milkyWay > 0.5) return Math.atan2(core.x, core.z);
+  return null;
+}
 
 export const GLIDE_SINK_RATE = 1; // m/s, per CONTEXT.md: Gliding
 export const FLAP_CLIMB_RATE = 4; // m/s while flapping
@@ -43,8 +77,8 @@ export const THERMAL_CLIMB_RANGE = { min: 3, max: 4 } as const;
 const THERMAL_CIRCLE_SPEED = 14; // m/s; with 30–60 m radius this yields a 20–35° bank
 const THERMAL_WEAK_LIFT = 0.18;
 const CRUISE_SPEED = 32;
-/** No behaviour may run four minutes; a long glide seeks a thermal before that. */
-const MAX_GLIDE_SECONDS = 200;
+/** A seek that has not reached its thermal in two minutes picks again. */
+const SEEK_SECONDS = 120;
 const MAX_TURN_RATE = 0.48;
 
 /** Roll rate limit, so entries and exits bank in rather than snap. */
@@ -176,16 +210,6 @@ export function inwardThermalBankSign(
   return rightTowardCenter > 0 ? -1 : 1;
 }
 
-export function normalizeFlightHeight(min: number, max: number): FlightHeightRange {
-  const safeMin = clamp(Number.isFinite(min) ? min : DEFAULT_FLIGHT_HEIGHT.min,
-    FLIGHT_HEIGHT_LIMITS.min, FLIGHT_HEIGHT_LIMITS.max - FLIGHT_HEIGHT_LIMITS.gap);
-  return {
-    min: safeMin,
-    max: clamp(Number.isFinite(max) ? max : DEFAULT_FLIGHT_HEIGHT.max,
-      safeMin + FLIGHT_HEIGHT_LIMITS.gap, FLIGHT_HEIGHT_LIMITS.max),
-  };
-}
-
 export class EagleNavigator {
   readonly state: EagleState;
   private readonly world: WorldModel;
@@ -196,7 +220,7 @@ export class EagleNavigator {
   private thermal: Thermal | null = null;
   private scenicIndex = 0;
   private flapTimer = 0;
-  private heightRange: FlightHeightRange;
+  private readonly heightRange: FlightHeightRange;
   private circleAngle = 0;
   private circleRadius = 45;
   private targetRadius = 45;
@@ -215,19 +239,18 @@ export class EagleNavigator {
   private ridgeLockout: { x: number; z: number; until: number } | null = null;
   private liftRate = 0;
   private ridgeLeadUntil = 0;
-  private glideStart = 0;
   private shore: ShoreTrace | null = null;
   private aheadAge: number = CLIMB_AHEAD.seconds;
   private climbNeed = -Infinity;
   private detour: number | null = null;
   private lastShore: { x: number; z: number; time: number } | null = null;
-  private cloudBlend = 0;
-  private cloudVelocity = 0;
-  private cloudFlight = false;
-  private cloudOrigin = 0;
-  private opening: 'abeam' | 'climb' | 'hold' | 'dive' | null = null;
-  private openingSince = 0;
-  private openingBearing = 0;
+  private phase: FlightPhase = 'cruise';
+  private phaseSince = CYCLE.firstCruiseSeconds - CYCLE.cruiseSeconds;
+  private cycleIndex = 0;
+  private topOffset = 0;
+  private diveRate: number = CYCLE.diveRate.min;
+  private cruiseHeight: number = CYCLE.cruise.min;
+  private skyGoal: number | null = null;
   private airspeed = CRUISE_SPEED;
   private orbitSign: 1 | -1 = 1;
   private circleSpeed = THERMAL_CIRCLE_SPEED;
@@ -238,31 +261,32 @@ export class EagleNavigator {
   private turnHeld = 0;
   private nudgedBearing: { bearing: number; until: number } | null = null;
 
-  constructor(world: WorldModel, start: { x: number; z: number; heading: number }, heightRange = DEFAULT_FLIGHT_HEIGHT, openingBearing?: number) {
+  constructor(world: WorldModel, start: { x: number; z: number; heading: number }, heightRange = FLIGHT_HEIGHT) {
     this.world = world;
     this.seedAngle = hash2(0, 0, world.seed + COMPASS_SEED) * Math.PI * 2;
-    this.heightRange = normalizeFlightHeight(heightRange.min, heightRange.max);
+    this.heightRange = heightRange;
+    this.drawCycle();
     const startSample = world.sample(start.x, start.z);
     const startGround = startSample.water ? startSample.surface : startSample.height;
     const ground = startGround + highlandWeight(startSample.mountainRegion) * (this.highestGround(start.x, start.z) - startGround);
     this.smoothedGround = ground;
     this.groundEnvelope = ground;
-    this.state = { x: start.x, y: ground + clamp(105, this.heightRange.min, this.heightRange.max), z: start.z, heading: start.heading, bank: 0, behavior: 'gliding', flapping: false };
+    this.state = { x: start.x, y: ground + this.holdClearance, z: start.z, heading: start.heading, bank: 0, behavior: 'gliding', flapping: false };
     this.chooseScenicTarget();
-    if (openingBearing !== undefined) {
-      this.opening = 'abeam';
-      this.openingBearing = openingBearing;
-      this.state.heading = openingBearing + Math.PI / 2;
-    }
   }
 
   get flightSeconds(): number {
     return this.totalTime;
   }
 
-  /** Opening slows only the day clock while climbing/holding, not flight time. */
-  get openingDayRate(): number {
-    return this.opening === 'climb' || this.opening === 'hold' ? 0.55 : 1;
+  /** The flight cycle: its phase, the thermal top over the current ground, and the cruise clearance. */
+  get cycle(): { phase: FlightPhase; top: number; cruise: number } {
+    return { phase: this.phase, top: this.thermalTop(this.smoothedGround), cruise: this.holdClearance };
+  }
+
+  /** Main passes the bearing of the show in the sky, or null; see `skyBearing`. */
+  setSkyBearing(bearing: number | null): void {
+    this.skyGoal = bearing;
   }
 
   get flightGround(): number {
@@ -326,18 +350,10 @@ export class EagleNavigator {
     if (this.nudgedBearing && this.totalTime > this.nudgedBearing.until) this.nudgedBearing = null;
   }
 
-  setFlightHeightRange(range: FlightHeightRange): void {
-    this.heightRange = normalizeFlightHeight(range.min, range.max);
-    const ground = this.flightGround;
-    this.state.y = ground + clamp(this.state.y - ground, this.heightRange.min, this.heightRange.max);
-  }
-
   update(deltaSeconds: number): EagleState {
     const dt = Math.min(deltaSeconds, 0.1);
-    const previousY = this.state.y;
     this.behaviorTime += dt;
     this.totalTime += dt;
-    this.updateCloudSchedule(dt);
     this.applyNudge(dt);
     if (this.state.behavior !== 'thermal-riding') {
       this.airspeed += (CRUISE_SPEED - this.airspeed) * (1 - Math.exp(-dt / 4));
@@ -362,19 +378,14 @@ export class EagleNavigator {
         this.target.z = this.thermal.z;
         const distance = Math.hypot(this.state.x - this.thermal.x, this.state.z - this.thermal.z);
         if (distance < 70) this.enter('thermal-riding');
-        else if (this.behaviorTime > 42 && distance > 150) this.enterGliding(); // never give up on a final approach
-      } else if (this.behaviorTime > 34) {
-        const altitude = this.state.y - ground;
-        const span = this.heightRange.max - this.heightRange.min;
-        if (altitude < this.heightRange.min + span * (0.2 + mountain * 0.35) || hash2(Math.floor(this.totalTime / 20), this.scenicIndex, this.world.seed + 401) > 0.64
-          || this.totalTime - this.glideStart > MAX_GLIDE_SECONDS) this.seekThermal();
-        else this.behaviorTime = 0;
+        else if (this.behaviorTime > SEEK_SECONDS && distance > 150) this.enterGliding(); // never give up on a final approach
+      } else if (this.phase === 'cruise' && this.totalTime - this.phaseSince >= CYCLE.cruiseSeconds
+        // Retry every 5 s if no thermal is in reach. Wait while the viewer steers or holds an adopted course.
+        && this.behaviorTime > 5 && this.nudgeIdle > NUDGE.holdSeconds && !this.nudgedBearing) {
+        this.seekThermal();
       }
     }
 
-    // Powered cloud flight sets the visible flap flag each frame. It must not
-    // extend an ordinary flap burst once the scheduled altitude is reached.
-    if (this.cloudFlight && (this.state.behavior === 'gliding' || this.state.behavior === 'thermal-seeking')) this.state.flapping = false;
     // Re-check: the block above may have just switched behavior this frame.
     if (this.state.behavior === 'thermal-riding') {
       this.state.flapping = false;
@@ -385,73 +396,39 @@ export class EagleNavigator {
       this.flyTowardTarget(dt, ground);
     }
     if (this.state.behavior !== 'ridge-soaring') this.state.crab = (this.state.crab ?? 0) * Math.exp(-dt / RIDGE.easeSeconds);
-    this.crossCloudDeck(dt, ground, previousY, mountain);
     const current = this.world.sample(this.state.x, this.state.z);
     this.state.y = Math.max(this.state.y, Math.max(current.height, current.water ? current.surface : current.height) + TERRAIN_SAFETY_MARGIN);
     return this.state;
   }
 
-  /** FWM's half-day schedule: low for 300 s, high for the final 150 s of 450 s. */
-  private updateCloudSchedule(dt: number): void {
-    const timing = DAY_SECONDS / 600;
-    if (this.opening === 'abeam' && this.totalTime >= 13 * timing) {
-      this.opening = 'climb';
-      this.openingSince = this.totalTime;
-    } else if (this.opening === 'climb' && (this.state.y >= CLOUD_DECK + 140 * CLOUD_HEIGHT_SCALE
-      // Soaring climbs at 4 m/s, not FWM's 11 m/s. Allow the full lowland ascent.
-      || this.totalTime - this.openingSince >= 240)) {
-      this.opening = 'hold';
-      this.openingSince = this.totalTime;
-    } else if (this.opening === 'hold' && this.totalTime - this.openingSince >= 10 * timing) {
-      this.opening = 'dive';
-      this.openingSince = this.totalTime;
-    } else if (this.opening === 'dive' && this.totalTime - this.openingSince >= 30 * timing) {
-      this.opening = null;
-      this.cloudOrigin = this.totalTime;
-    }
-    let high = this.opening ? this.opening === 'climb' || this.opening === 'hold'
-      : (this.totalTime - this.cloudOrigin) % (300 * timing) > 200 * timing;
-    this.cloudBlend += (Number(high) - this.cloudBlend) * (1 - Math.exp(-dt * 0.5));
-    if (this.opening) {
-      // Fly abeam for five reference seconds, then turn toward the sunrise.
-      // A course the viewer chose outranks the scripted sunrise turn.
-      const bearing = this.nudgedBearing?.bearing ?? this.openingBearing + (this.totalTime < 5 * timing ? Math.PI / 2 : 0);
-      this.target = { x: this.state.x + Math.sin(bearing) * 2000,
-        z: this.state.z + Math.cos(bearing) * 2000 };
-    }
+  /** Draw this cycle's top, dive rate and cruise height. */
+  private drawCycle(): void {
+    this.cycleIndex += 1;
+    const draw = (salt: number) => hash2(this.cycleIndex, salt, this.world.seed + 541);
+    this.topOffset = (draw(1) * 2 - 1) * CYCLE.topVariation;
+    this.diveRate = CYCLE.diveRate.min + draw(2) * (CYCLE.diveRate.max - CYCLE.diveRate.min);
+    this.cruiseHeight = CYCLE.cruise.min + draw(3) * (CYCLE.cruise.max - CYCLE.cruise.min);
   }
 
-  private crossCloudDeck(dt: number, ground: number, previousY: number, mountain: number): void {
-    // Highlands stand in FWM's mountain role and stay out of the lowland cloud
-    // schedule, as does ground that already protrudes through the deck. Keep their
-    // established lift, routing and ceiling rules. Safety always outranks the target.
-    if (mountain >= 0.5 || ground + this.heightRange.min >= CLOUD_DECK - 90 * CLOUD_HEIGHT_SCALE) {
-      this.cloudVelocity = 0;
-      return;
-    }
-    if (dt <= 0) return;
-    if (this.cloudBlend > 0.001) this.cloudFlight = true;
-    if (!this.cloudFlight) return;
-    const low = ground + clamp(110 + fbm1d(this.totalTime / 80, this.world.seed + 521) * 40,
-      this.heightRange.min, this.heightRange.max);
-    const high = CLOUD_HIGH_CRUISE + fbm1d(this.totalTime / 100, this.world.seed + 523) * 30 * CLOUD_HEIGHT_SCALE;
-    if (this.cloudBlend < 0.001 && previousY <= ground + this.heightRange.max) {
-      this.cloudVelocity = 0;
-      this.cloudFlight = false;
-      return;
-    }
-    // Thermals and ridges keep their no-flap lift and ceiling rules. The next
-    // glide or seek resumes the powered crossing; their episode limits stay intact.
-    if (this.state.behavior === 'thermal-riding' || this.state.behavior === 'ridge-soaring') return;
-    const target = Math.max(low + (high - low) * this.cloudBlend, this.climbNeed,
-      ground + this.heightRange.min + 10);
-    const requested = clamp((target - previousY) * 0.12, -16, FLAP_CLIMB_RATE);
-    this.cloudVelocity += (requested - this.cloudVelocity) * (1 - Math.exp(-dt * (requested > this.cloudVelocity ? 2.6 : 0.9)));
-    // Do not cancel a normal safety climb when the schedule requests descent.
-    const normalClimb = this.state.y > previousY ? (this.state.y - previousY) / dt : -Infinity;
-    const velocity = Math.max(this.cloudVelocity, normalClimb);
-    this.state.y = previousY + velocity * dt;
-    this.state.flapping = velocity > 0;
+  /** Clearance the bird holds by flapping: the cruise height, wandering up to 30 m. */
+  private get holdClearance(): number {
+    const wander = clamp(fbm1d(this.totalTime / 60, this.world.seed + 527), -1, 1) * CYCLE.cruiseWander;
+    return clamp(this.cruiseHeight + wander, this.heightRange.min, this.heightRange.max);
+  }
+
+  /**
+   * World height where this cycle's thermal climb ends: about 700 m above sea level, so lowland
+   * climbs pass the 600 m cloud deck. High ground still gets a 250 m climb, within the 800 m cap.
+   */
+  private thermalTop(ground: number): number {
+    return clamp(CYCLE.top + this.topOffset, ground + CYCLE.minRide, ground + this.heightRange.max);
+  }
+
+  /** Leaving a thermal high starts the dive; leaving it low starts the cruise. */
+  private leaveLift(): void {
+    this.drawCycle();
+    this.phase = this.state.y - this.smoothedGround > this.holdClearance + 60 ? 'dive' : 'cruise';
+    this.phaseSince = this.totalTime;
   }
 
   /** Sample the 250 m disk, not just the point below the bird. Refresh at 2 Hz. */
@@ -526,8 +503,7 @@ export class EagleNavigator {
    * (`need`) and at the full climb (`full`). Both keep the flap floor over each point.
    */
   private climbAlong(heading: number, reach: number): { need: number; full: number } {
-    const span = this.heightRange.max - this.heightRange.min;
-    const floor = this.heightRange.min + Math.max(10, span * 0.15);
+    const floor = this.holdClearance;
     const dx = Math.sin(heading);
     const dz = Math.cos(heading);
     let need = -Infinity;
@@ -659,7 +635,8 @@ export class EagleNavigator {
       || this.behaviorTime < RIDGE.seekCommitSeconds
       || Math.hypot(this.state.x - this.thermal.x, this.state.z - this.thermal.z) < RIDGE.seekCommitDistance);
     const gate = best as { x: number; z: number; face: Face; climb: number } | null;
-    if (committedSeek || !gate) {
+    // A dive goes down to the cruise; a ridge on the way does not catch it.
+    if (committedSeek || !gate || this.phase === 'dive') {
       this.ridgeGate = 0;
       return;
     }
@@ -843,13 +820,18 @@ export class EagleNavigator {
     this.enterGliding(target);
   }
 
-  // Gliding sinks; a flap burst climbs when near the floor or terrain rises ahead.
+  // Gliding sinks and a dive sinks faster; a flap burst climbs back to the held clearance
+  // when the bird drops under it here or ahead.
   private updateHeightEnergy(dt: number, ground: number, lookAheadGround: number): void {
-    const span = this.heightRange.max - this.heightRange.min;
-    const floorTrigger = this.heightRange.min + Math.max(10, span * 0.15);
+    const floorTrigger = this.holdClearance;
     const clearance = this.state.y - ground;
     const aheadClearance = this.state.y - lookAheadGround;
-    if (!this.state.flapping && (clearance < floorTrigger || aheadClearance < floorTrigger || this.state.y < this.climbNeed)) {
+    if (this.phase === 'dive' && clearance <= floorTrigger) {
+      this.phase = 'cruise';
+      this.phaseSince = this.totalTime;
+    }
+    const diving = this.phase === 'dive' && aheadClearance > floorTrigger && this.state.y >= this.climbNeed;
+    if (!this.state.flapping && !diving && (clearance < floorTrigger || aheadClearance < floorTrigger || this.state.y < this.climbNeed)) {
       this.state.flapping = true;
       this.flapTimer = FLAP_BURST_SECONDS;
     }
@@ -867,7 +849,7 @@ export class EagleNavigator {
       this.flapTimer -= dt;
       if (this.flapTimer <= 0) this.state.flapping = false;
     } else {
-      this.state.y -= GLIDE_SINK_RATE * dt;
+      this.state.y -= (diving ? this.diveRate : GLIDE_SINK_RATE) * dt;
     }
   }
 
@@ -954,12 +936,20 @@ export class EagleNavigator {
     this.state.bank += clamp(bankStep, -BANK_RATE * dt, BANK_RATE * dt);
 
     // A falling reference must not teleport the bird down when crossing a crest.
-    this.state.y += Math.min(climbRate * dt, Math.max(0, this.flightGround + this.heightRange.max - this.state.y));
-    // Skip the max-height/weaken exit on the entry tick: gliding can arrive already at/above max over low ground,
+    const top = this.thermalTop(ground);
+    this.state.y += Math.min(climbRate * dt, Math.max(0, top - this.state.y));
+    // Skip the top/weaken exit on the entry tick: gliding can arrive already at the top over low ground,
     // and this guarantees at least one visible thermal-riding tick before assessing it.
-    const clearance = this.state.y - ground;
-    if (this.behaviorTime > 0 && (clearance >= this.heightRange.max || this.rideLift < THERMAL_WEAK_LIFT)) {
+    if (this.behaviorTime <= 0) return;
+    if (this.state.y >= top - 0.5) {
       this.enterGliding();
+    } else if (this.rideLift < THERMAL_WEAK_LIFT) {
+      this.enterGliding();
+      // Lift that fades well short of the top sends the bird to the next thermal.
+      if (this.state.y < top - CYCLE.reseekBelowTop) {
+        this.phase = 'cruise';
+        this.phaseSince = -Infinity;
+      }
     }
   }
 
@@ -998,7 +988,8 @@ export class EagleNavigator {
     this.state.behavior = behavior;
     this.behaviorTime = 0;
     if (behavior !== 'gliding') this.shore = null;
-    else if (previous !== 'gliding') this.glideStart = this.totalTime;
+    if (behavior === 'thermal-riding') this.phase = 'lift';
+    else if (previous === 'thermal-riding') this.leaveLift();
     if (behavior !== 'ridge-soaring') this.ridge = null;
     this.ridgeGate = 0;
     // A new leg plans its own way ahead on its first tick.
@@ -1010,6 +1001,7 @@ export class EagleNavigator {
 
   private get compassBearing(): number {
     if (this.nudgedBearing) return this.nudgedBearing.bearing;
+    if (this.skyGoal !== null) return this.skyGoal;
     return this.seedAngle + fbm1d(this.totalTime / 300, this.world.seed + COMPASS_SEED) * Math.PI / 2;
   }
 
