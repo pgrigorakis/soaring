@@ -534,9 +534,8 @@ export function buildEagleMesh(): { mesh: THREE.SkinnedMesh; bones: THREE.Bone[]
     FINGERS.forEach((finger, i) => bone(wrist, `${side}-finger-${i}`, sign * (finger.base[0] - WRIST_X), 0, finger.base[1] - 1.0));
   }
   const map = featherAtlas();
-  const material = new THREE.MeshStandardMaterial({
-    map, vertexColors: true, roughness: 0.9, alphaTest: map ? 0.5 : 0, alphaToCoverage: map !== null,
-  });
+  // A hard alpha cut, not alpha-to-coverage: its partial edge alpha shows as white specks in the cloud deck.
+  const material = new THREE.MeshStandardMaterial({ map, vertexColors: true, roughness: 0.9, alphaTest: map ? 0.5 : 0 });
   const mesh = new THREE.SkinnedMesh(b.geometry(), material);
   mesh.add(root);
   mesh.bind(new THREE.Skeleton(bones));
