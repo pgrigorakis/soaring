@@ -71,10 +71,10 @@ export const FLAP_CLIMB_RATE = 4; // m/s while flapping
 const FLAP_BURST_SECONDS = 0.9; // a few wing beats, then glide again
 // ponytail: last-resort collision floor; normal flapping keeps clearance well above this.
 export const TERRAIN_SAFETY_MARGIN = 6;
-export const THERMAL_RADIUS_RANGE = { min: 30, max: 60 } as const;
-export const THERMAL_BANK_RANGE = { min: (20 * Math.PI) / 180, max: (35 * Math.PI) / 180 } as const;
-export const THERMAL_CLIMB_RANGE = { min: 3, max: 4 } as const;
-const THERMAL_CIRCLE_SPEED = 14; // m/s; with 30–60 m radius this yields a 20–35° bank
+export const THERMAL_RADIUS_RANGE = { min: 60, max: 120 } as const;
+export const THERMAL_BANK_RANGE = { min: (10 * Math.PI) / 180, max: (20 * Math.PI) / 180 } as const;
+export const THERMAL_CLIMB_RANGE = { min: 12, max: 16 } as const;
+const THERMAL_CIRCLE_SPEED = 14; // m/s; a 60–120 m radius turns at 0.12–0.23 rad/s and banks 10–20°
 const THERMAL_WEAK_LIFT = 0.18;
 const CRUISE_SPEED = 32;
 /** A seek that has not reached its thermal in two minutes picks again. */
@@ -222,7 +222,7 @@ export class EagleNavigator {
   private flapTimer = 0;
   private readonly heightRange: FlightHeightRange;
   private circleAngle = 0;
-  private circleRadius = 45;
+  private circleRadius = 90;
   private targetRadius = 45;
   private circleDrift = 0;
   private rideLift = 1;

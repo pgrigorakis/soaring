@@ -61,8 +61,8 @@ describe('procedural eagle', () => {
     }
   });
 
-  it('circles with the rendered bank toward the thermal and climbs at 3–4 m/s', () => {
-    expect(THERMAL_CLIMB_RANGE).toEqual({ min: 3, max: 4 });
+  it('circles with the rendered bank toward the thermal and climbs at 12–16 m/s', () => {
+    expect(THERMAL_CLIMB_RANGE).toEqual({ min: 12, max: 16 });
     const world = new WorldModel(448122);
     const navigator = new EagleNavigator(world, world.scenicStart(2));
     let riding = false;
