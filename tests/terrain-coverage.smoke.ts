@@ -9,7 +9,7 @@ const pose = (x: number) => ({ x, y: 350, z: -3239, lookX: x, lookY: 280, lookZ:
 // and moves the eagle more than 10 km, so the render origin rebases. It lands where green land is
 // within 3.5 km.
 const JUMP = 17 * 1440;
-// CI's software renderer checks bounded work, not repeated full 8 km loads (see docs/testing.md):
+// CI's software renderer checks bounded work, not repeated full 12 km loads (see docs/testing.md):
 // there, one crossing runs in the reduced smoke renderer. Locally, ordinary rendering covers
 // the jump and the rebase.
 const ci = Boolean(process.env.CI);
@@ -25,7 +25,7 @@ test('keeps intact distant land visible while crossing terrain boundaries', asyn
   await page.evaluate((start) => {
     const app = window.__SOARING__;
     app.pauseFlight();
-    app.setVisibility(8000);
+    app.setVisibility(12000);
     app.setTimeOfDay(.5);
     app.setViewpoint(start);
   }, pose(-1441));

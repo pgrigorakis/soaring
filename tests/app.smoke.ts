@@ -501,14 +501,14 @@ test('fullscreen toggle and F keep the idle scene clear while settings and diagn
   expect(errors).toEqual([]);
 });
 
-test('streams bounded work at each LOD tier out to the 8 km max', async ({ page }) => {
-  // On CI's software renderer the far tier took more than 4 min to start at 8 km (under 3 min at 5 km): far water
-  // tiles wait for the larger coarsest ground level, which shares the build budget with the tiles.
+test('streams bounded work at each LOD tier out to the 12 km max', async ({ page }) => {
+  // On CI's software renderer, far water tiles wait for the larger coarsest ground level,
+  // which shares the build budget with the tiles.
   test.setTimeout(540_000);
   const errors = captureErrors(page);
   await page.goto('/?smoke');
   await expect(page.locator('canvas').first()).toBeVisible();
-  // The smoke harness keeps a bounded 720 m budget instead of the 8 km product default.
+  // The smoke harness keeps a bounded 720 m budget instead of the 12 km product default.
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).requestedDistance).toBe(720);
 
   // Keep the measurement pose fixed: this checks coverage, not accelerated-flight throughput.
@@ -516,8 +516,8 @@ test('streams bounded work at each LOD tier out to the 8 km max', async ({ page 
     const s = window.__SOARING__.snapshot();
     window.__SOARING__.reviewFlight!({ x: s.position[0]!, z: s.position[2]!, heading: s.heading });
   });
-  // Raise the reach to the 8 km product default and confirm all three LOD tiers populate with bounded work.
-  await page.evaluate(() => window.__SOARING__.setVisibility(8000));
+  // Raise the reach to the 12 km product default and confirm all three LOD tiers populate with bounded work.
+  await page.evaluate(() => window.__SOARING__.setVisibility(12000));
   await page.evaluate(() => window.__SOARING__.setTimeScale(1));
   // Full far-field draining is covered by the unit tests; on the software-WebGL CI runner even the
   // real per-frame time budget (4 ms/frame) can take a while to fully drain hundreds of
@@ -527,14 +527,14 @@ test('streams bounded work at each LOD tier out to the 8 km max', async ({ page 
   await page.waitForFunction(() => window.__SOARING__.snapshot().tiers.far > 0, undefined, { timeout: 480_000 });
   console.log(`far tier started after ${((Date.now() - farStart) / 1000).toFixed(1)} s`);
   const snapshot = await page.evaluate(() => window.__SOARING__.snapshot());
-  expect(snapshot.requestedDistance).toBe(8000);
+  expect(snapshot.requestedDistance).toBe(12000);
   expect(snapshot.tiers.near).toBeGreaterThan(0);
   expect(snapshot.tiers.mid).toBeGreaterThan(0);
   expect(snapshot.tiers.far).toBeGreaterThan(0);
-  // Bounded chunk/mesh work even at the 8 km max: the coarse far grid plans at most 640 tiles
-  // at any pose. A queued tile may still replace a built one, so bound each count on its own.
+  // This fixed pose stays below 800 built or pending tiles at the 12 km max.
+  // A queued tile may still replace a built one, so bound each count on its own.
   expect(snapshot.chunks).toBeLessThan(700);
-  expect(snapshot.pending).toBeLessThanOrEqual(640);
+  expect(snapshot.pending).toBeLessThanOrEqual(800);
   expect(errors).toEqual([]);
 });
 
