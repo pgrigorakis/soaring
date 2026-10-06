@@ -3,6 +3,7 @@ import { ChunkBuffers } from './chunk-buffers';
 import { bindCloudFog, type CloudFogUniforms } from './cloud-sea';
 import { GroundLevels } from './ground-levels';
 import { InstancePool } from './instance-pool';
+import { midModel, placeTree, TreeModels } from './trees';
 import { WaterPool } from './water-pool';
 import { fbm, hash2, type LandscapeSample, SEA_LEVEL, type Tree, WorldModel } from './world';
 
@@ -97,7 +98,14 @@ const WATER_SEGMENTS = { near: DETAIL.segments, mid: 20, far: 16 };
 const TREE_SPACING = 29;
 // Shared pool capacities fit the densest Woodland ring measured by scripts/audit-tree-pools.mjs,
 // including a one-chunk move before rebuilds finish, with headroom. A full pool grows rather than drop trees.
-const POOL_CAPACITY = { midTrees: 40_000, nearTrunks: 12_000, cones: 7_500, broadleaf: 7_500, birch: 1_500 };
+const POOL_CAPACITY = { midConifers: 13_000, midBroadleaf: 30_000, conifers: 4_000, broadleaf: 7_500, birch: 1_500 };
+// The tallest tree model is about 29 m, scaled up to 1.8 by its crown and 1.18 by its jitter.
+const TALLEST_TREE = 62;
+// A low sun's tree shadows end at the 600 m shadow camera's range across.
+const MAX_SHADOW_SWEEP = 1200;
+const cullMatrix = new THREE.Matrix4();
+const cullFrustum = new THREE.Frustum();
+const shadowSweep = new THREE.Vector3();
 // Water blocks of 16 quads. The capacity grows if a lake-heavy ring needs more.
 const WATER_CAPACITY = 4096;
 // Instance data stays relative to an anchor near the stream, so long flights keep float32 precision.
@@ -169,33 +177,17 @@ export class TerrainStream {
     side: THREE.DoubleSide,
     depthWrite: false,
   });
-  private readonly trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1 });
-  private readonly foliageMaterials = [
-    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
-  ];
   private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x899b98, roughness: 1, flatShading: true });
-  private readonly trunkGeometry = new THREE.CylinderGeometry(0.8, 1.35, 9, 5);
-  private readonly crownGeometries = [
-    new THREE.ConeGeometry(5.5, 12, 7), // layered conifer
-    new THREE.IcosahedronGeometry(6.8, 1), // spreading deciduous crown
-    new THREE.IcosahedronGeometry(3.7, 1), // tall, narrow tree
-  ];
   private readonly rockGeometry = new THREE.DodecahedronGeometry(4.5, 0);
   private readonly torGeometry = new THREE.BoxGeometry(6, 3.2, 5);
   private readonly hedgeGeometry = new THREE.DodecahedronGeometry(1, 0);
   private readonly hedgeMaterial = new THREE.MeshStandardMaterial({ color: 0x518628, roughness: 1, flatShading: true });
-  // Distant trees keep the near placement, trunks, and colors with a simpler crown.
-  private readonly farCrownGeometry = new THREE.IcosahedronGeometry(5.4, 0);
-  private readonly farFoliageMaterial = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });
+  // Distant trees keep the near placement and colours with a simpler model.
+  private readonly trees = new TreeModels();
   // One draw call per tree shape for the whole ring, not one per tile. Mid-tier trees start beyond
   // the near tiles, outside the shadow camera's 600 m range, so they skip the shadow pass.
-  private readonly midTrunkPool: InstancePool;
-  private readonly midCrownPool: InstancePool;
-  private readonly nearTrunkPool: InstancePool;
-  // Conifers draw a lower and an upper cone from the same pool.
-  private readonly crownPools: InstancePool[];
+  private readonly nearTreePools: InstancePool[];
+  private readonly midTreePools: InstancePool[];
   private readonly waterPool: WaterPool;
   private readonly ground: GroundLevels;
 
@@ -204,11 +196,10 @@ export class TerrainStream {
     this.scene = scene;
     this.world = world;
     this.reach = reach;
-    this.midTrunkPool = new InstancePool(scene, 'mid tree trunks', POOL_CAPACITY.midTrees, this.trunkGeometry, this.trunkMaterial, false, false);
-    this.midCrownPool = new InstancePool(scene, 'mid tree crowns', POOL_CAPACITY.midTrees, this.farCrownGeometry, this.farFoliageMaterial, true, false);
-    this.nearTrunkPool = new InstancePool(scene, 'near tree trunks', POOL_CAPACITY.nearTrunks, this.trunkGeometry, this.trunkMaterial, false, true);
-    this.crownPools = (['cones', 'broadleaf', 'birch'] as const).map((kind, index) =>
-      new InstancePool(scene, `near ${kind}`, POOL_CAPACITY[kind], this.crownGeometries[index]!, this.foliageMaterials[index]!, true, true));
+    this.midTreePools = (['conifers', 'broadleaf'] as const).map((kind, index) => new InstancePool(scene, `mid ${kind}`,
+      POOL_CAPACITY[index === 0 ? 'midConifers' : 'midBroadleaf'], this.trees.mid[index]!, this.trees.midMaterial, true, false));
+    this.nearTreePools = (['conifers', 'broadleaf', 'birch'] as const).map((kind, index) => new InstancePool(scene, `near ${kind}`,
+      POOL_CAPACITY[kind], this.trees.near[index]!, this.trees.leafMaterial, true, true, this.trees.leafDepthMaterial));
     this.waterPool = new WaterPool(scene, WATER_CAPACITY, this.waterMaterial);
     // Water lies on the ground under every other transparent object, so it blends first.
     this.waterPool.mesh.renderOrder = -1;
@@ -449,7 +440,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
   private recenter(centerX: number, centerZ: number): void {
     this.centerX = centerX;
     this.centerZ = centerZ;
-    const anchor = this.midTrunkPool.mesh.position;
+    const anchor = this.midTreePools[0]!.mesh.position;
     if (Math.hypot(centerX * CHUNK_SIZE - anchor.x, centerZ * CHUNK_SIZE - anchor.z) > POOL_ANCHOR_DISTANCE) {
       for (const pool of this.pools) pool.reanchor(centerX * CHUNK_SIZE, centerZ * CHUNK_SIZE);
     }
@@ -524,7 +515,21 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
   }
 
   private get pools(): (InstancePool | WaterPool)[] {
-    return [this.midTrunkPool, this.midCrownPool, this.nearTrunkPool, ...this.crownPools, this.waterPool];
+    return [...this.midTreePools, ...this.nearTreePools, this.waterPool];
+  }
+
+  /**
+   * Draws only the trees that can show in the camera's view. `lightDir` points to the shadow-casting light,
+   * or is null without shadows. With shadows, a tree outside the view still draws if its shadow can reach it.
+   */
+  cullTrees(camera: THREE.Camera, lightDir: THREE.Vector3 | null): void {
+    camera.updateMatrixWorld();
+    this.scene.updateWorldMatrix(true, false);
+    cullMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    cullFrustum.setFromProjectionMatrix(cullMatrix);
+    const shadow = lightDir && shadowSweep.copy(lightDir)
+      .multiplyScalar(-Math.min(TALLEST_TREE / Math.max(lightDir.y, 0.05), MAX_SHADOW_SWEEP));
+    for (const pool of [...this.midTreePools, ...this.nearTreePools]) pool.cull(cullFrustum, shadow);
   }
 
   /** Live and total slots per shared pool, for diagnostics and tests. */
@@ -546,8 +551,8 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
   }
 
   bindCloudFog(uniforms: CloudFogUniforms): void {
-    for (const material of [this.terrainMaterial, this.waterMaterial, this.trunkMaterial,
-      this.rockMaterial, this.hedgeMaterial, this.farFoliageMaterial, ...this.foliageMaterials]) bindCloudFog(material, uniforms);
+    for (const material of [this.terrainMaterial, this.waterMaterial, ...this.trees.materials,
+      this.rockMaterial, this.hedgeMaterial]) bindCloudFog(material, uniforms);
   }
 
   dispose(): void {
@@ -558,17 +563,12 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     this.ground.dispose();
     this.terrainMaterial.dispose();
     this.waterMaterial.dispose();
-    this.trunkMaterial.dispose();
-    this.foliageMaterials.forEach((material) => material.dispose());
+    this.trees.dispose();
     this.rockMaterial.dispose();
-    this.trunkGeometry.dispose();
-    this.crownGeometries.forEach((geometry) => geometry.dispose());
     this.rockGeometry.dispose();
     this.torGeometry.dispose();
     this.hedgeGeometry.dispose();
     this.hedgeMaterial.dispose();
-    this.farCrownGeometry.dispose();
-    this.farFoliageMaterial.dispose();
   }
 
   private *createChunk({ x: chunkX, z: chunkZ, chunkSize, tier, trees: treeMode }: Pending): Generator<void, Chunk> {
@@ -783,46 +783,22 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
   }
 
   private placeNearTrees(trees: Tree[], pooled: InstancePool[], slots: number[]): void {
-    const dummy = new THREE.Object3D();
-    const tint = new THREE.Color();
-    const place = (pool: InstancePool, color?: THREE.Color) => {
-      dummy.updateMatrix();
-      slots.push(pool.add(dummy.matrix, color));
-      pooled.push(pool);
-    };
-    for (const tree of trees) {
-      const kind = tree.kind;
-      dummy.position.set(tree.x, tree.y + 4.5 * tree.scale, tree.z);
-      dummy.rotation.set(0, tree.turn, 0);
-      dummy.scale.setScalar(tree.scale);
-      place(this.nearTrunkPool);
-      treeColor(tree, tint);
-      dummy.position.y = tree.y + (kind === 2 ? 18 : 14) * tree.scale;
-      dummy.scale.set(tree.scale, tree.scale * (kind === 0 ? 1.4 : kind === 1 ? 0.83 : 2.6), tree.scale);
-      place(this.crownPools[kind]!, tint);
-      if (kind === 0) {
-        dummy.position.y = tree.y + 22 * tree.scale;
-        dummy.scale.setScalar(tree.scale * 0.85);
-        place(this.crownPools[0]!, tint);
-      }
-    }
+    this.placeTrees(trees, pooled, slots, this.nearTreePools, (kind) => kind);
   }
 
   private placeFarTrees(trees: Tree[], pooled: InstancePool[], slots: number[]): void {
+    this.placeTrees(trees, pooled, slots, this.midTreePools, midModel);
+  }
+
+  /** One instance per tree: each model holds the whole tree, trunk and crown. */
+  private placeTrees(trees: Tree[], pooled: InstancePool[], slots: number[], pools: InstancePool[], model: (kind: number) => number): void {
     const tint = new THREE.Color();
-    const dummy = new THREE.Object3D();
+    const matrix = new THREE.Matrix4();
     for (const tree of trees) {
-      dummy.position.set(tree.x, tree.y + 4.5 * tree.scale, tree.z);
-      dummy.rotation.set(0, tree.turn, 0);
-      dummy.scale.setScalar(tree.scale);
-      dummy.updateMatrix();
-      slots.push(this.midTrunkPool.add(dummy.matrix));
-      pooled.push(this.midTrunkPool);
-      dummy.position.y = tree.y + (tree.kind === 2 ? 18 : 14) * tree.scale;
-      dummy.scale.set(tree.scale * (tree.kind === 2 ? 0.68 : 1.2), tree.scale * (tree.kind === 0 ? 1.55 : tree.kind === 1 ? 1.05 : 1.8), tree.scale * (tree.kind === 2 ? 0.68 : 1.2));
-      dummy.updateMatrix();
-      slots.push(this.midCrownPool.add(dummy.matrix, treeColor(tree, tint)));
-      pooled.push(this.midCrownPool);
+      const pool = pools[model(tree.kind)]!;
+      placeTree(tree, matrix, treeColor(tree, tint));
+      slots.push(pool.add(matrix, tint));
+      pooled.push(pool);
     }
   }
 

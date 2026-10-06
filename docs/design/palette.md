@@ -104,7 +104,9 @@ The former peat-water tint `#2e4a4a` is retired with elevated peat pools. The gr
 | Highlands water tint | `#2a7fa0` |
 | Sun glint | `#fff1c2` |
 | Moon glint | `#dde7f0` |
-| Tree trunks | `#6b4a2e` |
+| Conifer bark | `#4a3222` |
+| Broadleaf bark | `#5b4330` |
+| Birch bark | `#d8d4c8` |
 | Hemisphere sky | `#cfe3f0` |
 | Hemisphere ground | `#5e7a3a` |
 
