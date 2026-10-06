@@ -82,8 +82,8 @@ function treeColor(tree: Tree, target: THREE.Color): THREE.Color {
 
 export const CHUNK_SIZE = 360;
 export const MIN_VISIBILITY = 720;
-export const MAX_VISIBILITY = 8000;
-export const DEFAULT_VISIBILITY = 8000;
+export const MAX_VISIBILITY = 12000;
+export const DEFAULT_VISIBILITY = 12000;
 const NEAR_RADIUS = 3; // chunks (fine grid): individual trees, rocks, full-density mesh
 // Beyond this distance, forest reads as terrain color only - no per-tree geometry.
 const TREE_CUTOFF = 3000;

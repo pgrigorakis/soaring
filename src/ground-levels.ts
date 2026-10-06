@@ -14,7 +14,7 @@ export type GroundPaint = (sample: LandscapeSample, x: number, z: number, normal
 const LEVELS = [
   { step: 9, extent: 1440, tile: 40 },
   { step: 18, extent: 4500, tile: 50 },
-  { step: 90, extent: 12600, tile: 40 },
+  { step: 90, extent: 16200, tile: 40 },
 ] as const;
 const SNAP = 90;
 // The published centre moves at most this far at once. Each window keeps a matching margin,

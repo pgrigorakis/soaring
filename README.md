@@ -24,7 +24,7 @@ Sound is procedural and starts muted on every page load. The two volume settings
 
 ## Terrain visibility
 
-Terrain visibility is fixed at 8,000 m around the eagle, independently of camera distance. It is not a setting. Haze reaches only drawn ground while it loads; trees and water can appear after the ground. Terrain loading is capped at the reach needed for a 16:9 window. Wider windows can show a shorter haze distance than 8,000 m.
+Terrain visibility is fixed at 12,000 m around the eagle, independently of camera distance. It is not a setting. Haze reaches only drawn ground while it loads; trees and water can appear after the ground. Terrain loading is capped at the reach needed for a 16:9 window. Wider windows can show a shorter haze distance than 12,000 m.
 
 Near the eagle, the landscape shows individual trees and rocks. Farther away, it shows simplified terrain. Engine rules for terrain streaming and mesh transitions are in [AGENTS.md](AGENTS.md).
 
