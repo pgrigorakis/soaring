@@ -19,7 +19,7 @@ for (let dz = -RADIUS; dz <= RADIUS; dz += 1) {
     else if (gap < CUTOFF) offsets.push({ dx, dz, near: false });
   }
 }
-const pools = ['midTrees', 'nearTrunks', 'cones', 'broadleaf', 'birch'];
+const pools = ['midConifers', 'midBroadleaf', 'conifers', 'broadleaf', 'birch'];
 const seeds = process.argv.slice(2).map(Number);
 if (seeds.length === 0) seeds.push(5, 80231, 448122, 1, 2, 3);
 
@@ -57,11 +57,10 @@ for (const seed of seeds) {
     const total = Object.fromEntries(pools.map((pool) => [pool, 0]));
     for (const [key, tile] of tiles) {
       const [conifer, broadleaf, birch] = chunk(tile.x, tile.z);
-      const all = conifer + broadleaf + birch;
       // A chunk that changed tier still holds its old trees, so a union counts both sets.
-      if (near.has(key)) { total.cones += conifer * 2; total.broadleaf += broadleaf; total.birch += birch; total.nearTrunks += all; }
-      // Mid-tier trees fill two pools of this size: trunks and crowns.
-      if (mid.has(key)) total.midTrees += all;
+      // Each tree is one whole-tree instance; mid-tier broadleaf and birch share one model.
+      if (near.has(key)) { total.conifers += conifer; total.broadleaf += broadleaf; total.birch += birch; }
+      if (mid.has(key)) { total.midConifers += conifer; total.midBroadleaf += broadleaf + birch; }
     }
     return total;
   };

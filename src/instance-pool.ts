@@ -16,7 +16,7 @@ export class InstancePool {
 
   constructor(private readonly parent: THREE.Object3D, name: string, capacity: number,
     geometry: THREE.BufferGeometry, material: THREE.Material, private readonly colored: boolean,
-    private readonly castShadow: boolean) {
+    private readonly castShadow: boolean, private readonly depthMaterial?: THREE.Material) {
     this.mesh = this.createMesh(name, capacity, geometry, material);
     parent.add(this.mesh);
   }
@@ -85,6 +85,7 @@ export class InstancePool {
     mesh.name = name;
     mesh.count = 0;
     mesh.castShadow = this.castShadow;
+    if (this.depthMaterial) mesh.customDepthMaterial = this.depthMaterial;
     // The pool spans the whole ring, so a bounding test would never cull it.
     mesh.frustumCulled = false;
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
