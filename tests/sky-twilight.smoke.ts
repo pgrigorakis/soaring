@@ -12,7 +12,7 @@ test('a painted twilight gradient keeps the dusk sky lit and fades out without a
     localStorage.setItem('soaring.world-seed.v1', '1406157560');
     localStorage.setItem('soaring.scenic-visit.v1', '0');
     localStorage.setItem('soaring.settings.v1', JSON.stringify({
-      muted: true, cameraDistance: 100, terrainVisibility: 720,
+      muted: true, cameraDistance: 100,
       showThermal: false,
     }));
   });

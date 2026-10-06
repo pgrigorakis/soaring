@@ -7,7 +7,7 @@ test('puff faces follow sky light and night exposure decreases without a global 
     localStorage.setItem('soaring.world-seed.v1', '1406157560');
     localStorage.setItem('soaring.scenic-visit.v1', '0');
     localStorage.setItem('soaring.settings.v1', JSON.stringify({
-      muted: true, cameraDistance: 100, terrainVisibility: 720,
+      muted: true, cameraDistance: 100,
       showThermal: false,
     }));
   });

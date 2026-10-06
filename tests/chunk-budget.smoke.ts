@@ -30,7 +30,6 @@ test('resumable streaming cancels safely and reuses detached buffers', async ({ 
   test.setTimeout(480_000);
   await page.addInitScript(() => {
     localStorage.setItem('soaring.world-seed.v1', '12345');
-    localStorage.setItem('soaring.settings.v1', JSON.stringify({ terrainVisibility: 720 }));
   });
   await page.goto('/?smoke');
   // Coverage is measured at fixed poses. A slow CI CPU can otherwise add work faster than 4 ms builds drain it.

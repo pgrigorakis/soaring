@@ -19,13 +19,13 @@ test('keeps intact distant land visible while crossing terrain boundaries', asyn
   await page.setViewportSize({ width: 1374, height: 870 });
   await page.addInitScript(() => {
     localStorage.setItem('soaring.world-seed.v1', '2272854000');
-    localStorage.setItem('soaring.settings.v1', JSON.stringify({ terrainVisibility: 8000 }));
   });
   await page.goto(ci ? '/?smoke' : '/');
   const coldStart = Date.now();
   await page.evaluate((start) => {
     const app = window.__SOARING__;
     app.pauseFlight();
+    app.setVisibility(8000);
     app.setTimeOfDay(.5);
     app.setViewpoint(start);
   }, pose(-1441));

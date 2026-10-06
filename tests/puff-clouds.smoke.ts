@@ -182,7 +182,7 @@ test('captures the puff deck from low, mid, and high chase flights at noon and g
     localStorage.setItem('soaring.scenic-visit.v1', '0');
     localStorage.setItem('soaring.settings.v1', JSON.stringify({
       ambienceVolume: 0.52, musicVolume: 0.52, muted: true,
-      cameraDistance: 100, terrainVisibility: 720, showThermal: false,
+      cameraDistance: 100, showThermal: false,
     }));
   });
 
