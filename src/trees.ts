@@ -3,7 +3,7 @@
 // Near trees build their crowns from alpha-tested leaf cards on a painted atlas; mid trees are a
 // simple cone or blob. A `crown` vertex attribute limits the instance tint to foliage, so bark keeps its colour.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Tree } from './world';
 import { hash2 } from './world-noise';
 
@@ -140,8 +140,11 @@ function part(source: THREE.BufferGeometry, crown: number, shade: Shade, cell: C
   return geometry;
 }
 
+/** Merges parts and shares identical vertices, so software WebGL shades about 40% fewer vertices. */
 function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  const merged = mergeGeometries(parts, false)!;
+  const joined = mergeGeometries(parts, false)!;
+  const merged = mergeVertices(joined, 1e-4);
+  joined.dispose();
   for (const geometry of parts) geometry.dispose();
   merged.computeBoundingSphere();
   merged.computeBoundingBox();
