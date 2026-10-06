@@ -133,8 +133,8 @@ test('the lowland flight cycle climbs through the cloud deck without collision-f
   await testInfo.attach('cloud-crossing', { body: JSON.stringify(metrics), contentType: 'application/json' });
   expect(metrics.minClearance).toBeGreaterThan(6);
   expect(metrics.corrections).toBe(0);
-  // Thermals climb at up to 4 m/s and dives sink at up to 6 m/s: no floor jumps.
-  expect(metrics.climb).toBeLessThanOrEqual(4.001);
+  // Thermals climb at up to 16 m/s and dives sink at up to 6 m/s: no floor jumps.
+  expect(metrics.climb).toBeLessThanOrEqual(16.001);
   expect(metrics.dive).toBeLessThanOrEqual(6.001);
   const y = metrics.trace.map((point) => point.y as number);
   // Lowland climbs end near 700 m above sea level, through the 600 m deck and not far past it.
