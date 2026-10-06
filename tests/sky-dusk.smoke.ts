@@ -11,7 +11,7 @@ test('dusk warmth follows the sun, a rose belt faces it, and the low sun is wide
     localStorage.setItem('soaring.world-seed.v1', '1406157560');
     localStorage.setItem('soaring.scenic-visit.v1', '0');
     localStorage.setItem('soaring.settings.v1', JSON.stringify({
-      muted: true, cameraDistance: 100, terrainVisibility: 720,
+      muted: true, cameraDistance: 100,
       showThermal: false,
     }));
   });

@@ -170,7 +170,7 @@ async function preparePixelBudgetPage(page: Page, path = '/'): Promise<void> {
     localStorage.setItem('soaring.scenic-visit.v1', '0');
     localStorage.setItem('soaring.settings.v1', JSON.stringify({
       ambienceVolume: 0.52, musicVolume: 0.52, muted: true,
-      cameraDistance: 100, terrainVisibility: 720, showThermal: true,
+      cameraDistance: 100, showThermal: true,
     }));
   });
   await page.goto(path);
@@ -260,7 +260,7 @@ test('rebases render coordinates while navigation stays in world coordinates', a
   expect(errors).toEqual([]);
 });
 
-test('tracks the active thermal and persists the visibility setting', async ({ page }) => {
+test('tracks the active thermal and persists the Show thermal setting', async ({ page }) => {
   test.setTimeout(90_000);
   const errors = captureErrors(page);
   await page.addInitScript(() => {
@@ -292,38 +292,35 @@ test('tracks the active thermal and persists the visibility setting', async ({ p
   expect(errors).toEqual([]);
 });
 
-test('loads legacy settings without flight-height, Low power or camera-distance controls', async ({ page }) => {
+test('loads legacy settings without flight-height, Low power, camera-distance or terrain-visibility controls', async ({ page }) => {
   const errors = captureErrors(page);
   await page.addInitScript(() => {
     if (!localStorage.getItem('soaring.settings.v1')) localStorage.setItem('soaring.settings.v1', JSON.stringify({
-      terrainVisibility: 5000, lowPower: true, minFlightHeight: 90, maxFlightHeight: 145, cameraDistance: 150,
+      lowPower: true, minFlightHeight: 90, maxFlightHeight: 145, cameraDistance: 150,
     }));
   });
   await page.goto('/?smoke');
   await openSettings(page);
-  for (const id of ['min-height', 'max-height', 'low-power', 'distance']) await expect(page.locator(`#${id}`)).toHaveCount(0);
-  // The old 5 km maximum becomes the new 8 km maximum.
-  await expect(page.locator('#visibility')).toHaveValue('8000');
+  for (const id of ['min-height', 'max-height', 'low-power', 'distance', 'visibility']) await expect(page.locator(`#${id}`)).toHaveCount(0);
+  // The stale saved 5000 m must not change visibility; the smoke harness keeps its bounded 720 m.
   const snapshot = await page.evaluate(() => window.__SOARING__.snapshot());
-  expect(snapshot.requestedDistance).toBe(8000);
+  expect(snapshot.requestedDistance).toBe(720);
   expect(snapshot.cameraDistance).toBe(150);
   expect(snapshot.chunkBuildBudget).toBe(4);
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).frameCap).toBeNull();
   await page.getByRole('checkbox', { name: 'Show thermal' }).uncheck();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1') ?? '{}'));
-  expect(Object.keys(saved).sort()).toEqual(['ambienceVolume', 'cameraDistance', 'musicVolume', 'muted', 'showThermal', 'terrainVisibility']);
+  expect(Object.keys(saved).sort()).toEqual(['ambienceVolume', 'cameraDistance', 'musicVolume', 'muted', 'showThermal']);
   expect(errors).toEqual([]);
 });
 
-test('visibility and camera distance persist independently', async ({ page }) => {
-  // Twenty cold 3600 m tiles share the frame budget with ground levels. CI's software renderer
-  // builds a tile in about 58 ms of CPU, so they take about 20 s there, not 3 s.
+test('camera distance and volume settings persist', async ({ page }) => {
   test.setTimeout(60_000);
   const errors = captureErrors(page);
   await page.addInitScript(() => {
     if (!localStorage.getItem('soaring.settings.v1')) localStorage.setItem('soaring.settings.v1', JSON.stringify({
-      ambienceVolume: 0.4, musicVolume: 0.4, muted: false, terrainVisibility: 1120, cameraDistance: 220,
+      ambienceVolume: 0.4, musicVolume: 0.4, muted: false, cameraDistance: 220,
     }));
   });
   await page.goto('/?smoke');
@@ -351,28 +348,19 @@ test('visibility and camera distance persist independently', async ({ page }) =>
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).cameraDistance).toBe(200);
   await expect(page.locator('#ambience')).toHaveValue('0.4');
   await expect(page.locator('#music')).toHaveValue('0.4');
-  await expect(page.locator('#visibility')).toHaveValue('1120');
-  expect(await page.locator('#visibility').getAttribute('max')).toBe('8000');
-  await page.locator('#visibility').fill('3600');
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).cameraDistance).toBe(200);
   await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
   await page.mouse.wheel(0, -3000);
   await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 10);
   await page.reload();
   await openSettings(page);
-  await expect(page.locator('#visibility')).toHaveValue('3600');
   await page.waitForFunction(() => {
     const { cameraDistance, cameraHeight } = window.__SOARING__.snapshot();
     return cameraDistance === 10 && cameraHeight > 0 && cameraHeight < 10;
   });
-  // Full far-field loading is covered by unit tests; here the stream only has to make bounded progress.
-  const first = await page.evaluate(() => window.__SOARING__.snapshot());
-  await page.waitForFunction((chunks) => window.__SOARING__.snapshot().chunks >= chunks + 20, first.chunks);
   const snapshot = await page.evaluate(() => window.__SOARING__.snapshot());
-  expect(snapshot.requestedDistance).toBe(3600);
   expect(snapshot.cameraDistance).toBe(10);
   expect(snapshot.cameraHeight).toBeLessThan(10);
-  expect(snapshot.visibleDistance).toBeLessThanOrEqual(3600);
   const firstFrame = await page.evaluate(async () => {
     const startingHeight = window.__SOARING__.snapshot().cameraHeight;
     document.querySelector('canvas')!.dispatchEvent(new WheelEvent('wheel', { deltaY: 20_000, cancelable: true }));
@@ -513,32 +501,23 @@ test('fullscreen toggle and F keep the idle scene clear while settings and diagn
   expect(errors).toEqual([]);
 });
 
-test('defaults terrain visibility to 8 km and streams bounded work at each LOD tier out to the 8 km max', async ({ page }) => {
+test('streams bounded work at each LOD tier out to the 8 km max', async ({ page }) => {
   // On CI's software renderer the far tier took more than 4 min to start at 8 km (under 3 min at 5 km): far water
   // tiles wait for the larger coarsest ground level, which shares the build budget with the tiles.
   test.setTimeout(540_000);
   const errors = captureErrors(page);
   await page.goto('/?smoke');
   await expect(page.locator('canvas').first()).toBeVisible();
-  await openSettings(page);
-  // A fresh session (no saved settings) still gets the smoke harness's bounded budget, not the
-  // 8 km product default - see the smokeMode override in src/main.ts.
-  await expect(page.locator('#visibility')).toHaveValue('720');
-  await page.evaluate(() => localStorage.removeItem('soaring.settings.v1'));
-  await page.reload();
-  await openSettings(page);
-  await expect(page.locator('#visibility')).toHaveValue('720');
+  // The smoke harness keeps a bounded 720 m budget instead of the 8 km product default.
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).requestedDistance).toBe(720);
 
   // Keep the measurement pose fixed: this checks coverage, not accelerated-flight throughput.
   await page.evaluate(() => {
     const s = window.__SOARING__.snapshot();
     window.__SOARING__.reviewFlight!({ x: s.position[0]!, z: s.position[2]!, heading: s.heading });
   });
-  // Push the slider to the 8 km max and confirm all three LOD tiers populate with bounded work.
-  await page.locator('#visibility').evaluate((input: HTMLInputElement) => {
-    input.value = '8000';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  // Raise the reach to the 8 km product default and confirm all three LOD tiers populate with bounded work.
+  await page.evaluate(() => window.__SOARING__.setVisibility(8000));
   await page.evaluate(() => window.__SOARING__.setTimeScale(1));
   // Full far-field draining is covered by the unit tests; on the software-WebGL CI runner even the
   // real per-frame time budget (4 ms/frame) can take a while to fully drain hundreds of
@@ -566,17 +545,17 @@ test('settings stay scrollable within short desktop and mobile viewports', async
   expect(await panel.evaluate((element) => element.scrollHeight)).toBe(await panel.evaluate((element) => element.clientHeight));
 
   for (const width of [800, 390]) {
-    await page.setViewportSize({ width, height: 430 });
+    await page.setViewportSize({ width, height: 300 });
     const bounds = await panel.boundingBox();
     expect(bounds).not.toBeNull();
-    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(430);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(300);
     expect(await panel.evaluate((element) => element.scrollHeight)).toBeGreaterThan(await panel.evaluate((element) => element.clientHeight));
     await panel.evaluate((element) => { element.scrollTop = element.scrollHeight; });
     expect(await panel.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
     const button = await page.locator('#new-world').boundingBox();
     expect(button).not.toBeNull();
     expect(button!.y).toBeGreaterThanOrEqual(0);
-    expect(button!.y + button!.height).toBeLessThanOrEqual(430);
+    expect(button!.y + button!.height).toBeLessThanOrEqual(300);
   }
 });
 

@@ -16,7 +16,7 @@ import { Trail } from './trail';
 import { Minimap } from './minimap';
 import { MapPanel } from './map-panel';
 
-type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; cameraDistance: number; terrainVisibility: number; showThermal: boolean };
+type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; cameraDistance: number; showThermal: boolean };
 const CAMERA_DISTANCE = { min: 10, max: 200, default: 100 } as const;
 const CAMERA_CLOSE_HEIGHT = 3;
 // At full zoom-out the camera sits 36 m above the bird.
@@ -28,10 +28,7 @@ const MAX_PIXEL_RATIO = 1.5;
 const SETTINGS_KEY = 'soaring.settings.v1';
 const SEED_KEY = 'soaring.world-seed.v1';
 const VISIT_KEY = 'soaring.scenic-visit.v1';
-const defaultSettings: StoredSettings = { ambienceVolume: 0.52, musicVolume: 0.52, muted: true, cameraDistance: CAMERA_DISTANCE.default, terrainVisibility: DEFAULT_VISIBILITY,
-  showThermal: true };
-// The earlier visibility maximum. The 80 m slider grid never yields it, so a saved value is the old maximum.
-const LEGACY_MAX_VISIBILITY = 5000;
+const defaultSettings: StoredSettings = { ambienceVolume: 0.52, musicVolume: 0.52, muted: true, cameraDistance: CAMERA_DISTANCE.default, showThermal: true };
 const clamp = (value: unknown, fallback: number, min: number, max: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 
@@ -44,8 +41,6 @@ function loadSettings(): StoredSettings {
       muted: typeof saved.muted === 'boolean' ? saved.muted : defaultSettings.muted,
       cameraDistance: clamp(saved.cameraDistance, defaultSettings.cameraDistance, CAMERA_DISTANCE.min, CAMERA_DISTANCE.max),
       showThermal: typeof saved.showThermal === 'boolean' ? saved.showThermal : defaultSettings.showThermal,
-      terrainVisibility: saved.terrainVisibility === LEGACY_MAX_VISIBILITY ? MAX_VISIBILITY
-        : clamp(saved.terrainVisibility, defaultSettings.terrainVisibility, MIN_VISIBILITY, MAX_VISIBILITY),
     };
   } catch {
     return { ...defaultSettings };
@@ -70,16 +65,15 @@ function nextVisit(): number {
 }
 
 // Development-only smoke harness uses a smaller software-WebGL render budget and bounded
-// terrain visibility for fresh storage. Saved settings still take the normal migration path,
-// including the 8 km product default when a legacy record has no visibility value.
+// terrain visibility.
 const smokeMode = import.meta.env.DEV && new URLSearchParams(location.search).has('smoke');
 // Development-only `?profile` arms the frame profiler and holds quality steady for held-vantage benches.
 const profileMode = import.meta.env.DEV && new URLSearchParams(location.search).has('profile');
-const hasSavedSettings = localStorage.getItem(SETTINGS_KEY) != null;
 const settings = loadSettings();
 let qualityStep = 0;
 const QUALITY_PIXEL_RATIOS = [MAX_PIXEL_RATIO, 1.25, 1.0] as const;
-if (smokeMode && !hasSavedSettings) settings.terrainVisibility = MIN_VISIBILITY;
+// Terrain visibility is not a setting and is never saved, so a stale stored value cannot change it.
+let terrainVisibility = smokeMode ? MIN_VISIBILITY : DEFAULT_VISIBILITY;
 
 function pixelRatioForStep(step = qualityStep): number {
   if (smokeMode) return 0.25;
@@ -471,7 +465,7 @@ function depthPerDistance(aspect: number): number {
   return 1 / Math.hypot(1, tanHalfFov * Math.hypot(1, aspect));
 }
 function effectiveTerrainVisibility(): number {
-  return qualityStep >= 3 ? Math.min(settings.terrainVisibility, 3500) : settings.terrainVisibility;
+  return qualityStep >= 3 ? Math.min(terrainVisibility, 3500) : terrainVisibility;
 }
 function terrainReach(): number {
   return effectiveTerrainVisibility() / depthPerDistance(Math.min(camera.aspect, MAX_REACH_ASPECT));
@@ -578,7 +572,6 @@ app.insertAdjacentHTML('beforeend', `
       <label class="setting">Sound <button class="mute-button" id="mute" type="button">Muted</button></label>
       <label class="setting">Ambience <output id="ambience-value">${Math.round(settings.ambienceVolume * 100)}%</output><input id="ambience" type="range" min="0" max="1" step="0.01" value="${settings.ambienceVolume}"></label>
       <label class="setting">Music <output id="music-value">${Math.round(settings.musicVolume * 100)}%</output><input id="music" type="range" min="0" max="1" step="0.01" value="${settings.musicVolume}"></label>
-      <label class="setting">Terrain visibility <output id="visibility-value">${Math.round(settings.terrainVisibility)} m</output><input id="visibility" type="range" min="${MIN_VISIBILITY}" max="${MAX_VISIBILITY}" step="80" value="${settings.terrainVisibility}"></label>
       <label class="setting">Show thermal <input id="show-thermal" type="checkbox" ${settings.showThermal ? 'checked' : ''}></label>
       <label class="setting"><button class="new-world" id="new-world" type="button">Generate a new world</button></label>
       <p class="audio-note" role="status">Sound starts muted. It is generated in your browser; no media is downloaded.</p>
@@ -603,8 +596,6 @@ const ambienceValue = document.querySelector<HTMLOutputElement>('#ambience-value
 const musicInput = document.querySelector<HTMLInputElement>('#music')!;
 const musicValue = document.querySelector<HTMLOutputElement>('#music-value')!;
 const audioNote = document.querySelector<HTMLElement>('.audio-note')!;
-const visibilityInput = document.querySelector<HTMLInputElement>('#visibility')!;
-const visibilityValue = document.querySelector<HTMLOutputElement>('#visibility-value')!;
 const showThermalInput = document.querySelector<HTMLInputElement>('#show-thermal')!;
 const diagnostics = document.querySelector<HTMLElement>('#diagnostics')!;
 
@@ -687,14 +678,6 @@ musicInput.addEventListener('input', () => {
   soundscape.setMusicVolume(settings.musicVolume);
   saveSettings();
 });
-visibilityInput.addEventListener('input', () => {
-  settings.terrainVisibility = Number(visibilityInput.value);
-  visibilityValue.value = `${Math.round(settings.terrainVisibility)} m`;
-  qualityStep = 0;
-  resetQualityTimers();
-  applyRenderQuality();
-  saveSettings();
-});
 showThermalInput.addEventListener('change', () => {
   settings.showThermal = showThermalInput.checked;
   thermalMarker.update(navigator.state, navigator.activeThermal, settings.showThermal, performance.now() / 1000);
@@ -722,7 +705,7 @@ function saveSettings(): void {
 let hazeStart = 0.82;
 function updateFog(): void {
   const coveredDepth = terrain.coveredDistance(cameraPosition.x, cameraPosition.z) * depthPerDistance(camera.aspect);
-  fog.far = Math.min(settings.terrainVisibility, coveredDepth);
+  fog.far = Math.min(terrainVisibility, coveredDepth);
   fog.near = fog.far * hazeStart;
   if (captureClear) {
     fog.near = Math.max(fog.far, 4200);
@@ -1274,7 +1257,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       ground: terrain.groundState,
       lastChunkBuilds,
       visibleDistance: fog.far,
-      requestedDistance: settings.terrainVisibility,
+      requestedDistance: terrainVisibility,
       cameraDistance: settings.cameraDistance,
       orbitYaw,
       orbitPitch,
@@ -1355,7 +1338,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
   setCaptureClear: (on: boolean) => { captureClear = on; },
   setCloudCoverage: (coverage: number | null) => { cloudCoverageOverride = coverage; },
   setVisibility: (meters: number) => {
-    settings.terrainVisibility = meters;
+    terrainVisibility = meters;
     terrain.setReach(terrainReach());
   },
   reviewSpots: () => world.reviewSpots(),

@@ -47,7 +47,7 @@ An inland basin filled to sea level. Its shore follows the surrounding land rath
 _Avoid_: Drainage lake, elevated cirque lake
 
 **Terrain visibility**:
-The setting described in [README.md](README.md#terrain-visibility).
+The fixed 8 km distance around the eagle, described in [README.md](README.md#terrain-visibility).
 _Avoid_: Camera distance, draw distance (when it could be confused with camera distance)
 
 **Ambience**:

@@ -6,7 +6,6 @@ test('production bundle serves from its base path and renders without dev hooks 
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => {
     localStorage.setItem('soaring.world-seed.v1', '0');
-    localStorage.setItem('soaring.settings.v1', JSON.stringify({ terrainVisibility: 720 }));
     const probe = { colors: 0, draws: 0, buffer: [0, 0], region: [0, 0, 0], renderer: '' };
     Object.assign(window, { __productionPixelProbe: probe });
     const pixels = new Uint8Array(256 * 256 * 4);
