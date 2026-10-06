@@ -1129,6 +1129,7 @@ function frame(now: number): void {
   // The scene and shaders stay real; only the dev-only smoke render cadence changes.
   if (!smokeMode || smokeFrameIndex++ % 4 === 0) {
     profiler?.renderBegin();
+    terrain.cullTrees(camera, renderer.shadowMap.enabled && keyLight.castShadow ? keyDir : null);
     renderer.render(scene, camera);
     sceneDrawCalls = renderer.info.render.calls;
     profiler?.renderEnd();

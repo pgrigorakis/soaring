@@ -99,6 +99,13 @@ const TREE_SPACING = 29;
 // Shared pool capacities fit the densest Woodland ring measured by scripts/audit-tree-pools.mjs,
 // including a one-chunk move before rebuilds finish, with headroom. A full pool grows rather than drop trees.
 const POOL_CAPACITY = { midConifers: 13_000, midBroadleaf: 30_000, conifers: 4_000, broadleaf: 7_500, birch: 1_500 };
+// The tallest tree model is about 29 m, scaled up to 1.8 by its crown and 1.18 by its jitter.
+const TALLEST_TREE = 62;
+// A low sun's tree shadows end at the 600 m shadow camera's range across.
+const MAX_SHADOW_SWEEP = 1200;
+const cullMatrix = new THREE.Matrix4();
+const cullFrustum = new THREE.Frustum();
+const shadowSweep = new THREE.Vector3();
 // Water blocks of 16 quads. The capacity grows if a lake-heavy ring needs more.
 const WATER_CAPACITY = 4096;
 // Instance data stays relative to an anchor near the stream, so long flights keep float32 precision.
@@ -509,6 +516,20 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
 
   private get pools(): (InstancePool | WaterPool)[] {
     return [...this.midTreePools, ...this.nearTreePools, this.waterPool];
+  }
+
+  /**
+   * Draws only the trees that can show in the camera's view. `lightDir` points to the shadow-casting light,
+   * or is null without shadows. With shadows, a tree outside the view still draws if its shadow can reach it.
+   */
+  cullTrees(camera: THREE.Camera, lightDir: THREE.Vector3 | null): void {
+    camera.updateMatrixWorld();
+    this.scene.updateWorldMatrix(true, false);
+    cullMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    cullFrustum.setFromProjectionMatrix(cullMatrix);
+    const shadow = lightDir && shadowSweep.copy(lightDir)
+      .multiplyScalar(-Math.min(TALLEST_TREE / Math.max(lightDir.y, 0.05), MAX_SHADOW_SWEEP));
+    for (const pool of [...this.midTreePools, ...this.nearTreePools]) pool.cull(cullFrustum, shadow);
   }
 
   /** Live and total slots per shared pool, for diagnostics and tests. */

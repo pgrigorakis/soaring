@@ -21,7 +21,12 @@ function expectGroundWithin(scene: THREE.Scene, terrain: TerrainStream, x: numbe
 const NEAR_TREE_POOLS = ['near conifers', 'near broadleaf', 'near birch'];
 const MID_TREE_POOLS = ['mid conifers', 'mid broadleaf'];
 
-/** World positions of a shared pool's live instances inside one fine tile. */
+/** Draws every pooled tree, as a camera that sees the whole ring would. */
+function drawAllTrees(terrain: TerrainStream): void {
+  terrain.cullTrees(new THREE.OrthographicCamera(-1e6, 1e6, 1e6, -1e6, -1e6, 1e6), null);
+}
+
+/** World positions of a shared pool's drawn instances inside one fine tile. */
 function pooled(scene: THREE.Object3D, name: string, tile: THREE.Object3D): THREE.Vector3[] {
   const pool = scene.getObjectByName(name) as THREE.InstancedMesh;
   const matrix = new THREE.Matrix4();
@@ -98,6 +103,7 @@ describe('terrain streaming', () => {
       }
     }
     terrain.update((spot.x + 0.5) * CHUNK_SIZE, (spot.z + 0.5) * CHUNK_SIZE, Infinity);
+    drawAllTrees(terrain);
     const far = scene.getObjectByName(`land ${spot.x + 5},${spot.z}`)!;
     expect(far).toBeDefined();
     const farTrees = MID_TREE_POOLS.flatMap((pool) => pooled(scene, pool, far)).length;
@@ -109,6 +115,7 @@ describe('terrain streaming', () => {
     }
     const name = far.name;
     terrain.update((spot.x + 1.5) * CHUNK_SIZE, (spot.z + 0.5) * CHUNK_SIZE, Infinity);
+    drawAllTrees(terrain);
     const detailed = scene.getObjectByName(name)!;
     expect(detailed).not.toBe(far);
     expect(NEAR_TREE_POOLS.flatMap((pool) => pooled(scene, pool, detailed)).length).toBe(farTrees);
@@ -126,6 +133,7 @@ describe('terrain streaming', () => {
       return { x, z, trees: world.treesInArea(x * CHUNK_SIZE, z * CHUNK_SIZE, CHUNK_SIZE, 29) };
     }).find((cell) => cell.trees.length > 8 && new Set(cell.trees.map((tree) => tree.kind)).size === 3)!;
     terrain.update((forest.x + 0.5) * CHUNK_SIZE, (forest.z + 0.5) * CHUNK_SIZE, Infinity);
+    drawAllTrees(terrain);
     const chunk = scene.getObjectByName(`land ${forest.x},${forest.z}`)!;
     const trees = forest.trees;
     // Each tree is one whole-tree instance in its kind's pool.
@@ -150,6 +158,7 @@ describe('terrain streaming', () => {
       .find(({ x, z }) => world.treesInArea(x * CHUNK_SIZE, z * CHUNK_SIZE, CHUNK_SIZE, 29).length > 8)!;
     terrain.update(0, 0, Infinity);
     terrain.update((cell.x + 0.5) * CHUNK_SIZE, (cell.z + 0.5) * CHUNK_SIZE, Infinity);
+    drawAllTrees(terrain);
     const pool = scene.getObjectByName('near conifers')!;
     expect(Math.hypot(pool.position.x, pool.position.z)).toBeGreaterThan(8000);
     const chunk = scene.getObjectByName(`land ${cell.x},${cell.z}`)!;
