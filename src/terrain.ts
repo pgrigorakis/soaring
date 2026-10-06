@@ -318,7 +318,7 @@ if ( abs( determinant ) > 0.00001 ) {
   ) / determinant;
 }
 float pixelFootprint = max( length( positionDx ), length( positionDy ) );
-float rippleFade = 1.0 - smoothstep( 1.25, 3.8, pixelFootprint );
+float rippleFade = 1.0 - smoothstep( 2.5, 7.6, pixelFootprint );
 rippleSlope = clamp( rippleSlope, vec2( -0.9 ), vec2( 0.9 ) ) * rippleFade * 0.55;
 vec3 waterBaseWorldNormal = normalize( transpose( mat3( viewMatrix ) ) * normal );
 vec3 waterWorldNormal = normalize( waterBaseWorldNormal + vec3( -rippleSlope.x, 0.0, -rippleSlope.y ) );
