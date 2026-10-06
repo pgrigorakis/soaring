@@ -4,6 +4,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { milkyWayComposite, milkyWayDeclarations, milkyWayFunctions, milkyWayUniforms } from './milky-way';
 import './style.css';
 import { Soundscape } from './audio';
+import { createStartScreen } from './start-screen';
 import { EagleNavigator, EagleView, skyBearing, type FlightPhase, type NudgeStatus } from './eagle';
 import { DEFAULT_VISIBILITY, MAX_VISIBILITY, MIN_VISIBILITY, TerrainStream } from './terrain';
 import { THERMAL_MARKER_RANGE, ThermalMarker } from './thermal-marker';
@@ -627,7 +628,16 @@ window.addEventListener('pointermove', showPointerActivity, { passive: true });
 window.addEventListener('keydown', showControls);
 showControls();
 cursorTimer = window.setTimeout(() => document.body.classList.add('cursor-hidden'), 3000);
-window.setTimeout(() => document.querySelector('#intro')?.classList.add('hidden'), 7000);
+// Dev smoke and profile runs skip the start screen unless `?start` asks for it.
+const startScreen = import.meta.env.DEV && (smokeMode || profileMode) && !new URLSearchParams(location.search).has('start')
+  ? null
+  : createStartScreen(app);
+function beginIntro(): void {
+  showPointerActivity();
+  window.setTimeout(() => document.querySelector('#intro')?.classList.add('hidden'), 7000);
+}
+if (startScreen) void startScreen.revealed.then(beginIntro);
+else beginIntro();
 
 function setSettingsOpen(open: boolean): void {
   panel.classList.toggle('open', open);
@@ -1139,6 +1149,7 @@ function frame(now: number): void {
     sceneDrawCalls = renderer.info.render.calls;
     profiler?.renderEnd();
     renderedFrames += 1;
+    if (renderedFrames === 1) startScreen?.firstFrameDrawn(renderer.getContext() as WebGL2RenderingContext);
   }
   const measuredFps = elapsed > 0 ? 1 / elapsed : 60;
   fpsSmoothed += (measuredFps - fpsSmoothed) * (1 - Math.exp(-elapsed / 0.5));
