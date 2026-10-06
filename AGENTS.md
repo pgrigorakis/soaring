@@ -12,6 +12,7 @@ This file holds the engine invariants established by #95 and points agents to re
 - Keep continental terrain height independent of biome profiles; sample water at common sea level and interpolate shore depth on the ground level's triangles.
 - Publish every ground level around one centre snapped to the coarsest spacing, and keep inward skirts on coarser holes, so level joins never expose gaps or cracks.
 - Derive fog coverage from displayed ground levels only, so pending water or tree tiles never hide land that is already drawn.
+- Fully hide streamed ground only at the live fog limit, never at a fixed distance, and discard it past that limit, so the horizon never shows a flat fog-coloured band.
 - Exclude water from thermal placement, so lift sites remain on land.
 - Keep thermal sun-facing placement on a fixed azimuth, so thermal sites do not drift as the sky sun moves.
 - Keep both directional lights dark at the horizon, so switching the shadow caster does not pop.

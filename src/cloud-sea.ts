@@ -33,18 +33,21 @@ uniform float cloudAbove;
 uniform float cloudWhiteout;
 uniform float cloudDensity;
 uniform float cloudOriginY;
-varying vec3 vCloudRender;`).replace('#include <fog_fragment>', `
+varying vec3 vCloudRender;`).replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+${streamingCover ? `#ifdef USE_FOG
+// Past the fog limit streamed ground is pure fog colour, which never matches the sky behind it. Leave the sky.
+if (vFogDepth > fogFar) discard;
+#endif` : ''}`).replace('#include <fog_fragment>', `
 #ifdef USE_FOG
 float cloudY = (vCloudRender.y + cloudOriginY) / ${CLOUD_HEIGHT_SCALE};
 float cloudDistance = length(vCloudRender - cameraPosition);
 float cloudDepth = max(vFogDepth, 0.0);
 float distF = (1.0 - exp(-pow(cloudDensity * cloudDepth, 2.0))) * mix(1.0, 0.55, smoothstep(100.0, 1000.0, cloudY));
 float lowAir = clamp(cloudDistance / ${120 * CLOUD_HEIGHT_SCALE}, 0.0, 1.0) * 0.055 * (1.0 - smoothstep(200.0, 800.0, cloudY));
-float farCover = smoothstep(${2600 * CLOUD_HEIGHT_SCALE}, ${4100 * CLOUD_HEIGHT_SCALE}, cloudDistance);
 // Preserve the live streaming boundary, including short visibility and Low power.
 // The nearby eagle is not streamed, so it stays visible while that boundary grows.
 float coverage = ${streamingCover ? 'smoothstep(fogNear, max(fogNear + 1.0, fogFar), cloudDepth)' : '0.0'};
-float air = 1.0 - (1.0 - distF) * (1.0 - lowAir) * (1.0 - max(farCover, coverage));
+float air = 1.0 - (1.0 - distF) * (1.0 - lowAir) * (1.0 - coverage);
 float below = max(490.0 - cloudY, 0.0);
 float seaF = (1.0 - exp(-pow(0.0000085 * below * cloudDepth / ${CLOUD_HEIGHT_SCALE}, 2.0))) * cloudAbove;
 float factor = max(max(air, seaF), cloudWhiteout);
