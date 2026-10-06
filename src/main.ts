@@ -822,7 +822,8 @@ function previousQualityStep(): number {
   return 0;
 }
 function updateAdaptiveQuality(elapsed: number): void {
-  if (profileMode) return;
+  // The unfocused 30 fps cap is a choice, not slow rendering: it must not cut the terrain reach.
+  if (profileMode || currentFrameCap() !== null) return;
   if (fpsSmoothed < 40) {
     headroomSeconds = 0;
     if (qualityStep >= 3) return;
