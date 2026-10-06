@@ -32,6 +32,7 @@ Development builds also expose `reviewFlight({ x, y?, z, heading })` to freeze n
 
 Relevant browser checks include:
 
+- `tests/start-screen.smoke.ts` checks that the white start screen holds until a click and fades only after the first world frame's GPU fence and one more frame. Add `?start` to a `?smoke` or `?profile` URL to show the start screen; those dev modes skip it otherwise. It saves captures in `test-results/start-screen/`.
 - `tests/app.smoke.ts` checks rendering, streaming, controls, and app behavior.
 - `tests/highlands.smoke.ts` records three one-hour Highlands flights from nearby starts with terrain clearance, climb limits, and behavior-duration checks. A glide may last a dive plus the 300 s cruise. Ridge soaring must occur in at least one flight. Total flap time is recorded, not limited.
 - `tests/highlands-cover.smoke.ts` captures noon and golden-hour snow cover from the default chase camera.
