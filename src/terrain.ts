@@ -378,6 +378,16 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
 
   get pendingCount(): number { return this.pending.length + this.ground.pending(this.reach); }
 
+  /** A full disk includes the starting view and allows a camera turn without exposing empty tiles. */
+  startupReady(x: number, z: number, radius: number): boolean {
+    const reach = Math.min(radius, this.reach);
+    if (this.ground.coveredDistance(x, z, this.reach) < reach) return false;
+    return !this.pending.some((tile) => Math.hypot(
+      Math.max(tile.x * tile.chunkSize - x, 0, x - (tile.x + 1) * tile.chunkSize),
+      Math.max(tile.z * tile.chunkSize - z, 0, z - (tile.z + 1) * tile.chunkSize),
+    ) < reach);
+  }
+
   update(x: number, z: number, buildBudgetMs = 4): number {
     const start = performance.now();
     this.rawX = x;
