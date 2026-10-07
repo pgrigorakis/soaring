@@ -8,9 +8,9 @@ const outfile = 'test-results/tree-pool-world.mjs';
 await build({ entryPoints: ['src/world.ts'], outfile, bundle: true, platform: 'node', format: 'esm', logLevel: 'error' });
 const { WorldModel } = await import(`../${outfile}?${Date.now()}`);
 
-// Mirrors TerrainStream.recenter at the default 5 km visibility: near trees inside 3 chunk gaps,
-// mid-tier trees out to the 3 km tree cutoff, both measured from the camera's chunk.
-const CHUNK = 360, NEAR = 3 * CHUNK, CUTOFF = 3000, SPACING = 29, RADIUS = 12;
+// Mirrors TerrainStream.recenter: near trees inside 3 chunk gaps, then tree billboards on the rest
+// of the fine grid, out to FAR_START (4320 m), both measured from the camera's chunk.
+const CHUNK = 360, NEAR = 3 * CHUNK, CUTOFF = 4320, SPACING = 29, RADIUS = 12;
 const offsets = [];
 for (let dz = -RADIUS; dz <= RADIUS; dz += 1) {
   for (let dx = -RADIUS; dx <= RADIUS; dx += 1) {
@@ -19,7 +19,7 @@ for (let dz = -RADIUS; dz <= RADIUS; dz += 1) {
     else if (gap < CUTOFF) offsets.push({ dx, dz, near: false });
   }
 }
-const pools = ['midConifers', 'midBroadleaf', 'conifers', 'broadleaf', 'birch'];
+const pools = ['midconifers', 'midbroadleaf', 'midbirch', 'conifers', 'broadleaf', 'birch'];
 const seeds = process.argv.slice(2).map(Number);
 if (seeds.length === 0) seeds.push(5, 80231, 448122, 1, 2, 3);
 
@@ -58,9 +58,9 @@ for (const seed of seeds) {
     for (const [key, tile] of tiles) {
       const [conifer, broadleaf, birch] = chunk(tile.x, tile.z);
       // A chunk that changed tier still holds its old trees, so a union counts both sets.
-      // Each tree is one whole-tree instance; mid-tier broadleaf and birch share one model.
+      // Each tree is one whole-tree instance or billboard in its kind's pool.
       if (near.has(key)) { total.conifers += conifer; total.broadleaf += broadleaf; total.birch += birch; }
-      if (mid.has(key)) { total.midConifers += conifer; total.midBroadleaf += broadleaf + birch; }
+      if (mid.has(key)) { total.midconifers += conifer; total.midbroadleaf += broadleaf; total.midbirch += birch; }
     }
     return total;
   };

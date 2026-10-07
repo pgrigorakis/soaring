@@ -3,7 +3,7 @@ import { ChunkBuffers } from './chunk-buffers';
 import { bindCloudFog, type CloudFogUniforms } from './cloud-sea';
 import { GroundLevels } from './ground-levels';
 import { InstancePool } from './instance-pool';
-import { midModel, placeTree, TreeModels } from './trees';
+import { placeTree, TreeModels } from './trees';
 import { WaterPool } from './water-pool';
 import { fbm, hash2, type LandscapeSample, SEA_LEVEL, type Tree, WorldModel } from './world';
 
@@ -86,8 +86,6 @@ export const MIN_VISIBILITY = 720;
 export const MAX_VISIBILITY = 12000;
 export const DEFAULT_VISIBILITY = 12000;
 const NEAR_RADIUS = 3; // chunks (fine grid): individual trees, rocks, full-density mesh
-// Beyond this distance, forest reads as terrain color only - no per-tree geometry.
-const TREE_CUTOFF = 3000;
 // Water placement switches to larger tiles here. A multiple of both tile sizes so the
 // two grids' tile edges always coincide - a large tile never straddles a fine tile.
 const FAR_CHUNK_SIZE = CHUNK_SIZE * 4;
@@ -98,7 +96,7 @@ const WATER_SEGMENTS = { near: DETAIL.segments, mid: 20, far: 16 };
 const TREE_SPACING = 29;
 // Shared pool capacities fit the densest Woodland ring measured by scripts/audit-tree-pools.mjs,
 // including a one-chunk move before rebuilds finish, with headroom. A full pool grows rather than drop trees.
-const POOL_CAPACITY = { midConifers: 13_000, midBroadleaf: 30_000, conifers: 4_000, broadleaf: 7_500, birch: 1_500 };
+const POOL_CAPACITY = { midconifers: 18_000, midbroadleaf: 34_000, midbirch: 6_000, conifers: 4_000, broadleaf: 7_500, birch: 1_500 };
 // The tallest tree model is about 29 m, scaled up to 1.8 by its crown and 1.18 by its jitter.
 const TALLEST_TREE = 62;
 // A low sun's tree shadows end at the 600 m shadow camera's range across.
@@ -182,10 +180,10 @@ export class TerrainStream {
   private readonly torGeometry = new THREE.BoxGeometry(6, 3.2, 5);
   private readonly hedgeGeometry = new THREE.DodecahedronGeometry(1, 0);
   private readonly hedgeMaterial = new THREE.MeshStandardMaterial({ color: 0x518628, roughness: 1, flatShading: true });
-  // Distant trees keep the near placement and colours with a simpler model.
+  // Distant trees keep the near placement and colours as billboards baked from the near models.
   private readonly trees = new TreeModels();
-  // One draw call per tree shape for the whole ring, not one per tile. Mid-tier trees start beyond
-  // the near tiles, outside the shadow camera's 600 m range, so they skip the shadow pass.
+  // One draw call per tree shape for the whole ring, not one per tile. Billboards start beyond the
+  // near tiles, outside the shadow camera's 600 m range, so they skip the shadow pass.
   private readonly nearTreePools: InstancePool[];
   private readonly midTreePools: InstancePool[];
   private readonly waterPool: WaterPool;
@@ -196,8 +194,8 @@ export class TerrainStream {
     this.scene = scene;
     this.world = world;
     this.reach = reach;
-    this.midTreePools = (['conifers', 'broadleaf'] as const).map((kind, index) => new InstancePool(scene, `mid ${kind}`,
-      POOL_CAPACITY[index === 0 ? 'midConifers' : 'midBroadleaf'], this.trees.mid[index]!, this.trees.midMaterial, true, false));
+    this.midTreePools = (['conifers', 'broadleaf', 'birch'] as const).map((kind, index) => new InstancePool(scene, `mid ${kind}`,
+      POOL_CAPACITY[`mid${kind}`], this.trees.billboards[index]!, this.trees.billboardMaterial, true, false));
     this.nearTreePools = (['conifers', 'broadleaf', 'birch'] as const).map((kind, index) => new InstancePool(scene, `near ${kind}`,
       POOL_CAPACITY[kind], this.trees.near[index]!, this.trees.leafMaterial, true, true, this.trees.leafDepthMaterial));
     this.waterPool = new WaterPool(scene, WATER_CAPACITY, this.waterMaterial);
@@ -448,7 +446,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     this.pending = [];
 
     // Fine grid (near + mid tiers): detailed trees, rocks and hedgerows near the eagle, then
-    // simplified trees, out to where the large far tiles take over. Every tier places water.
+    // tree billboards, out to where the large far tiles take over. Every tier places water.
     const fineReach = Math.min(this.reach, FAR_START);
     const fineRadius = Math.ceil(fineReach / CHUNK_SIZE);
     for (let dz = -fineRadius; dz <= fineRadius; dz += 1) {
@@ -458,7 +456,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
         const key = `n:${centerX + dx},${centerZ + dz}`;
         needed.add(key);
         const tier: Tier = gap <= NEAR_RADIUS * CHUNK_SIZE ? 'near' : 'mid';
-        const trees: TreeMode = tier === 'near' ? 'near' : gap < TREE_CUTOFF ? 'far' : 'none';
+        const trees: TreeMode = tier === 'near' ? 'near' : 'far';
         const descriptor = `${tier}:${trees}`;
         if (this.chunks.get(key)?.descriptor !== descriptor) {
           this.pending.push({ x: centerX + dx, z: centerZ + dz, key, chunkSize: CHUNK_SIZE, tier, trees, descriptor });
@@ -548,6 +546,11 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     this.pending = [];
     this.centerX = Number.NaN;
     this.centerZ = Number.NaN;
+  }
+
+  /** Bakes the tree billboards from the near models. Billboards draw nothing until this runs. */
+  bakeTrees(renderer: THREE.WebGLRenderer): void {
+    this.trees.bake(renderer);
   }
 
   bindCloudFog(uniforms: CloudFogUniforms): void {
@@ -783,20 +786,20 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
   }
 
   private placeNearTrees(trees: Tree[], pooled: InstancePool[], slots: number[]): void {
-    this.placeTrees(trees, pooled, slots, this.nearTreePools, (kind) => kind);
+    this.placeTrees(trees, pooled, slots, this.nearTreePools, false);
   }
 
   private placeFarTrees(trees: Tree[], pooled: InstancePool[], slots: number[]): void {
-    this.placeTrees(trees, pooled, slots, this.midTreePools, midModel);
+    this.placeTrees(trees, pooled, slots, this.midTreePools, true);
   }
 
-  /** One instance per tree: each model holds the whole tree, trunk and crown. */
-  private placeTrees(trees: Tree[], pooled: InstancePool[], slots: number[], pools: InstancePool[], model: (kind: number) => number): void {
+  /** One instance per tree: each model or billboard holds the whole tree, trunk and crown. */
+  private placeTrees(trees: Tree[], pooled: InstancePool[], slots: number[], pools: InstancePool[], billboard: boolean): void {
     const tint = new THREE.Color();
     const matrix = new THREE.Matrix4();
     for (const tree of trees) {
-      const pool = pools[model(tree.kind)]!;
-      placeTree(tree, matrix, treeColor(tree, tint));
+      const pool = pools[tree.kind]!;
+      placeTree(tree, matrix, treeColor(tree, tint), billboard ? this.trees.billboardSizes[tree.kind] : undefined);
       slots.push(pool.add(matrix, tint));
       pooled.push(pool);
     }
