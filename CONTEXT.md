@@ -25,18 +25,22 @@ The eagle's phase of flying toward a thermal.
 _Avoid_: Thermal-riding
 
 **Thermal-riding**:
-The eagle's phase of circling within a thermal, without flapping, to gain height. It rolls into the circle at its arrival speed, centres the lift, and drifts downwind with the thermal. It ends when the eagle reaches maximum flight height or the thermal weakens.
+The eagle's phase of circling within a thermal, without flapping, to gain height. It rolls into the circle at its arrival speed, centres the lift, and drifts downwind with the thermal. It ends when the eagle reaches the top of its **flight cycle** or the thermal weakens.
 _Avoid_: Thermal-seeking
 
+**Flight cycle**:
+The eagle's repeating sequence, after Fly With Me: it rides a thermal to a top near 700 m above sea level, dives to a cruise height of 50–150 m above the ground, holds that height for 300 s, then seeks the next thermal.
+_Avoid_: Loop, routine
+
 **Flight height**:
-The eagle's height above the local terrain. The minimum is a soft floor: near it the eagle flaps to climb. The maximum caps climbing in a thermal.
+The eagle's height above the local terrain, kept in a fixed 50–800 m band. Near the bottom the eagle flaps to climb. The top caps thermal and ridge climbs.
 
 **Gliding**:
 Flight without flapping outside a thermal; the eagle trades height for distance and slowly sinks.
 _Avoid_: Soaring (unless in a thermal)
 
 **Flapping**:
-Short bursts of wing beats the eagle uses to climb outside a thermal. Never used while thermal-riding. The wing beat eases in and out; it does not start at full stroke.
+Short bursts of wing beats the eagle uses to climb outside a thermal and to hold its cruise height. Never used while thermal-riding. The wing beat eases in and out; it does not start at full stroke.
 
 **Sea level**:
 The shared water height across the world. Bays, coasts and inland basins all fill to this height.
@@ -47,13 +51,17 @@ An inland basin filled to sea level. Its shore follows the surrounding land rath
 _Avoid_: Drainage lake, elevated cirque lake
 
 **Terrain visibility**:
-The fixed 8 km distance around the eagle, described in [README.md](README.md#terrain-visibility).
+The fixed 12 km distance around the eagle, described in [README.md](README.md#terrain-visibility).
 _Avoid_: Camera distance, draw distance (when it could be confused with camera distance)
+
+**Start screen**:
+The white screen shown on page load until the viewer clicks. The world loads behind it and fades in once nearby terrain is drawn.
+_Avoid_: Loading screen, splash
 
 **Ambience**:
 Environmental sounds such as wind and wing flaps, separate from music.
 _Avoid_: Music
 
 **Time of day**:
-The landscape's shared cycle of daylight and night. A full cycle lasts fifteen minutes. The sun and the full moon sit on opposite sides of the sky and do not follow the camera.
+The landscape's shared cycle of daylight and night. A full cycle lasts fifteen minutes. The sun and moon do not follow the camera. The moon falls behind the sun by a full turn every eight cycles, so it rises later and changes phase each night.
 _Avoid_: Fixed sun, camera sun

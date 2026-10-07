@@ -17,6 +17,8 @@ See [performance procedures](testing.md#performance-tools) for the benchmark and
 
 Because the frame interval is vsync-bound, read headroom from work and GPU time, not from frame-interval percentiles. A frame interval above the refresh period means a missed frame.
 
+The results below predate the continental terrain (#127). They used the drainage-era vantages `lake-noon`, `confluence-noon`, `river-run-golden-hour`, `network-noon` and `origin-night`. The current five vantages are defined in `scripts/perf-bench.ts`. Do not compare results across that change.
+
 ## Actual-browser parity run
 
 A two-read local run on 2026-10-03 used Chromium 154.0.8037.93, ANGLE Metal on Apple M4 Pro, 1440×900 CSS viewport, DPR 2, render pixel ratio 1.75, seed 5, and all five bench vantages. The commit was `2870e8f821adec23c357ba3ffddd9d6d67de60d9` with a dirty working tree. The saved output is `artifacts/look-parity/2026-10-03T07-51-50.264Z-2870e8f821ad/` on the capture machine; the directory is ignored and versioned by the tool, not checked into source control.
