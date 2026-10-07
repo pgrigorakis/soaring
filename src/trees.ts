@@ -1,7 +1,8 @@
 // Whole-tree models: trunk and crown merged in tree space with the origin at the trunk foot,
 // so one instance matrix places a whole tree and each tree shape costs one draw call for the ring.
-// Near trees build their crowns from alpha-tested leaf cards on a painted atlas; mid trees are a
-// simple cone or blob. A `crown` vertex attribute limits the instance tint to foliage, so bark keeps its colour.
+// Near trees build their crowns from alpha-tested leaf cards on a painted atlas. Mid and far trees are
+// camera-facing billboards baked from the near models at startup. A `crown` vertex attribute limits the
+// instance tint to foliage, so bark keeps its colour.
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Tree } from './world';
@@ -20,22 +21,25 @@ const BARK = { conifer: new THREE.Color(0x4a3222), broadleaf: new THREE.Color(0x
 
 const dummy = new THREE.Object3D();
 
-/** Index of the mid-tier model for a tree kind: conifers keep a cone, broadleaf and birch share a blob. */
-export function midModel(kind: number): number {
-  return kind === 0 ? 0 : 1;
-}
-
 /**
  * Writes the instance matrix of a whole tree and jitters its crown colour in place. Width, height and
  * hue vary per tree, hashed from the world position, so the same tree always looks the same.
+ * A billboard takes the same jitter, with its width averaged and no turn, so it can face the camera.
  */
-export function placeTree(tree: Tree, matrix: THREE.Matrix4, color: THREE.Color): void {
+export function placeTree(tree: Tree, matrix: THREE.Matrix4, color: THREE.Color, billboard?: THREE.Vector2): void {
   const ix = Math.round(tree.x), iz = Math.round(tree.z);
   const h = (offset: number) => hash2(ix, iz, 9100 + offset);
   color.offsetHSL((h(1) - 0.5) * 0.035, (h(2) - 0.5) * 0.18, (h(3) - 0.5) * 0.11);
+  const width = tree.scale * (0.85 + h(4) * 0.3), height = tree.scale * (0.82 + h(5) * 0.36), depth = tree.scale * (0.85 + h(6) * 0.3);
   dummy.position.set(tree.x, tree.y - 0.4, tree.z);
-  dummy.rotation.set(0, tree.turn, 0);
-  dummy.scale.set(tree.scale * (0.85 + h(4) * 0.3), tree.scale * (0.82 + h(5) * 0.36), tree.scale * (0.85 + h(6) * 0.3));
+  if (billboard) {
+    const across = billboard.x * (width + depth) / 2;
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(across, billboard.y * height, across);
+  } else {
+    dummy.rotation.set(0, tree.turn, 0);
+    dummy.scale.set(width, height, depth);
+  }
   dummy.updateMatrix();
   matrix.copy(dummy.matrix);
 }
@@ -43,18 +47,27 @@ export function placeTree(tree: Tree, matrix: THREE.Matrix4, color: THREE.Color)
 export class TreeModels {
   /** Near models by `Tree.kind`: conifer, broadleaf, birch. */
   readonly near: THREE.BufferGeometry[];
-  /** Mid models by `midModel(kind)`. */
-  readonly mid: THREE.BufferGeometry[];
+  /** Unit billboard quads by `Tree.kind`, each mapped to its kind's baked cell. */
+  readonly billboards: THREE.BufferGeometry[];
+  /** Billboard width and height in tree space by `Tree.kind`, for `placeTree`. */
+  readonly billboardSizes: THREE.Vector2[];
   readonly leafMaterial: THREE.MeshStandardMaterial;
   /** Shadow depth with the leaf alpha test, so shadows show gaps between leaves. */
   readonly leafDepthMaterial: THREE.MeshDepthMaterial;
-  readonly midMaterial: THREE.MeshStandardMaterial;
+  readonly billboardMaterial: THREE.MeshStandardMaterial;
   private readonly atlas = paintAtlas();
+  // The bake keeps colour and normals apart, so billboards take the live scene light like the near trees.
+  private readonly baked = { color: bakeTarget(THREE.SRGBColorSpace), normal: bakeTarget(THREE.NoColorSpace) };
 
   constructor() {
     const random = rng(99);
     this.near = [cardConifer(random), cardBroadleaf(random), cardBroadleaf(random, true)];
-    this.mid = [midConifer(), midBroadleaf()];
+    this.billboardSizes = this.near.map((geometry) => {
+      const box = geometry.boundingBox!;
+      const radius = Math.max(-box.min.x, box.max.x, -box.min.z, box.max.z) * BAKE.margin;
+      return new THREE.Vector2(radius * 2, box.max.y * BAKE.margin);
+    });
+    this.billboards = this.near.map((_, kind) => billboardQuad(kind));
     this.leafMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, map: this.atlas, alphaTest: 0.5,
       side: THREE.DoubleSide, roughness: 0.92 });
     this.leafMaterial.onBeforeCompile = (shader) => {
@@ -66,21 +79,146 @@ export class TreeModels {
     this.leafDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: this.atlas,
       alphaTest: 0.5, side: THREE.DoubleSide });
     this.leafDepthMaterial.onBeforeCompile = solidWithoutMap;
-    this.midMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
-    this.midMaterial.onBeforeCompile = tintCrownOnly;
+    this.billboardMaterial = billboardMaterial(this.baked.color.texture, this.baked.normal.texture);
   }
 
   get materials(): THREE.MeshStandardMaterial[] {
-    return [this.leafMaterial, this.midMaterial];
+    return [this.leafMaterial, this.billboardMaterial];
+  }
+
+  /**
+   * Renders each near model once, side on, into the billboard cells: unlit colour into one texture, and
+   * tree-space normals with the crown mask into another. Needs the live renderer, so it runs at startup.
+   */
+  bake(renderer: THREE.WebGLRenderer): void {
+    const scene = new THREE.Scene();
+    const material = bakeMaterial(this.atlas);
+    const mesh = new THREE.Mesh(this.near[0], material);
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+    const previous = { target: renderer.getRenderTarget(), clear: renderer.getClearColor(new THREE.Color()),
+      alpha: renderer.getClearAlpha(), autoClear: renderer.autoClear };
+    renderer.setClearColor(0x000000, 0);
+    renderer.autoClear = false;
+    for (const [pass, target] of [this.baked.color, this.baked.normal].entries()) {
+      material.uniforms.normalPass!.value = pass;
+      renderer.setRenderTarget(target);
+      renderer.clear();
+      this.near.forEach((geometry, kind) => {
+        const { x: width, y: height } = this.billboardSizes[kind]!;
+        // Looking along -z: tree-space x is the billboard's right and +z faces the viewer.
+        const camera = new THREE.OrthographicCamera(-width / 2, width / 2, height, 0, -width, width);
+        mesh.geometry = geometry;
+        target.viewport.set(kind * BAKE.cell.x, 0, BAKE.cell.x, BAKE.cell.y);
+        target.scissor.copy(target.viewport);
+        target.scissorTest = true;
+        renderer.setRenderTarget(target);
+        renderer.render(scene, camera);
+      });
+      target.scissorTest = false;
+      target.viewport.set(0, 0, target.width, target.height);
+    }
+    renderer.setRenderTarget(previous.target);
+    renderer.setClearColor(previous.clear, previous.alpha);
+    renderer.autoClear = previous.autoClear;
+    material.dispose();
   }
 
   dispose(): void {
-    for (const geometry of [...this.near, ...this.mid]) geometry.dispose();
+    for (const geometry of [...this.near, ...this.billboards]) geometry.dispose();
     this.leafMaterial.dispose();
     this.leafDepthMaterial.dispose();
-    this.midMaterial.dispose();
+    this.billboardMaterial.dispose();
     this.atlas.dispose();
+    this.baked.color.dispose();
+    this.baked.normal.dispose();
   }
+}
+
+// One cell per tree kind, side by side. The margin keeps leaf tips off the cell edge.
+const BAKE = { cell: new THREE.Vector2(256, 512), margin: 1.04 };
+
+function bakeTarget(colorSpace: THREE.ColorSpace): THREE.WebGLRenderTarget {
+  const target = new THREE.WebGLRenderTarget(BAKE.cell.x * 3, BAKE.cell.y, { generateMipmaps: true, depthBuffer: true,
+    minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
+  target.texture.colorSpace = colorSpace;
+  return target;
+}
+
+/** A unit quad standing on its foot at the origin, with uv on one kind's baked cell. */
+function billboardQuad(kind: number): THREE.BufferGeometry {
+  const quad = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
+  const uv = quad.attributes.uv as THREE.BufferAttribute;
+  for (let i = 0; i < uv.count; i++) uv.setX(i, (kind + uv.getX(i)) / 3);
+  // White vertex colour, so the instance tint reaches the fragment stage as vColor.
+  quad.setAttribute('color', new THREE.BufferAttribute(new Float32Array(uv.count * 3).fill(1), 3));
+  quad.computeBoundingSphere();
+  return quad;
+}
+
+/** Writes unlit near-tree colour, or tree-space normal and crown mask, with the near trees' alpha test. */
+function bakeMaterial(atlas: THREE.Texture): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: { atlas: { value: atlas }, normalPass: { value: 0 } },
+    side: THREE.DoubleSide,
+    vertexShader: `
+attribute vec3 color;
+attribute float crown;
+varying vec2 vUv;
+varying vec3 vColor;
+varying vec3 vTreeNormal;
+varying float vCrown;
+void main() {
+  vUv = uv;
+  vColor = color;
+  vTreeNormal = normal;
+  vCrown = crown;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`,
+    fragmentShader: `
+uniform sampler2D atlas;
+uniform int normalPass;
+varying vec2 vUv;
+varying vec3 vColor;
+varying vec3 vTreeNormal;
+varying float vCrown;
+void main() {
+  vec4 leaf = vUv.x < 0.0 ? vec4(1.0) : texture2D(atlas, vUv);
+  if (leaf.a < 0.5) discard;
+  gl_FragColor = normalPass == 1 ? vec4(normalize(vTreeNormal) * 0.5 + 0.5, vCrown) : vec4(vColor * leaf.rgb, 1.0);
+}`,
+  });
+}
+
+/**
+ * Camera-facing quads lit as the near trees: the baked normal turns with the quad, so sun, sky and night
+ * light it from the right side. Empty texels are black and clear, so the filtered colour, normal and crown
+ * mask are divided by the filtered coverage to stay true at every mip level.
+ */
+function billboardMaterial(color: THREE.Texture, normal: THREE.Texture): THREE.MeshStandardMaterial {
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, map: color, alphaTest: 0.4, roughness: 0.92 });
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.bakedNormal = { value: normal };
+    const facing = `
+vec3 billboardRight = normalize(vec3(viewMatrix[0][0], 0.0, viewMatrix[2][0]) + vec3(1e-5, 0.0, 0.0));
+vec3 billboardBack = cross(billboardRight, vec3(0.0, 1.0, 0.0));`;
+    // The instance matrix only moves and scales, with equal x and z scale, so turning the quad in
+    // instance space keeps the stock projection, fog and cloud-fog chunks valid.
+    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `${facing}
+vec3 transformed = vec3(billboardRight.x * position.x, position.y, billboardRight.z * position.x);`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform sampler2D bakedNormal;')
+      .replace('#include <map_fragment>', `
+vec4 bakedColor = texture2D( map, vMapUv );
+vec4 bakedTreeNormal = texture2D( bakedNormal, vMapUv ) / max( bakedColor.a, 1e-3 );
+diffuseColor.rgb *= bakedColor.rgb / max( bakedColor.a, 1e-3 ) * mix( vec3( 1.0 ), vColor, bakedTreeNormal.a );
+diffuseColor.a *= bakedColor.a;`)
+      .replace('#include <color_fragment>', '')
+      .replace('#include <normal_fragment_maps>', `${facing}
+vec3 treeNormal = bakedTreeNormal.xyz * 2.0 - 1.0;
+normal = normalize( ( viewMatrix * vec4( billboardRight * treeNormal.x + vec3( 0.0, treeNormal.y, 0.0 ) + billboardBack * treeNormal.z, 0.0 ) ).xyz );`);
+  };
+  return material;
 }
 
 function tintCrownOnly(shader: THREE.WebGLProgramParametersWithUniforms): void {
@@ -323,19 +461,4 @@ function cardConifer(random: () => number): THREE.BufferGeometry {
     }
   }
   return merge(parts);
-}
-
-function midConifer(): THREE.BufferGeometry {
-  const cone = new THREE.ConeGeometry(5.6, 23, 6, 1);
-  cone.translate(0, 4.5 + 11.5, 0);
-  return merge([trunk(7, 0.95, 0.5, BARK.conifer, 4),
-    part(cone, 1, aoShade(4, 28, 5.6, 0.45), SOLID, (p) => new THREE.Vector3(0, p.y - 3, 0), 0.4)]);
-}
-
-function midBroadleaf(): THREE.BufferGeometry {
-  const blob = new THREE.IcosahedronGeometry(6.6, 0);
-  blob.scale(1, 0.9, 1);
-  blob.translate(0, 14.5, 0);
-  const centre = new THREE.Vector3(0, 14.5, 0);
-  return merge([trunk(9, 1.1, 0.6, BARK.broadleaf, 4), part(blob, 1, aoShade(8.5, 20.5, 6.6, 0.5), SOLID, () => centre, 0.7)]);
 }

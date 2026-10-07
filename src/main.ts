@@ -474,6 +474,7 @@ function terrainReach(): number {
 const terrain = new TerrainStream(worldRoot, world, terrainReach());
 const cloudSea = new CloudSea(worldRoot);
 terrain.bindCloudFog(cloudSea.fogUniforms);
+terrain.bakeTrees(renderer);
 const birdMaterials = new Set<THREE.Material>();
 eagle.group.traverse((object) => {
   if (object instanceof THREE.Mesh) for (const material of Array.isArray(object.material) ? object.material : [object.material]) birdMaterials.add(material);

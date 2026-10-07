@@ -19,7 +19,7 @@ function expectGroundWithin(scene: THREE.Scene, terrain: TerrainStream, x: numbe
 }
 
 const NEAR_TREE_POOLS = ['near conifers', 'near broadleaf', 'near birch'];
-const MID_TREE_POOLS = ['mid conifers', 'mid broadleaf'];
+const MID_TREE_POOLS = ['mid conifers', 'mid broadleaf', 'mid birch'];
 
 /** Draws every pooled tree, as a camera that sees the whole ring would. */
 function drawAllTrees(terrain: TerrainStream): void {
