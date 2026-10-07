@@ -23,6 +23,8 @@ const CAMERA_CLOSE_HEIGHT = 3;
 // At full zoom-out the camera sits 36 m above the bird.
 const CAMERA_FAR_HEIGHT = 36;
 const CHUNK_BUILD_BUDGET_MS = 4;
+// Four placement tiles, matching the finest ground level's extent. Far terrain remains asynchronous.
+const STARTUP_NEAR_RADIUS = 1440;
 const RENDER_ORIGIN_DISTANCE = 10_000;
 const MAX_RENDER_PIXELS = 2_000_000;
 const MAX_PIXEL_RATIO = 1.5;
@@ -1056,7 +1058,8 @@ function frame(now: number): void {
   lastProcessedFrame = now;
   const delta = clampNextSimulationDelta ? Math.min(rawDelta * timeScale, 0.1) : rawDelta * timeScale;
   clampNextSimulationDelta = false;
-  updateFlight(delta, now);
+  // Keep the starting view fixed while its terrain fills behind the white screen.
+  updateFlight(startScreen?.holding ? 0 : delta, now);
   const state = navigator.state;
   if (Math.hypot(state.x - renderOrigin.x, state.y - renderOrigin.y, state.z - renderOrigin.z) > RENDER_ORIGIN_DISTANCE) {
     renderOrigin.set(state.x, state.y, state.z);
@@ -1103,7 +1106,8 @@ function frame(now: number): void {
   }
   camera.position.copy(cameraPosition).sub(renderOrigin);
   camera.lookAt(renderLookAt.copy(lookAt).sub(renderOrigin));
-  lastChunkBuilds = terrain.update(cameraPosition.x, cameraPosition.z, CHUNK_BUILD_BUDGET_MS);
+  // Keep incremental work small as the white screen becomes transparent.
+  lastChunkBuilds = terrain.update(cameraPosition.x, cameraPosition.z, startScreen?.fading ? 2 : CHUNK_BUILD_BUDGET_MS);
   updateFog();
   if (!skyPaused) skySeconds += rawDelta;
   minimap.update(state.x, state.z, state.heading, rawDelta);
@@ -1126,16 +1130,17 @@ function frame(now: number): void {
     cacheTrimElapsed -= 1;
     world.trim(WORLD_CACHE_LIMIT);
   }
-  // Keep input, streaming and simulation responsive between costly software-WebGL draws.
-  // The scene and shaders stay real; only the dev-only smoke render cadence changes.
-  if (!smokeMode || smokeFrameIndex++ % 4 === 0) {
+  // Stream on every frame, but avoid spending every frame drawing an opaque, hidden world.
+  // The first draw still warms the GPU; the readiness draw includes all completed near terrain.
+  if (!(smokeMode || startScreen?.holding) || smokeFrameIndex++ % 4 === 0) {
     profiler?.renderBegin();
     terrain.cullTrees(camera, renderer.shadowMap.enabled && keyLight.castShadow ? keyDir : null);
     renderer.render(scene, camera);
     sceneDrawCalls = renderer.info.render.calls;
     profiler?.renderEnd();
     renderedFrames += 1;
-    if (renderedFrames === 1) startScreen?.firstFrameDrawn(renderer.getContext() as WebGL2RenderingContext);
+    if (startScreen?.holding) startScreen.worldFrameDrawn(renderer.getContext() as WebGL2RenderingContext,
+      terrain.startupReady(cameraPosition.x, cameraPosition.z, STARTUP_NEAR_RADIUS));
   }
   const measuredFps = elapsed > 0 ? 1 / elapsed : 60;
   fpsSmoothed += (measuredFps - fpsSmoothed) * (1 - Math.exp(-elapsed / 0.5));
@@ -1202,7 +1207,7 @@ window.addEventListener('beforeunload', () => {
 declare global {
   interface Window {
     __SOARING__: {
-      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; ground: string; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; moonLit: number; moonIntensity: number; dominant: 'sun' | 'moon'; starAmount: number; milkyWayAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; chunkBuildBudget: number; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; cloudLayer: ReturnType<CloudSea['snapshot']>; nudge: NudgeStatus; cycle: { phase: FlightPhase; top: number; cruise: number } };
+      snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; ground: string; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; moonLit: number; moonIntensity: number; dominant: 'sun' | 'moon'; starAmount: number; milkyWayAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; chunkBuildBudget: number; startupNearReady: boolean; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; cloudLayer: ReturnType<CloudSea['snapshot']>; nudge: NudgeStatus; cycle: { phase: FlightPhase; top: number; cruise: number } };
       puffCloudSnapshot: () => PuffCloudSnapshot;
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
@@ -1277,6 +1282,7 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       orbitPitch,
       frameCap: currentFrameCap(),
       chunkBuildBudget: CHUNK_BUILD_BUDGET_MS,
+      startupNearReady: terrain.startupReady(cameraPosition.x, cameraPosition.z, STARTUP_NEAR_RADIUS),
       qualityStep,
       pixelRatio: renderer.getPixelRatio(),
       renderWidth: renderer.domElement.width,
