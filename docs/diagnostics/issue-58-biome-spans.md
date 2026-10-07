@@ -1,5 +1,7 @@
 # Issue #58: biome span decision evidence
 
+The scripts named below, `scripts/audit-biome-spans.mjs`, `scripts/audit-biomes-browser.ts` and `scripts/audit-route.mjs`, are no longer in the tree. They remain in git history at commit `5da4b07`.
+
 ## Decision B implementation
 
 Firstmate authorized independent Rolling Hills territory and broader fields. The implementation passes the median-span audit and the **actual dry-land sample-grid coverage** across all three requested seeds. Runtime source uses:

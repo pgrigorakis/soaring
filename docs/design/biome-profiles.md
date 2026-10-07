@@ -26,4 +26,4 @@ Adding a climate point does not move terrain height. It does move biome territor
 
 ## Validation
 
-See [testing](../testing.md) for the commands and [the refactor evidence](../../evidence/biome-data/README.md) for the comparison against main. `tests/biomes.smoke.ts` writes `biome-parity.json` without app timing or animation state. It includes exact world samples, ground RGB at three slopes, shared-mesh hashes, and tree placement/tints at five fixed poses.
+See [testing](../testing.md) for the commands. The refactor's parity evidence against main is no longer in the tree; it remains in git history at commit `5da4b07`, under `evidence/biome-data/`. `tests/biomes.smoke.ts` writes `biome-parity.json` without app timing or animation state. It includes exact world samples, ground RGB at three slopes, shared-mesh hashes, and tree placement/tints at five fixed poses.

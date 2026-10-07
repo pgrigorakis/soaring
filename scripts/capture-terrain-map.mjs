@@ -4,8 +4,9 @@ import { build } from 'esbuild';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { deflateSync } from 'node:zlib';
 const label = process.argv[2] ?? 'after';
-const out = 'docs/design/fwm-terrain-evidence';
+const out = 'test-results/terrain-map';
 await mkdir('.scratch', { recursive: true });
+await mkdir(out, { recursive: true });
 await build({
   entryPoints: ['src/world.ts'],
   outfile: '.scratch/map-world.mjs',

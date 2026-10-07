@@ -1,3 +1,0 @@
-result: "\"{\\\"cameraWorldY\\\":576.9230769230769,\\\"timeOfDay\\\":0.5,\\\"sunElevation\\\":0.788010753606722,\\\"moonElevation\\\":-0.788010753606722,\\\"exposure\\\":0.925138888888889,\\\"starAmount\\\":0,\\\"pending\\\":0,\\\"cloudLayer\\\":{\\\"above\\\":0.6238425925925924,\\\"whiteout\\\":0.996,\\\"bodies\\\":1,\\\"opacity\\\":0.5864120370370368,\\\"visible\\\":true,\\\"deck\\\":600},\\\"position\\\":[3.061616997868383e-14,558.5297435897436,500],\\\"heading\\\":0.4,\\\"cameraDistance\\\":100,\\\"orbitYaw\\\":0,\\\"orbitPitch\\\":0,\\\"pixelRatio\\\":1}\""
-help[1]:
-  Run `chrome-devtools-axi snapshot` to see current page state

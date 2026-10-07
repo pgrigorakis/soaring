@@ -2,7 +2,7 @@
 
 ## Problem
 
-A camera tile crossing queued new terrain tiles. The nearest pending tile set the global fog distance, so fog closed in all directions and hid land that was already drawn. On seed 2272854000, a two-metre crossing of x = −1440 dropped visibility from 5000 m to 3310 m for many frames. Red traces and strips from unchanged `main` and green ones from this port are in `evidence/ground-levels/`.
+A camera tile crossing queued new terrain tiles. The nearest pending tile set the global fog distance, so fog closed in all directions and hid land that was already drawn. On seed 2272854000, a two-metre crossing of x = −1440 dropped visibility from 5000 m to 3310 m for many frames. Red traces and strips from unchanged `main` and green ones from this port remain in git history at commit `5da4b07`, under `evidence/ground-levels/`.
 
 ## Reference
 
