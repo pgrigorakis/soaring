@@ -78,8 +78,8 @@ test('the feathered eagle draws as one skinned call with painted, spread wings',
   // A close three-quarter view from above shows the painted feather tracts.
   await page.evaluate(({ position, heading }) => {
     const [x, y, z] = position as [number, number, number];
-    window.__SOARING__.setViewpoint({ x: x - Math.sin(heading) * 14 + Math.cos(heading) * 12, y: y + 9,
-      z: z - Math.cos(heading) * 14 - Math.sin(heading) * 12, lookX: x, lookY: y, lookZ: z });
+    window.__SOARING__.setViewpoint({ x: x - Math.sin(heading) * 1.3 + Math.cos(heading) * 1.1, y: y + 0.84,
+      z: z - Math.cos(heading) * 1.3 - Math.sin(heading) * 1.1, lookX: x, lookY: y, lookZ: z });
   }, start);
   const close = await capture(page, 'close', true);
   const closeHidden = await capture(page, 'close-hidden', false);
@@ -96,7 +96,7 @@ test('the feathered eagle draws as one skinned call with painted, spread wings',
   expect(evidence.eagleDrawCalls).toBe(1);
   // From behind, the spread wings make a wide, flat silhouette inside the box other captures skip.
   const { bounds } = chasePixels;
-  expect(chasePixels.count).toBeGreaterThan(400);
+  expect(chasePixels.count).toBeGreaterThan(250);
   expect((bounds.x1 - bounds.x0) / (bounds.y1 - bounds.y0)).toBeGreaterThan(3);
   expect(bounds.x0).toBeGreaterThanOrEqual(CHASE_BOX.x0);
   expect(bounds.x1).toBeLessThan(CHASE_BOX.x1);

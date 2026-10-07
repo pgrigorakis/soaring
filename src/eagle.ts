@@ -69,8 +69,8 @@ export function skyBearing(body: Daylight, milkyWay: number, core: Vec3): number
 export const GLIDE_SINK_RATE = 1; // m/s, per CONTEXT.md: Gliding
 export const FLAP_CLIMB_RATE = 4; // m/s while flapping
 const FLAP_BURST_SECONDS = 0.9; // a few wing beats, then glide again
-// ponytail: last-resort collision floor; normal flapping keeps clearance well above this.
-export const TERRAIN_SAFETY_MARGIN = 6;
+// Last-resort body clearance for a life-size bird; normal flight holds at least 50 m.
+export const TERRAIN_SAFETY_MARGIN = 0.6;
 export const THERMAL_RADIUS_RANGE = { min: 60, max: 120 } as const;
 export const THERMAL_BANK_RANGE = { min: (10 * Math.PI) / 180, max: (20 * Math.PI) / 180 } as const;
 export const THERMAL_CLIMB_RANGE = { min: 12, max: 16 } as const;
@@ -1103,7 +1103,8 @@ export class EagleView {
     mesh.frustumCulled = false;
     this.bones = bones;
     this.group.add(mesh);
-    this.group.scale.setScalar(1.15);
+    // The ~19.6-unit mesh becomes a ~2.1 m wingspan, including its shadow.
+    this.group.scale.setScalar(0.107);
   }
 
   update(state: EagleState, deltaSeconds: number): void {

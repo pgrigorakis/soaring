@@ -1,6 +1,6 @@
 // The golden eagle's mesh: one skinned draw call with a painted feather atlas.
 // Bird frame: +z is the bill, +y is up, the wings extend along x. One unit is
-// about 10.6 cm on a 2.0 m golden eagle.
+// 10.7 cm in the world (EagleView scale 0.107), for a ~2.1 m wingspan.
 import * as THREE from 'three';
 
 // ---------------------------------------------------------------------------

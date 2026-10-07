@@ -14,8 +14,8 @@ A white start screen shows the title until you click. The world loads behind it.
 
 ## Controls
 
-- Drag on the landscape to orbit the camera. Release to let it return slowly to the trailing view.
-- Scroll the mouse wheel to move the camera between 10 m and 200 m behind the eagle. At 200 m it sits 36 m above the eagle. The distance persists across reloads.
+- Drag on the landscape to orbit around the eagle. The eagle stays centred. Double-click to return to the trailing view.
+- Scroll the mouse wheel to move the camera between 6 m and 60 m behind the life-size eagle. The default distance is 16 m. At 60 m it sits 6 m above the eagle. The distance persists across reloads.
 - Move the pointer to reveal the settings control. The cursor and control hide after 3 seconds without pointer movement.
 - Settings provide fullscreen, sound and volume controls, Show thermal, and a new-world action. Show thermal marks thermals within 3.5 km of the eagle; the selected thermal stays hotter.
 - The eagle flies a repeating cycle, after Fly With Me. It rides a thermal to a top near 700 m above sea level and dives at 5–6 m/s to a cruise of 50–150 m above the ground. It holds that height by flapping for 300 s, then seeks the next thermal. Ridges can carry it during the cruise. At sunrise and sunset it heads toward the low sun, after dark toward a low moon, and on dark nights toward the galaxy core. Climbs stay within 800 m of the ground, and terrain safety always takes priority.

@@ -305,7 +305,7 @@ test('loads legacy settings without flight-height, Low power, camera-distance or
   // The stale saved 5000 m must not change visibility; the smoke harness keeps its bounded 720 m.
   const snapshot = await page.evaluate(() => window.__SOARING__.snapshot());
   expect(snapshot.requestedDistance).toBe(720);
-  expect(snapshot.cameraDistance).toBe(150);
+  expect(snapshot.cameraDistance).toBe(60);
   expect(snapshot.chunkBuildBudget).toBe(4);
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   expect((await page.evaluate(() => window.__SOARING__.snapshot())).frameCap).toBeNull();
@@ -344,22 +344,22 @@ test('camera distance and volume settings persist', async ({ page }) => {
   await expect(settingsToggle).toHaveAttribute('aria-expanded', 'true');
   await expect(settingsToggle).toHaveAccessibleName('Close settings');
   await expect(page.locator('#quality')).toHaveCount(0);
-  // A saved 220 m distance is clamped to the 200 m maximum.
-  expect((await page.evaluate(() => window.__SOARING__.snapshot())).cameraDistance).toBe(200);
+  // A saved 220 m distance is clamped to the 60 m maximum.
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).cameraDistance).toBe(60);
   await expect(page.locator('#ambience')).toHaveValue('0.4');
   await expect(page.locator('#music')).toHaveValue('0.4');
-  expect((await page.evaluate(() => window.__SOARING__.snapshot())).cameraDistance).toBe(200);
+  expect((await page.evaluate(() => window.__SOARING__.snapshot())).cameraDistance).toBe(60);
   await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
   await page.mouse.wheel(0, -3000);
-  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 10);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 6);
   await page.reload();
   await openSettings(page);
   await page.waitForFunction(() => {
     const { cameraDistance, cameraHeight } = window.__SOARING__.snapshot();
-    return cameraDistance === 10 && cameraHeight > 0 && cameraHeight < 10;
+    return cameraDistance === 6 && cameraHeight > 0 && cameraHeight < 10;
   });
   const snapshot = await page.evaluate(() => window.__SOARING__.snapshot());
-  expect(snapshot.cameraDistance).toBe(10);
+  expect(snapshot.cameraDistance).toBe(6);
   expect(snapshot.cameraHeight).toBeLessThan(10);
   const firstFrame = await page.evaluate(async () => {
     const startingHeight = window.__SOARING__.snapshot().cameraHeight;
@@ -371,21 +371,21 @@ test('camera distance and volume settings persist', async ({ page }) => {
   });
   // A single render frame must ease toward the new height, not teleport to it.
   expect(Math.abs(firstFrame.cameraHeight - firstFrame.startingHeight)).toBeLessThan(12);
-  // At the 200 m maximum the camera sits 36 m above the bird.
+  // At the 60 m maximum the camera sits 6 m above the bird.
   // Hold the bird still: the camera trails a climb or dive, so it settles only on a fixed pose.
-  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 200);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 60);
   await page.evaluate(() => {
     const s = window.__SOARING__.snapshot();
     window.__SOARING__.reviewFlight!({ x: s.position[0]!, y: s.position[1]!, z: s.position[2]!, heading: s.heading });
   });
-  await page.waitForFunction(() => Math.abs(window.__SOARING__.snapshot().cameraHeight - 36) < 0.01);
+  await page.waitForFunction(() => Math.abs(window.__SOARING__.snapshot().cameraHeight - 6) < 0.01);
   const farCamera = await page.evaluate(() => window.__SOARING__.snapshot());
-  expect(farCamera.cameraHeight).toBeCloseTo(36, 1);
+  expect(farCamera.cameraHeight).toBeCloseTo(6, 1);
   expect(snapshot.chunks + snapshot.pending).toBeLessThan(700);
   expect(errors).toEqual([]);
 });
 
-test('mouse wheel zooms the camera between 10 m and 200 m and persists the distance', async ({ page }) => {
+test('mouse wheel zooms the camera between 6 m and 60 m and persists the distance', async ({ page }) => {
   const errors = captureErrors(page);
   await page.goto('/?smoke');
   const canvas = page.locator('canvas').first();
@@ -394,16 +394,16 @@ test('mouse wheel zooms the camera between 10 m and 200 m and persists the dista
   if (!box) throw new Error('Canvas has no layout box');
   await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
   await page.mouse.wheel(0, -2000);
-  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 10);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 6);
   await page.mouse.wheel(0, 300);
-  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance > 12);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance > 7);
   await page.waitForTimeout(1000);
   const zoomed = await page.evaluate(() => window.__SOARING__.snapshot().cameraDistance);
-  expect(zoomed).toBeGreaterThan(12);
-  expect(zoomed).toBeLessThan(200);
+  expect(zoomed).toBeGreaterThan(7);
+  expect(zoomed).toBeLessThan(60);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('soaring.settings.v1') ?? '{}').cameraDistance)).toBe(zoomed);
   await page.mouse.wheel(0, 20_000);
-  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 200);
+  await page.waitForFunction(() => window.__SOARING__.snapshot().cameraDistance === 60);
   expect(errors).toEqual([]);
 });
 
