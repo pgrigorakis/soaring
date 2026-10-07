@@ -1,5 +1,7 @@
 # Issue 99: resumable terrain streaming
 
+The `evidence/chunk-budget-*` files named below are no longer in the tree. They remain in git history at commit `5da4b07`.
+
 ## Implementation
 
 Normal streaming receives 4 ms per update; Low power receives 2 ms. Startup uses the same budget. A generator yields between eight terrain samples/vertices, eight water samples/levels, individual wet water cells, and tree-placement lattice rows. Geometry completion and instance construction remain short indivisible steps. This is a cooperative CPU budget, not a hard real-time guarantee. A slow world sample, garbage collection, or GPU upload can still exceed it.

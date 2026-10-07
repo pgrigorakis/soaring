@@ -2,7 +2,7 @@
 
 ## Problem
 
-A camera tile crossing queued new terrain tiles. The nearest pending tile set the global fog distance, so fog closed in all directions and hid land that was already drawn. On seed 2272854000, a two-metre crossing of x = −1440 dropped visibility from 5000 m to 3310 m for many frames. Red traces and strips from unchanged `main` and green ones from this port are in `evidence/ground-levels/`.
+A camera tile crossing queued new terrain tiles. The nearest pending tile set the global fog distance, so fog closed in all directions and hid land that was already drawn. On seed 2272854000, a two-metre crossing of x = −1440 dropped visibility from 5000 m to 3310 m for many frames. Red traces and strips from unchanged `main` and green ones from this port remain in git history at commit `5da4b07`, under `evidence/ground-levels/`.
 
 ## Reference
 
@@ -15,9 +15,9 @@ The reference is MIT licensed, copyright 2026 Kun Chen. `THIRD_PARTY_NOTICES.md`
 
 ## Soaring adaptation
 
-`src/ground-levels.ts` keeps the reference architecture: fixed GPU-displaced grids, toroidal CPU sample windows, and incremental row and column refill. It keeps Soaring's world sampling, palette, water, vegetation, floating origin and 720–5000 m visibility control.
+`src/ground-levels.ts` keeps the reference architecture: fixed GPU-displaced grids, toroidal CPU sample windows, and incremental row and column refill. It keeps Soaring's world sampling, palette, water, vegetation and floating origin. Terrain visibility is now fixed at 12 km.
 
-- **Three levels instead of one.** Soaring's established look uses 9 m spacing near the eagle, 18 m in the middle distance and 90 m far away. One 9 m grid over 7 km would cost too many triangles. The levels extend ±1440 m, ±4500 m and ±7200 m.
+- **Three levels instead of one.** Soaring's established look uses 9 m spacing near the eagle, 18 m in the middle distance and 90 m far away. One 9 m grid over the full reach would cost too many triangles. The levels extend ±1440 m, ±4500 m and ±16,200 m.
 - **One shared centre.** Every level is published around one centre, snapped to 90 m. Each coarser level has a hole exactly the size of the next finer level, so the levels meet without gaps. Inward skirts below each hole edge hide T-junction cracks, as the old tile skirts did.
 - **Budgeted refill.** Fly-with-me refills synchronously. Soaring keeps its per-frame CPU budget, so refills are resumable generators. Each window has a margin of one 90 m step. The next centre is filled first and published only when every displayed level has reached it, so a refill never overwrites a displayed texel.
 - **One sample per texel.** Each point needs its sample for colour and its neighbours' heights for the normal. The line ahead is sampled once and kept for the next line.
@@ -32,15 +32,15 @@ The reference is MIT licensed, copyright 2026 Kun Chen. `THIRD_PARTY_NOTICES.md`
 
 ## Failure modes covered
 
-- A crossing hides drawn land: `tests/terrain-coverage.smoke.ts` asserts 5000 m visibility and steady horizon pixels in every frame of two crossings. It covers normal and Low power rendering.
-- A jump shows unbuilt ground: the same test jumps 21.6 km. It asserts zero visibility in the first frame and monotonic growth back to 5000 m.
-- A rebase moves ground: the jump moves the eagle more than 10 km, so the render origin rebases. The second crossing runs after the rebase.
+- A crossing hides drawn land: `tests/terrain-coverage.smoke.ts` asserts that haze stays at the requested 12 km visibility in every frame of a crossing.
+- A jump shows unbuilt ground: the same test jumps 24.5 km. It asserts zero visibility in the first frame and monotonic growth back to the requested visibility.
+- A rebase moves ground: the jump moves the eagle more than 10 km, so the render origin rebases. The second crossing runs after the rebase. In CI, only the first crossing runs, in smoke mode; see [testing](../testing.md).
 - Fog covers more than displayed ground: `tests/terrain.test.ts` checks that every point inside the covered radius lies on a displayed level.
 - Placement, water seams and tree pools: the existing unit and smoke tests remain unchanged.
 
 ## Measurements
 
-All runs used Chrome 154 with ANGLE Metal on an Apple M4 Pro, against `main` at `15046e0` in a separate export on its own dev server.
+These measurements are from the original port, at 5 km visibility and with the drainage-era bench vantages. All runs used Chrome 154 with ANGLE Metal on an Apple M4 Pro, against `main` at `15046e0` in a separate export on its own dev server.
 
 Interleaved held-vantage bench (`BENCH_BUILDS=port=…,main=… BENCH_ROUNDS=3 npm run bench`, seed 5, 5000 m, DPR 2):
 

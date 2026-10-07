@@ -8,6 +8,10 @@ Play it at [pgrigorakis.github.io/soaring](https://pgrigorakis.github.io/soaring
 
 Use a current desktop version of Chrome, Edge, or Firefox.
 
+## Start screen
+
+A white start screen shows the title until you click. The world loads behind it. After the click, the screen fades once nearby ground, water and trees are drawn, or after at most 8 seconds of terrain loading. Far terrain keeps loading after the fade.
+
 ## Controls
 
 - Drag on the landscape to orbit the camera. Release to let it return slowly to the trailing view.
@@ -20,17 +24,23 @@ Use a current desktop version of Chrome, Edge, or Firefox.
 - Press `M` to open the biome map of the whole trail, or 40 km or 120 km around the eagle. Export PNG saves it with a legend and a scale. Press `M` or `Esc` to close it.
 - Press `F` to toggle fullscreen. Press `D` to show or hide diagnostics.
 
-Sound is procedural and starts muted on every page load. The two volume settings persist independently. Settings, the world seed and the flight trail live in `localStorage`. A new world starts a new trail. A reload keeps the seed but starts the eagle elsewhere in the same world.
+Sound is procedural and starts muted. The sound setting and the two volume settings persist. If you left sound on, it starts again at your first click, because browsers need a click before they play sound. Settings, the world seed and the flight trail live in `localStorage`. A new world starts a new trail. A reload keeps the seed but starts the eagle elsewhere in the same world.
+
+## The world
+
+Each world comes from a seed. A continental generator shapes land, coasts and islands, and all water sits at one sea level. The land has five biomes: Rolling Hills, Woodland, Moor, Highlands and Lakeland. Thermals rise only over land.
 
 ## Terrain visibility
 
 Terrain visibility is fixed at 12,000 m around the eagle, independently of camera distance. It is not a setting. Haze reaches only drawn ground while it loads; trees and water can appear after the ground. Terrain loading is capped at the reach needed for a 16:9 window. Wider windows can show a shorter haze distance than 12,000 m.
 
-Near the eagle, the landscape shows individual trees and rocks. Farther away, it shows simplified terrain. Engine rules for terrain streaming and mesh transitions are in [AGENTS.md](AGENTS.md).
+If the frame rate stays below 40 fps for 10 seconds, the app lowers the render resolution by one step. When the resolution is already at its lowest, the next step cuts terrain visibility to 3,500 m. After 60 seconds at 40 fps or more, quality returns by one step. A window without focus draws at 30 fps and keeps its quality.
+
+Near the eagle, the landscape shows individual leaf-card trees, rocks and hedgerows. Farther out, trees are billboards baked from the near tree models. The far tiles show simplified ground and water. Engine rules for terrain streaming and mesh transitions are in [AGENTS.md](AGENTS.md).
 
 ## Day and night
 
-The sky shifts from blue at noon to golden dawn and dusk, then to a dark blue, starry night. Horizon fog follows the sky colour. A cloud deck sits at 600 m above sea level. Below it, the surface disappears. Inside it, white fog hides even the nearby eagle. Above it, cloud folds and height fog hide low ground, while high mountains can protrude. Over low ground, each thermal climb passes up through the deck, and the dive takes the eagle back below it. A first flight begins before sunrise.
+A full day lasts 15 minutes. The sky shifts from blue at noon to golden dawn and dusk, then to a dark blue, starry night. The moon rises later each night and goes through its phases over eight days. Some nights show an aurora. Horizon fog follows the sky colour. A cloud deck sits at 600 m above sea level. Below it, the deck's upper surface is hidden and puff clouds float overhead. Above it, no puff clouds show. Inside it, white fog hides even the nearby eagle. From above, cloud folds and height fog hide low ground, while high mountains can protrude. Over low ground, each thermal climb passes up through the deck, and the dive takes the eagle back below it. The first flight in a world begins just before sunrise. Later reloads begin in the morning.
 
 ## More information
 

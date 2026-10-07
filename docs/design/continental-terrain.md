@@ -49,26 +49,20 @@ Historical diagnostic boards and measurements are preserved as historical eviden
 
 ## Matched evidence
 
-Both maps use seed 42, bounds x,z = [-12,000,+12,000] m, 320² samples at 75 m, identical absolute height colours and hill shading. They exclude product colours and atmosphere.
+Both maps used seed 42, bounds x,z = [-12,000,+12,000] m, 320² samples at 75 m, identical absolute height colours and hill shading. They excluded product colours and atmosphere.
 
-![Before: drainage terrain](fwm-terrain-evidence/map-before.png)
-![After: continental terrain](fwm-terrain-evidence/map-after.png)
+Before: 8.89% sampled water. After: 49.49% sampled water. These describe this window only, not global coverage. Later terrain changes have moved these numbers.
 
-Before: 8.89% sampled water. After: 49.49% sampled water. These describe this window only, not global coverage.
+The chase-camera captures used seed 42, position (2000,2000), heading 0, noon, 3000 m requested terrain visibility, the normal `?profile` renderer, and a 1200×800 viewport. Chase height followed the changed terrain. The same horizontal pose was retained; the eagle was not moved to a flattering new location.
 
-The chase-camera captures use seed 42, position (2000,2000), heading 0, noon, 3000 m requested terrain visibility, the normal `?profile` renderer, and a 1200×800 viewport. Chase height follows the changed terrain. The same horizontal pose is retained; the eagle is not moved to a flattering new location.
-
-![Before: default chase camera](fwm-terrain-evidence/chase-before.png)
-![After: default chase camera](fwm-terrain-evidence/chase-after.png)
-
-Reproduce the map with `node scripts/capture-terrain-map.mjs after`. Browser capture instructions and test modes are in [testing](../testing.md). The browser E2E tests write JSON evidence for geography, triangle depths, placement, climate and the one-hour Highlands flight.
+The map and chase images are no longer in the tree. They remain in git history at commit `5da4b07`, under `docs/design/fwm-terrain-evidence/`. Run `node scripts/capture-terrain-map.mjs after` to draw the current map in `test-results/terrain-map/`. Browser capture instructions and test modes are in [testing](../testing.md). The browser E2E tests write JSON evidence for geography, triangle depths, placement, climate and the one-hour Highlands flight.
 
 ## Verified validation
 
 - `npm run check`: 53 tests passed, TypeScript passed, production build passed.
 - `npm run test:smoke`: 41 Chromium tests passed with the default six workers. A separate two-worker run also passed all 41.
-- One-hour Highlands: minimum clearance 12.40 m, zero safety-floor corrections, peak vertical speed 4 m/s, four ridge episodes. See [navigation evidence](fwm-terrain-evidence/highlands-navigation.json).
+- One-hour Highlands: minimum clearance 12.40 m, zero safety-floor corrections, peak vertical speed 4 m/s, four ridge episodes.
 - The one-hour sea-level crossing audit retained 18.91 m minimum clearance, a 2.43 km water crossing, 44.83 km net travel and zero revisits.
-- `scripts/measure-relief.mjs`, `scripts/measure-summits.mjs` and `scripts/audit-biome-spans.mjs` ran against the new generator. These are measurements, not guarantees of a world-wide maximum.
+- Relief, summit and biome-span measurement scripts ran against the new generator. These were measurements, not guarantees of a world-wide maximum. The scripts are no longer in the tree.
 
 The first full smoke attempt overlapped source edits and Vite reloads. It was not accepted. Both final full runs used unchanged source. The existing Vite warning about bundles larger than 500 kB remains.

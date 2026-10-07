@@ -24,4 +24,4 @@ npm run test:smoke -- -c playwright.chunk-ci.config.ts
 
 Results: all five focused repetitions passed; all 113 tests and the production build passed; all 31 smoke tests passed in 7.4 minutes. The smoke setup uses one worker, a 1440×900 viewport, and SwiftShader, matching CI's software-WebGL path.
 
-Local diagnostic artifacts are retained under `evidence/issue-101-camera/`, with the initial throttle logs at `evidence/shared-pools-drag-{repro,fixed}.log`. The scratch source is retained there as `.txt`, outside Playwright's test discovery. The pool benchmark and visual evidence remain unchanged in `docs/perf/issue-101-pools.{md,json}` and `docs/pr-101-screenshots/`.
+The local diagnostic artifacts under `evidence/issue-101-camera/`, the initial throttle logs at `evidence/shared-pools-drag-{repro,fixed}.log`, and the visual evidence in `docs/pr-101-screenshots/` are no longer in the tree. They remain in git history at commit `5da4b07`. The pool benchmark remains in `docs/perf/issue-101-pools.{md,json}`.
