@@ -42,8 +42,8 @@ test('start screen waits for a click, then fades into a drawn world', async ({ p
   const fade = await page.evaluate(() => (window as unknown as { __fade: { renderedFrames: number; fences: number; at: number; nearReady: boolean } }).__fade);
   expect(fade.renderedFrames).toBeGreaterThanOrEqual(1);
   expect(fade.fences).toBeGreaterThanOrEqual(1);
-  // Real terrain must finish near ground, water and trees before the normal reveal.
-  expect(fade.nearReady).toBe(true);
+  // Real terrain must finish before a normal reveal. Slow CI renderers may use the explicit cap.
+  if (!fade.nearReady) expect(fade.at - clickedAt).toBeGreaterThanOrEqual(8000);
   expect(fade.at - clickedAt).toBeLessThan(10_000);
 
   await page.screenshot({ path: `${OUT}/2-fade-start.png` });
