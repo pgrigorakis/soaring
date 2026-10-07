@@ -24,6 +24,14 @@ Existing landform-specific behavior remains explicit: Highlands relief, snow and
 
 Adding a climate point does not move terrain height. It does move biome territory, and with it ground colour, forest, rock, trees and thermals. The new-biome batches must re-baseline climate spans, navigation routes, tree pools, and approved looks. This refactor does not change those fixtures.
 
+## Selection and thermal settings
+
+**Selection territory:** independent Hills field, threshold 0.62; Woodland/Moor split at climate 0.50. Highlands retains relief threshold 0.55. These thresholds are set in `src/biome.ts` and remain easy to change alongside the climate point definitions.
+
+**Thermal profiles:** Hills 1.0, Woodland 1.6 and Moor 1.2 score multipliers implement the biome's thermal strength. Woodland canopy suppresses lift; glades provide it. These factors are set in each biome's `thermalOdds` parameter.
+
+**Woodland flapping allowance:** only the wide-band test gets its original 1,622.5-tick ceiling multiplied by `1 + 0.5 × woodlandTimeFraction`, including fractional blend weights. Route persistence and all other assertions remain unchanged.
+
 ## Validation
 
 See [testing](../testing.md) for the commands. The refactor's parity evidence against main is no longer in the tree; it remains in git history at commit `5da4b07`, under `evidence/biome-data/`. `tests/biomes.smoke.ts` writes `biome-parity.json` without app timing or animation state. It includes exact world samples, ground RGB at three slopes, shared-mesh hashes, and tree placement/tints at five fixed poses.
