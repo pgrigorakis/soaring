@@ -176,7 +176,7 @@ export class TerrainStream {
     depthWrite: false,
   });
   private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x899b98, roughness: 1, flatShading: true });
-  private readonly rockGeometry = new THREE.DodecahedronGeometry(4.5, 0);
+  private readonly rockGeometry = new THREE.DodecahedronGeometry(0.65, 0);
   private readonly torGeometry = new THREE.BoxGeometry(6, 3.2, 5);
   private readonly hedgeGeometry = new THREE.DodecahedronGeometry(1, 0);
   private readonly hedgeMaterial = new THREE.MeshStandardMaterial({ color: 0x518628, roughness: 1, flatShading: true });
@@ -823,7 +823,8 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
       const z = (chunkZ + hash2(chunkX, candidate, this.world.seed + 393)) * CHUNK_SIZE;
       const sample = this.world.sample(x, z);
       if (sample.water || sample.biome.moor < 0.7 || sample.rock < 0.55) continue;
-      const scale = 1.1 + hash2(chunkX, chunkZ, this.world.seed + 395);
+      // Keep the whole three-block tor about 1.3–2.5 m high.
+      const scale = (1.1 + hash2(chunkX, chunkZ, this.world.seed + 395)) * 0.14;
       const turn = hash2(chunkX, candidate, this.world.seed + 397) * Math.PI;
       let top = sample.height;
       for (let level = 0; level < 3; level += 1) {
@@ -861,7 +862,7 @@ outgoingLight += waterGlintColor * waterGlint * waterSparkle * waterShimmer * 4.
     const mesh = new THREE.InstancedMesh(this.rockGeometry, this.rockMaterial, entries.length);
     const dummy = new THREE.Object3D();
     entries.forEach((rock, index) => {
-      dummy.position.set(rock.x - originX, rock.y + rock.scale * 1.5, rock.z - originZ);
+      dummy.position.set(rock.x - originX, rock.y + rock.scale * 0.22, rock.z - originZ);
       dummy.rotation.set(rock.turn * 0.3, rock.turn, rock.turn * 0.15);
       dummy.scale.set(rock.scale * 1.25, rock.scale * 0.7, rock.scale);
       dummy.updateMatrix();

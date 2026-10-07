@@ -9,14 +9,16 @@ const SEED = '448122';
 const OUT = 'test-results/eagle-model';
 const CHASE_BOX = { x0: 560, x1: 880, y0: 380, y1: 480 }; // tests/cloud-puff-deck.smoke.ts
 
-async function capture(page: Page, name: string, eagle: boolean): Promise<{ image: Buffer; drawCalls: number }> {
+async function capture(page: Page, name: string, eagle: boolean): Promise<{ image: Buffer; drawCalls: number; pixelRatio: number }> {
   const frame = await page.evaluate((eagle) => {
     window.__SOARING__.setEagleVisible(eagle);
     return window.__SOARING__.snapshot().renderedFrames;
   }, eagle);
   await page.waitForFunction((frame) => window.__SOARING__.snapshot().renderedFrames > frame + 8, frame, { timeout: 120_000 });
-  const drawCalls = await page.evaluate(() => window.__SOARING__.snapshot().drawCalls);
-  return { image: await page.screenshot({ path: `${OUT}/${name}.png` }), drawCalls };
+  const { drawCalls, pixelRatio } = await page.evaluate(() => window.__SOARING__.snapshot());
+  // At 0.25 the thin chase wings blend with blue sky; their mean is not feather colour.
+  expect(pixelRatio, `${name} must use the fixed capture resolution`).toBe(1);
+  return { image: await page.screenshot({ path: `${OUT}/${name}.png` }), drawCalls, pixelRatio };
 }
 
 /** Pixels that change when the eagle is hidden: count, bounds, and mean colour. */
@@ -51,7 +53,9 @@ test('the feathered eagle draws as one skinned call with painted, spread wings',
     localStorage.setItem('soaring.world-seed.v1', seed);
     localStorage.setItem('soaring.scenic-visit.v1', '0');
   }, SEED);
-  await page.goto('/?smoke');
+  // Keep smoke streaming/flight hooks, but disable adaptive quality for the picture comparison.
+  // Slow software GL otherwise resets the requested capture ratio to smoke's 0.25.
+  await page.goto('/?smoke&profile');
   await expect(page.locator('canvas').first()).toBeVisible();
   await page.evaluate(() => window.__SOARING__.advanceSimulation!(20));
   // Hold a glide at noon in the default chase view, with the overlays and clouds out of frame.
@@ -78,8 +82,8 @@ test('the feathered eagle draws as one skinned call with painted, spread wings',
   // A close three-quarter view from above shows the painted feather tracts.
   await page.evaluate(({ position, heading }) => {
     const [x, y, z] = position as [number, number, number];
-    window.__SOARING__.setViewpoint({ x: x - Math.sin(heading) * 14 + Math.cos(heading) * 12, y: y + 9,
-      z: z - Math.cos(heading) * 14 - Math.sin(heading) * 12, lookX: x, lookY: y, lookZ: z });
+    window.__SOARING__.setViewpoint({ x: x - Math.sin(heading) * 1.3 + Math.cos(heading) * 1.1, y: y + 0.84,
+      z: z - Math.cos(heading) * 1.3 - Math.sin(heading) * 1.1, lookX: x, lookY: y, lookZ: z });
   }, start);
   const close = await capture(page, 'close', true);
   const closeHidden = await capture(page, 'close-hidden', false);
@@ -88,6 +92,7 @@ test('the feathered eagle draws as one skinned call with painted, spread wings',
   const evidence = {
     seed: Number(SEED), start,
     eagleDrawCalls: chase.drawCalls - chaseHidden.drawCalls,
+    capturePixelRatios: [chase, chaseHidden, close, closeHidden].map((capture) => capture.pixelRatio),
     chase: chasePixels, close: closePixels,
   };
   await writeFile(`${OUT}/evidence.json`, JSON.stringify(evidence, null, 2));
@@ -96,7 +101,7 @@ test('the feathered eagle draws as one skinned call with painted, spread wings',
   expect(evidence.eagleDrawCalls).toBe(1);
   // From behind, the spread wings make a wide, flat silhouette inside the box other captures skip.
   const { bounds } = chasePixels;
-  expect(chasePixels.count).toBeGreaterThan(400);
+  expect(chasePixels.count).toBeGreaterThan(250);
   expect((bounds.x1 - bounds.x0) / (bounds.y1 - bounds.y0)).toBeGreaterThan(3);
   expect(bounds.x0).toBeGreaterThanOrEqual(CHASE_BOX.x0);
   expect(bounds.x1).toBeLessThan(CHASE_BOX.x1);

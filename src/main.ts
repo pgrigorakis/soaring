@@ -18,10 +18,10 @@ import { Minimap } from './minimap';
 import { MapPanel } from './map-panel';
 
 type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; cameraDistance: number; showThermal: boolean };
-const CAMERA_DISTANCE = { min: 10, max: 200, default: 100 } as const;
-const CAMERA_CLOSE_HEIGHT = 3;
-// At full zoom-out the camera sits 36 m above the bird.
-const CAMERA_FAR_HEIGHT = 36;
+const CAMERA_DISTANCE = { min: 6, max: 60, default: 16 } as const;
+const CAMERA_CLOSE_HEIGHT = 0.6;
+// Keep the viewing angle shallow at every zoom distance.
+const CAMERA_FAR_HEIGHT = 6;
 const CHUNK_BUILD_BUDGET_MS = 4;
 // Four placement tiles, matching the finest ground level's extent. Far terrain remains asynchronous.
 const STARTUP_NEAR_RADIUS = 1440;
@@ -989,6 +989,12 @@ function applyDaylight(body: Daylight, delta: number): void {
   fog.color.lerp(fogGoal, 1 - Math.exp(-Math.max(delta, 0.016) * 4));
 }
 
+function flightSurface(): number {
+  const { x, z } = navigator.state;
+  const sample = world.sample(x, z);
+  return sample.water ? sample.surface : sample.height;
+}
+
 function currentDaylight(): Daylight {
   return daylight(skySeconds);
 }
@@ -1095,14 +1101,21 @@ function frame(now: number): void {
     const side = new THREE.Vector3(Math.cos(cameraHeading), 0, -Math.sin(cameraHeading));
     easeCameraDistance(rawDelta);
     const distance = settings.cameraDistance;
+    const height = followCameraHeight(distance);
+    const radius = Math.hypot(distance, height);
+    const elevation = Math.atan2(height, distance) + orbitPitch;
+    const horizontal = radius * Math.cos(elevation);
     const desired = new THREE.Vector3(state.x, state.y, state.z)
-      .addScaledVector(backward, Math.cos(orbitYaw) * distance)
-      .addScaledVector(side, Math.sin(orbitYaw) * distance)
-      .add(new THREE.Vector3(0, followCameraHeight(distance) + distance * orbitPitch, 0));
-    cameraPosition.lerp(desired, 1 - Math.exp(-rawDelta * (2.1 - rideBlend * 1.35)));
-    cameraPosition.y = Math.max(cameraPosition.y, world.sample(cameraPosition.x, cameraPosition.z).height + 14);
-    const lookAhead = 38 - rideBlend * 22;
-    lookAt.set(state.x + Math.sin(cameraHeading) * lookAhead, state.y - 9 - orbitPitch * 24, state.z + Math.cos(cameraHeading) * lookAhead);
+      .addScaledVector(backward, Math.cos(orbitYaw) * horizontal)
+      .addScaledVector(side, Math.sin(orbitYaw) * horizontal)
+      .add(new THREE.Vector3(0, radius * Math.sin(elevation), 0));
+    // Direct spherical placement during orbit avoids lag and shortcuts through the bird.
+    if (dragging || orbitYaw !== 0 || orbitPitch !== 0 || resettingOrbit) cameraPosition.copy(desired);
+    else cameraPosition.lerp(desired, 1 - Math.exp(-rawDelta * (2.1 - rideBlend * 1.35)));
+    const cameraGround = world.sample(cameraPosition.x, cameraPosition.z);
+    cameraPosition.y = Math.max(cameraPosition.y, (cameraGround.water ? cameraGround.surface : cameraGround.height) + 1.3);
+    // No forward/down offset: the bird remains the pivot, including at the ground clamp.
+    lookAt.set(state.x, state.y, state.z);
   }
   camera.position.copy(cameraPosition).sub(renderOrigin);
   camera.lookAt(renderLookAt.copy(lookAt).sub(renderOrigin));
@@ -1169,7 +1182,7 @@ function frame(now: number): void {
       `behavior     ${state.behavior}${state.flapping ? ' (flapping)' : ''}`,
       `wind         ${navigator.wind.x.toFixed(1)}, ${navigator.wind.z.toFixed(1)} m/s (${navigator.wind.speed.toFixed(1)} m/s)`,
       `ridge lift   ${navigator.ridgeLift.toFixed(2)} m/s`,
-      `clearance    ${(state.y - world.sample(state.x, state.z).height).toFixed(0)} m`,
+      `clearance    ${(state.y - flightSurface()).toFixed(0)} m`,
       `position     ${state.x.toFixed(0)}, ${state.z.toFixed(0)}`,
       `render origin ${renderOrigin.x.toFixed(0)}, ${renderOrigin.y.toFixed(0)}, ${renderOrigin.z.toFixed(0)}`,
       `thermal      ${navigator.activeThermal ? `${navigator.activeThermal.x.toFixed(0)}, ${navigator.activeThermal.z.toFixed(0)}` : 'none selected'}`,
@@ -1208,6 +1221,7 @@ declare global {
   interface Window {
     __SOARING__: {
       snapshot: () => { buildTiming: { chunks: number; meanMs: number; maxMs: number; maxSliceMs: number; maxUpdateMs: number; allocated: number; reused: number }; renderedFrames: number; seed: number; chunks: number; pending: number; ground: string; visibleDistance: number; requestedDistance: number; cameraDistance: number; cameraHeight: number; orbitYaw: number; orbitPitch: number; behavior: string; flapping: boolean; bank: number; heading: number; position: number[]; renderOrigin: number[]; geometries: number; activeThermal: number[] | null; marker: number[] | null; markerRange: number; markers: number[][]; thermalCandidates: number[][]; tiers: { near: number; mid: number; far: number }; timeOfDay: number; sunElevation: number; moonElevation: number; sunDirection: number[]; moonDirection: number[]; moonLit: number; moonIntensity: number; dominant: 'sun' | 'moon'; starAmount: number; milkyWayAmount: number; twilightAmount: number; exposure: number; hemisphereIntensity: number; auroraAmount: number; cloudCoverage: number; cloudTime: number; drawCalls: number; frameCap: 30 | null; chunkBuildBudget: number; startupNearReady: boolean; lastChunkBuilds: number; qualityStep: number; pixelRatio: number; renderWidth: number; renderHeight: number; renderPixels: number; shadowsEnabled: boolean; fog: { color: number[]; targetColor: number[]; readPending: boolean; samples: number; failures: number }; cloudLayer: ReturnType<CloudSea['snapshot']>; nudge: NudgeStatus; cycle: { phase: FlightPhase; top: number; cruise: number } };
+      birdScreen: () => number[];
       puffCloudSnapshot: () => PuffCloudSnapshot;
       fogSamples?: () => { revision: number; discarded: number; completion: FogReadCompletion | null };
       advanceSimulation?: (seconds: number) => void;
@@ -1332,6 +1346,11 @@ if (import.meta.env.DEV) window.__SOARING__ = {
       },
       cloudLayer: cloudSea.snapshot(),
     };
+  },
+  birdScreen: () => {
+    camera.updateMatrixWorld();
+    const point = eagle.group.getWorldPosition(new THREE.Vector3()).project(camera);
+    return [point.x, point.y];
   },
   puffCloudSnapshot: () => puffClouds.snapshot(),
   pauseFlight: () => { reviewFlightPaused = true; },
