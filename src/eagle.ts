@@ -14,6 +14,8 @@ export type EagleState = {
   bank: number;
   behavior: EagleBehavior;
   flapping: boolean;
+  /** Faster body response only during a vertical nudge and its release. */
+  nudging?: boolean;
   /** Visual-only yaw into a crosswind. Movement follows `heading`. */
   crab?: number;
 };
@@ -90,7 +92,8 @@ const THERMAL_WIND_DRIFT = 0.7;
  * bearing for `adoptSeconds`. A smaller bend holds for `holdSeconds`, then eases back.
  */
 export const NUDGE = { turnRate: 30 * Math.PI / 180, maxBias: 110 * Math.PI / 180, holdSeconds: 2, decaySeconds: 3,
-  adoptMin: 20 * Math.PI / 180, adoptSeconds: 180, leaveSeconds: 0.8, diveSink: 4 } as const;
+  adoptMin: 20 * Math.PI / 180, adoptSeconds: 180, leaveSeconds: 0.8, diveSink: 4,
+  responseSeconds: 0.08, releaseSeconds: 0.25 } as const;
 export type NudgeInput = { turn: number; climb: number };
 export type NudgeStatus = { turn: number; climb: number; bias: number; resumeIn: number; adopted: number };
 
@@ -256,6 +259,10 @@ export class EagleNavigator {
   private circleSpeed = THERMAL_CIRCLE_SPEED;
   private circleCentre = { x: 0, z: 0 };
   private nudgeInput: NudgeInput = { turn: 0, climb: 0 };
+  private verticalNudge = 0;
+  private verticalRate = 0;
+  // Manual wing beats must not become a mandatory autopilot recovery burst.
+  private autopilotFlapping = false;
   private headingBias = 0;
   private nudgeIdle = Infinity;
   private turnHeld = 0;
@@ -326,6 +333,15 @@ export class EagleNavigator {
   private applyNudge(dt: number): void {
     const { turn, climb } = this.nudgeInput;
     const active = turn !== 0 || climb !== 0;
+    const ease = climb !== 0 ? NUDGE.responseSeconds : NUDGE.releaseSeconds;
+    this.verticalNudge += (climb - this.verticalNudge) * (1 - Math.exp(-dt / ease));
+    if (climb === 0 && Math.abs(this.verticalNudge) < 0.001) this.verticalNudge = 0;
+    this.state.nudging = this.verticalNudge !== 0;
+    // A down hint leaves lift immediately. Up already gets more lift in a thermal,
+    // but a ridge or a seek can respond with a flapping climb instead.
+    if ((climb < 0 && this.state.behavior === 'thermal-riding')
+      || (climb !== 0 && this.state.behavior === 'ridge-soaring')) this.leaveRidge();
+    if (climb !== 0 && this.state.behavior === 'thermal-seeking') this.enterGliding();
     const wasTurning = this.turnHeld > 0;
     this.turnHeld = turn !== 0 ? this.turnHeld + dt : 0;
     if (active) this.nudgeIdle = 0;
@@ -352,6 +368,7 @@ export class EagleNavigator {
 
   update(deltaSeconds: number): EagleState {
     const dt = Math.min(deltaSeconds, 0.1);
+    const previousHeight = this.state.y;
     this.behaviorTime += dt;
     this.totalTime += dt;
     this.applyNudge(dt);
@@ -388,9 +405,11 @@ export class EagleNavigator {
 
     // Re-check: the block above may have just switched behavior this frame.
     if (this.state.behavior === 'thermal-riding') {
+      this.autopilotFlapping = false;
       this.state.flapping = false;
       this.updateCircle(dt, ground);
     } else if (this.state.behavior === 'ridge-soaring') {
+      this.autopilotFlapping = false;
       this.updateRidge(dt, ground);
     } else {
       this.flyTowardTarget(dt, ground);
@@ -398,6 +417,7 @@ export class EagleNavigator {
     if (this.state.behavior !== 'ridge-soaring') this.state.crab = (this.state.crab ?? 0) * Math.exp(-dt / RIDGE.easeSeconds);
     const current = this.world.sample(this.state.x, this.state.z);
     this.state.y = Math.max(this.state.y, Math.max(current.height, current.water ? current.surface : current.height) + TERRAIN_SAFETY_MARGIN);
+    if (dt > 0) this.verticalRate = (this.state.y - previousHeight) / dt;
     return this.state;
   }
 
@@ -636,7 +656,7 @@ export class EagleNavigator {
       || Math.hypot(this.state.x - this.thermal.x, this.state.z - this.thermal.z) < RIDGE.seekCommitDistance);
     const gate = best as { x: number; z: number; face: Face; climb: number } | null;
     // A dive goes down to the cruise; a ridge on the way does not catch it.
-    if (committedSeek || !gate || this.phase === 'dive') {
+    if (committedSeek || !gate || this.phase === 'dive' || this.verticalNudge !== 0) {
       this.ridgeGate = 0;
       return;
     }
@@ -823,6 +843,7 @@ export class EagleNavigator {
   // Gliding sinks and a dive sinks faster; a flap burst climbs back to the held clearance
   // when the bird drops under it here or ahead.
   private updateHeightEnergy(dt: number, ground: number, lookAheadGround: number): void {
+    this.state.flapping = this.autopilotFlapping;
     const floorTrigger = this.holdClearance;
     const clearance = this.state.y - ground;
     const aheadClearance = this.state.y - lookAheadGround;
@@ -835,22 +856,32 @@ export class EagleNavigator {
       this.state.flapping = true;
       this.flapTimer = FLAP_BURST_SECONDS;
     }
-    const climbNudge = this.nudgeInput.climb;
-    if (climbNudge > 0 && !this.state.flapping && clearance < this.heightRange.max) {
-      this.state.flapping = true;
-      this.flapTimer = FLAP_BURST_SECONDS;
-    }
-    if (climbNudge < 0 && !this.state.flapping && clearance > floorTrigger + 10 && aheadClearance > floorTrigger + 10) {
-      this.state.y -= NUDGE.diveSink * dt;
-      this.airspeed = Math.min(CRUISE_SPEED * 1.25, this.airspeed + 2 * dt);
-    }
+    const sink = diving ? this.diveRate : GLIDE_SINK_RATE;
+    let rate = this.state.flapping ? FLAP_CLIMB_RATE : -sink;
     if (this.state.flapping) {
-      this.state.y += FLAP_CLIMB_RATE * dt;
       this.flapTimer -= dt;
       if (this.flapTimer <= 0) this.state.flapping = false;
-    } else {
-      this.state.y -= (diving ? this.diveRate : GLIDE_SINK_RATE) * dt;
     }
+    this.autopilotFlapping = this.state.flapping;
+    if (this.verticalNudge !== 0) {
+      const climb = this.nudgeInput.climb;
+      // Fade the dive before the recovery floor, rather than snapping off at its gate.
+      const room = clamp((Math.min(clearance, aheadClearance) - floorTrigger - 10) / 10, 0, 1);
+      let target = rate;
+      if (climb > 0) target = FLAP_CLIMB_RATE;
+      else if (climb < 0) target += (-sink - NUDGE.diveSink - target) * room;
+      const ease = climb !== 0 ? NUDGE.responseSeconds : NUDGE.releaseSeconds;
+      rate = this.verticalRate + (target - this.verticalRate) * (1 - Math.exp(-dt / ease));
+      // Recovery and the ceiling override even the smoothed manual rate.
+      if (clearance < floorTrigger || aheadClearance < floorTrigger || this.state.y < this.climbNeed) {
+        rate = Math.max(rate, FLAP_CLIMB_RATE);
+      }
+      rate = Math.min(rate, dt > 0 ? Math.max(0, ground + this.heightRange.max - this.state.y) / dt : 0);
+      this.state.flapping = rate > 0;
+      const share = Math.max(0, -this.verticalNudge) * room;
+      this.airspeed = Math.min(CRUISE_SPEED * 1.25, this.airspeed + 2 * share * dt);
+    }
+    this.state.y += rate * dt;
   }
 
   private beginRide(): void {
@@ -1123,7 +1154,8 @@ export class EagleView {
     if (dt > 0 && ground < 200) {
       const vertical = (state.y - last.y) / dt;
       const angle = Math.atan2(vertical, Math.max(ground, 8));
-      this.climbAngle += (angle - this.climbAngle) * (1 - Math.exp(-dt / 0.6));
+      const pitchSeconds = state.nudging ? NUDGE.responseSeconds : 0.6;
+      this.climbAngle += (angle - this.climbAngle) * (1 - Math.exp(-dt / pitchSeconds));
       this.tuck += ((vertical < -6 ? clamp((-vertical - 6) / 6, 0, 1) : 0) - this.tuck) * (1 - Math.exp(-dt / 0.8));
     }
     this.last = { x: state.x, y: state.y, z: state.z };
