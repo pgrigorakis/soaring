@@ -95,7 +95,7 @@ test('the Milky Way shows on a dark night and fades with dusk and moonlight', as
   // On a dark, clear night the band is plainly brighter than the sky beside it.
   expect(dark.moonElevation * dark.moonLit).toBeLessThan(0.05);
   expect(dark.milkyWayAmount).toBe(1);
-  // About 7 levels on hardware; about -0.2 without the band.
+  // About 6 levels on hardware; about -0.2 without the band.
   expect(dark.contrast).toBeGreaterThan(4);
   // Dusk: nothing at -6 degrees, full by -18 degrees.
   expect(dusk.milkyWayAmount).toBeLessThan(0.01);
