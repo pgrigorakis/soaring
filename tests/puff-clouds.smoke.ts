@@ -113,6 +113,7 @@ test('frames one cumulus close up from its sunny side at noon and golden hour', 
     document.querySelector('#intro')?.remove();
     document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
     document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
+    document.querySelector<HTMLElement>('.flight-hud')!.style.visibility = 'hidden';
   });
   await page.waitForFunction(() => window.__SOARING__.snapshot().pending === 0, undefined, { timeout: 120_000 });
 
@@ -202,6 +203,7 @@ test('captures the puff deck from low, mid, and high chase flights at noon and g
       document.querySelector('#intro')?.remove();
       document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
       document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
+      document.querySelector<HTMLElement>('.flight-hud')!.style.visibility = 'hidden';
     });
     for (const [phase, time] of [[0.5, 'noon'], [0.72, 'golden-hour']] as const) {
       const start = await page.evaluate((phase) => {

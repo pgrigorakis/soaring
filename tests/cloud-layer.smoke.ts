@@ -28,6 +28,8 @@ test('cloud deck hides low ground above and whites out the chase bird inside', a
     document.querySelector('#intro')?.classList.add('hidden');
     document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
     document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
+    // Measure cloud whiteout, not the foreground instrument.
+    document.querySelector<HTMLElement>('.flight-hud')!.style.visibility = 'hidden';
   });
   const shots: Array<Record<string, unknown>> = [];
   for (const view of VIEWS) {

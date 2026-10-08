@@ -70,6 +70,7 @@ test('the feathered eagle draws as one skinned call with painted, spread wings',
     document.querySelector('#intro')?.classList.add('hidden');
     document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
     document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
+    document.querySelector<HTMLElement>('.flight-hud')!.style.visibility = 'hidden';
     return { position, heading };
   });
   await page.waitForFunction(() => window.__SOARING__.snapshot().pending === 0, undefined, { timeout: 240_000 });
