@@ -168,46 +168,44 @@ export class CloudSea {
           float sunUp = smoothstep(-0.06, 0.12, sunDirection.y);
           float highSun = smoothstep(0.1, 0.62, sunDirection.y);
           float golden = (1.0 - highSun) * sunUp;
-          float ndotl = dot(normal, sunDirection);
-          // Light scatters through cloud past the terminator, so the falloff is broad and a moving sun draws no line.
-          float diffuse = smoothstep(-0.25, 0.95, ndotl);
+          float night = smoothstep(-0.02, -0.22, sunDirection.y);
+          // Less sky light reaches the hollows and the gaps between billows.
           float hollow = 1.0 - smoothstep(-32.0, 26.0, heap / ${CLOUD_HEIGHT_SCALE});
-          // Less sky light reaches the gaps between billows, so they stay blue-grey even at noon.
-          float pocket = smoothstep(0.3, -0.7, lobe * near);
-          float occlusion = clamp(hollow * 0.55 + pocket * 0.75, 0.0, 1.0);
+          float pocket = smoothstep(0.25, -0.6, lobe * near);
+          float cavity = clamp(hollow * 0.35 + pocket * 0.35, 0.0, 1.0);
+          // A low sun leaves the lee of a high roll, and of a nearby billow, in shadow.
           vec2 sunFlat = sunDirection.xz;
           float sunFlatLen = length(sunFlat);
           vec2 sunStep = sunFlat / max(sunFlatLen, 0.0001);
-          // A low sun leaves the lee of a high roll in its shadow.
           float reach = mix(${26 * CLOUD_HEIGHT_SCALE}, ${80 * CLOUD_HEIGHT_SCALE}, 1.0 - highSun);
           float ahead = cloudHeap(vWorldXZ + sunStep * reach);
-          float blocked = smoothstep(${2.0 * CLOUD_HEIGHT_SCALE}, ${18 * CLOUD_HEIGHT_SCALE}, ahead - heap)
-            * smoothstep(0.04, 0.22, sunFlatLen) * (1.0 - highSun);
-          float form = diffuse * (1.0 - occlusion * 0.85) * (1.0 - blocked * 0.5) * sunUp;
-          // Noon tops go white. A low sun stays under the tone curve so the gold is not crushed to white.
-          vec3 sunlit = mix(vec3(2.1, 2.05, 1.98), sunColor * vec3(1.2, 0.92, 0.62), golden);
-          sunlit *= mix(0.58, 1.0, highSun) * mix(0.75, 1.0, sunUp);
-          // Soft blue-grey in the shade. Linear values sit under the tone map so the hollows stay pale, not black.
-          vec3 shade = vec3(0.4, 0.48, 0.63) * mix(vec3(1.0), vec3(0.74, 0.8, 0.9), occlusion);
-          shade = mix(shade, vec3(0.42, 0.34, 0.32), golden * 0.22);
-          float night = smoothstep(-0.02, -0.22, sunDirection.y);
-          shade = mix(shade, hollowColor, night);
-          vec3 tops = mix(shade, sunlit, form);
+          float lobeAhead = billow(vWorldXZ + sunStep * ${14 * CLOUD_HEIGHT_SCALE});
+          float shadow = max(smoothstep(${2.0 * CLOUD_HEIGHT_SCALE}, ${18 * CLOUD_HEIGHT_SCALE}, ahead - heap)
+            * smoothstep(0.04, 0.22, sunFlatLen) * (1.0 - highSun * 0.6),
+            smoothstep(0.05, 0.45, lobeAhead - lobe) * 0.6 * near * (1.0 - highSun * 0.5) * (1.0 - golden * 0.7));
+          // Crisp sun, steeper than Lambert, so slopes keep their gradation under the tone curve even at noon.
+          // A low sun grazes the noise normals, so it wraps further, or the shade breaks into streaks.
+          float ndotl = dot(normal, sunDirection);
+          float wrap = mix(0.1, 0.5, golden);
+          float direct = pow(clamp((ndotl + wrap) / (1.0 + wrap), 0.0, 1.0), mix(1.6, 1.0, golden))
+            * (1.0 - shadow * 0.9) * (1.0 - 0.55 * cavity) * sunUp;
+          vec3 sunlit = mix(vec3(1.45, 1.42, 1.36), sunColor * vec3(1.35, 1.0, 0.66), golden) * mix(0.8, 1.0, highSun);
+          // Blue sky light from above and grey bounce from the deck below fill the shade.
+          vec3 sky = vec3(0.34, 0.41, 0.57) * (0.6 + 0.4 * normal.y);
+          vec3 bounce = vec3(0.34, 0.35, 0.38) * (0.5 - 0.5 * normal.y);
+          vec3 ambient = (sky + bounce) * (1.0 - 0.55 * cavity) * mix(0.72, 1.0, crest);
+          // A low sun leaves the shade cool and dim, so warm lit faces stand out.
+          ambient = mix(ambient, ambient * vec3(0.84, 0.84, 0.96), golden);
+          ambient = mix(ambient, hollowColor * (1.0 - 0.45 * cavity), night);
+          vec3 tops = ambient + sunlit * direct;
+          // Light through thin edges when looking toward the sun.
           vec3 viewDir = normalize(vRender - cameraPosition);
+          float intoSun = pow(max(dot(viewDir, sunDirection), 0.0), 3.0);
+          float edge = pow(1.0 - clamp(dot(normal, -viewDir), 0.0, 1.0), 2.0);
+          vec3 rimColor = mix(vec3(1.3, 1.2, 1.05), sunColor, 0.4 + 0.4 * golden);
+          tops += rimColor * intoSun * edge * (1.0 - shadow * 0.6) * sunUp * 1.1;
           float align = dot(viewDir.xz, sunDirection.xz) / max(length(viewDir.xz) * length(sunDirection.xz), 0.0001);
-          tops = mix(tops, mix(tops, sunColor, 0.45), lowSun * pow(max(align, 0.0), 1.5) * 0.4);
-          // Rose counterlight uses the existing sky's sunset palette, not terrain colour.
-          float venus = exp(-pow((sunDirection.y + 0.03) / 0.09, 2.0));
-          tops = mix(tops, mix(tops, vec3(0.52, 0.36, 0.3), 0.5), venus * pow(max(-align, 0.0), 1.5) * 0.4);
-          // Thin glow where the sun shines through a crest: billow tops turned away from the sun,
-          // seen in a broad cone around it so the glow never collapses into one glint.
-          float intoSun = pow(max(dot(viewDir, sunDirection), 0.0), 1.6);
-          float ridge = smoothstep(-0.1, 0.45, lobe) * (1.0 - hollow * 0.5) * near;
-          float backlit = 1.0 - smoothstep(0.2, 0.75, ndotl);
-          float edge = mix(0.4, 1.0, pow(1.0 - clamp(dot(normal, -viewDir), 0.0, 1.0), 1.2));
-          float silver = intoSun * ridge * backlit * edge * sunUp;
-          vec3 rimColor = mix(vec3(1.25, 1.16, 1.05), sunColor, 0.35 + lowSun * 0.45);
-          tops += rimColor * silver * 0.55;
+          tops = mix(tops, mix(tops, sunColor, 0.45), lowSun * pow(max(align, 0.0), 1.5) * 0.35);
           float moonRamp = smoothstep(moonDirection.y - 0.6, moonDirection.y + 0.3, dot(normal, moonDirection));
           tops += vec3(0.42, 0.5, 0.72) * 0.1 * moonRamp * moonLight;
           float farFade = smoothstep(${2000 * CLOUD_HEIGHT_SCALE}, ${4300 * CLOUD_HEIGHT_SCALE}, dist);
