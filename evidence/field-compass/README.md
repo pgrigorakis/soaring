@@ -50,3 +50,4 @@ The eight 1440 × 900 JPEGs total about 1.04 MiB. They use quality 85 with no ch
 - Seven related browser checks passed: field compass, eagle camera, minimap, nudges and start screen.
 - The final field-compass and production browser checks passed after the phone typography and safe-area adjustments.
 - The field-compass check saves a bearing trace and screenshots. It verifies all eight map bearings, smooth north crossing, ground/water height, orbit independence, overlay layering and phone/large-desktop widths.
+- See [the CI follow-up](ci-follow-up.md) for the branch/main comparison, timeout trace findings and the regression check for unchanged HUD updates.

@@ -49,7 +49,7 @@ test('the field compass follows the eagle and shows flight height above land and
     await expect.poll(() => hud.locator('svg').evaluate((svg, cardinal) => {
       const text = [...svg.querySelectorAll('text')].find((node) => node.textContent === cardinal)!;
       const group = text.parentNode as SVGGElement;
-      return Math.abs(group.transform.baseVal.getItem(0).matrix.e - svg.clientWidth / 2);
+      return Math.abs(group.getCTM()!.e - svg.clientWidth / 2);
     }, cardinals[index]!)).toBeLessThan(2);
     evidence.push({ cardinal: cardinals[index], heading });
   }
@@ -66,7 +66,7 @@ test('the field compass follows the eagle and shows flight height above land and
       const hud = document.querySelector<HTMLElement>('.flight-hud')!;
       const text = [...hud.querySelectorAll('svg text')].find((node) => node.textContent === 'N')!;
       const group = text.parentNode as SVGGElement;
-      frames.push({ bearing: Number(hud.dataset.bearing), tickX: group.transform.baseVal.getItem(0).matrix.e });
+      frames.push({ bearing: Number(hud.dataset.bearing), tickX: group.getCTM()!.e });
     }
     return frames;
   }, spots.dry);
@@ -115,5 +115,33 @@ test('the field compass follows the eagle and shows flight height above land and
     await page.screenshot({ path: testInfo.outputPath(`field-compass-${width}.png`) });
   }
   await testInfo.attach('field-compass-evidence', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' });
+
+  // A held view should not spend its frame budget rewriting an unchanged instrument.
+  await page.evaluate(() => {
+    const api = window.__SOARING__, state = api.snapshot();
+    api.reviewFlight!({ x: state.position[0]!, y: state.position[1]!, z: state.position[2]!, heading: Math.PI / 2 });
+  });
+  await expect(hud.getByLabel('Eagle bearing')).toHaveText('090°');
+  // Wait for easing to finish, not a fixed wall-clock delay on a slow software renderer.
+  await expect.poll(() => hud.evaluate((element) => Number((element as HTMLElement).dataset.bearing)), { timeout: 20_000 }).toBe(90);
+  const writes = await hud.evaluate(async (element) => {
+    let writes = 0;
+    const observer = new MutationObserver((records) => { writes += records.length; });
+    observer.observe(element, { attributes: true, childList: true, characterData: true, subtree: true });
+    for (let frame = 0; frame < 20; frame++) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    writes += observer.takeRecords().length;
+    observer.disconnect();
+    return writes;
+  });
+  await testInfo.attach('held-hud-writes', { body: JSON.stringify({ frames: 20, writes }), contentType: 'application/json' });
+  expect(writes).toBe(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => hud.locator('svg').evaluate((svg) => {
+    const text = [...svg.querySelectorAll('text')].find((node) => node.textContent === 'E')!;
+    const group = text.parentNode as SVGGElement;
+    return Math.abs(group.getCTM()!.e - svg.clientWidth / 2);
+  })).toBeLessThan(2);
+  await expect(hud.getByLabel('Eagle bearing')).toHaveText('090°');
+  await hud.screenshot({ path: testInfo.outputPath('held-field-compass-resize.png') });
   expect(errors).toEqual([]);
 });
