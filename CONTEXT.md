@@ -13,7 +13,7 @@ The autonomous bird whose flight gives the experience its focus.
 _Avoid_: Player, avatar
 
 **Nudge**:
-A viewer's arrow-key hint to the autopilot. A held turn bends the course; on release, a turn of 20° or more becomes the eagle's course for three minutes. Up adds flap bursts and down steepens the glide. Terrain safety and the height floor always win.
+A viewer's arrow-key hint to the autopilot. A held turn bends the course; on release, a turn of 20° or more becomes the eagle's course for three minutes. Up asks for a flapping climb and down steepens the glide, leaving a thermal or ridge when needed. The eagle responds promptly and eases back on release. Terrain safety and the height floor and ceiling always win.
 _Avoid_: Steering, control (the viewer does not fly the eagle)
 
 **Thermal**:

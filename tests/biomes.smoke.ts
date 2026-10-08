@@ -91,7 +91,13 @@ test('renders varied farmland with physical hedgerows', async ({ page }, testInf
   test.setTimeout(120_000);
   await page.addInitScript(() => localStorage.setItem('soaring.world-seed.v1', '80231'));
   await page.goto('/?smoke');
-  await page.waitForFunction(() => window.__SOARING__?.snapshot().pending === 0);
+  await page.waitForFunction(() => !!window.__SOARING__);
+  // Only the held farmland view is asserted. Loading the unrelated moving start first
+  // spends the same timeout on two cold terrain loads, especially under CI contention.
+  await page.evaluate(() => {
+    window.__SOARING__.setTimeOfDay(.5);
+    window.__SOARING__.setViewpoint({ x: -9800, y: 220, z: -39100, lookX: -9600, lookY: 50, lookZ: -39900 });
+  });
   const evidence = await page.evaluate(async () => {
     const worldPath = '/src/world.ts';
     const terrainPath = '/src/terrain.ts';
@@ -117,8 +123,6 @@ test('renders varied farmland with physical hedgerows', async ({ page }, testInf
     let hedgeInstances = 0;
     scene.traverse((object: any) => { if (object.name === 'hedgerows') hedgeInstances += object.count; });
     terrain.dispose();
-    window.__SOARING__.setTimeOfDay(.5);
-    window.__SOARING__.setViewpoint({ x: -9800, y: 220, z: -39100, lookX: -9600, lookY: 50, lookZ: -39900 });
     return { fields: fields.size, angles: angles.size, deterministic, hedgeInstances };
   });
   expect(evidence.deterministic).toBe(true);
