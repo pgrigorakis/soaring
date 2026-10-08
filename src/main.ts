@@ -160,6 +160,8 @@ sky.material.uniforms.moonLit = { value: 1 };
 sky.material.uniforms.moonSunlight = { value: new THREE.Vector3(0, 1, 0) };
 sky.material.uniforms.sunTint = { value: new THREE.Color(1, 1, 1) };
 sky.material.uniforms.lowSun = { value: 0 };
+// The sun's colour after air-mass extinction, relative to its red channel. It warms the outer halos of a low sun.
+sky.material.uniforms.sunExtinction = { value: new THREE.Vector3(1, 1, 1) };
 sky.material.uniforms.glowAmount = { value: 0 };
 sky.material.uniforms.venusAmount = { value: 0 };
 sky.material.uniforms.twilightAmount = { value: 0 };
@@ -172,7 +174,7 @@ Object.assign(sky.material.uniforms, milkyWayUniforms);
 sky.material.fragmentShader = sky.material.fragmentShader
   .replace(
     'uniform float mieDirectionalG;',
-    'uniform float mieDirectionalG;\nuniform float skyExposure;\nuniform float nightAmount;\nuniform float goldenAmount;\nuniform float blueAmount;\nuniform float starAmount;\nuniform float auroraAmount;\nuniform float cloudTime;\nuniform float cloudCoverage;\nuniform vec3 moonPosition;\nuniform float moonLit;\nuniform vec3 moonSunlight;\nuniform vec3 sunTint;\nuniform float lowSun;\nuniform float glowAmount;\nuniform float venusAmount;\nuniform float twilightAmount;\nuniform vec3 twilightZenith;\nuniform vec3 twilightUpper;\nuniform vec3 twilightUpperWarm;\nuniform vec3 twilightHorizon;\nuniform vec3 twilightHorizonWarm;\nuniform float cloudAbove;\nuniform float cloudWhiteout;\nuniform vec3 deckWhite;',
+    'uniform float mieDirectionalG;\nuniform float skyExposure;\nuniform float nightAmount;\nuniform float goldenAmount;\nuniform float blueAmount;\nuniform float starAmount;\nuniform float auroraAmount;\nuniform float cloudTime;\nuniform float cloudCoverage;\nuniform vec3 moonPosition;\nuniform float moonLit;\nuniform vec3 moonSunlight;\nuniform vec3 sunTint;\nuniform float lowSun;\nuniform vec3 sunExtinction;\nuniform float glowAmount;\nuniform float venusAmount;\nuniform float twilightAmount;\nuniform vec3 twilightZenith;\nuniform vec3 twilightUpper;\nuniform vec3 twilightUpperWarm;\nuniform vec3 twilightHorizon;\nuniform vec3 twilightHorizonWarm;\nuniform float cloudAbove;\nuniform float cloudWhiteout;\nuniform vec3 deckWhite;',
   )
   .replace(
     'void main() {',
@@ -252,18 +254,24 @@ sky.material.fragmentShader = sky.material.fragmentShader
 			float zenith = smoothstep(0.0, 0.55, direction.y);
 			vec3 noonBlue = dayColor * vec3(0.55, 0.78, 1.35) + vec3(0.02, 0.07, 0.22);
 			dayColor = mix(dayColor, noonBlue, clamp(blueAmount, 0.0, 1.0) * mix(0.62, 1.0, zenith));
-			// The sun: a disc about 3 degrees across, a tight glow, and a broad warm halo while it is low.
-			// The disc stays pale yellow, so it reads against the orange glow near the horizon.
 			float sunLight = sunFacing * smoothstep(-0.14, 0.02, vSunDirection.y);
 			vec3 sunColor = mix(sunTint, glowColor, lowSun * 0.6);
-			// The disc edge runs from 0.03 to 0.024 radians from the sun's centre, as cosines.
-			float sunDisc = smoothstep(0.99955003, 0.99971201, sunLight);
 			float sunLight2 = sunLight * sunLight;
 			float sunLight4 = sunLight2 * sunLight2;
 			float sunLight15 = sunLight4 * sunLight4 * sunLight4 * sunLight2 * sunLight;
-			float sunGlow = sunLight15 * sunLight15 * 0.12 + pow(sunLight, 500.0) * 0.6 + sunLight4 * lowSun * 0.35;
-			// The glow fades softly below the horizon, so the haze under it shows no edge. The disc sets sharply.
-			dayColor += sunColor * sunGlow * smoothstep(-0.12, 0.02, direction.y) + (sunDisc * mix(1.4, 3.0, lowSun) * smoothstep(-0.02, 0.0, direction.y) * mix(sunTint, vec3(1.0, 0.9, 0.7), 0.5));
+			// The sun: a soft glow with no hard edge. A white-hot core fades through layered warm halos,
+			// so the sun reads as light rather than as a disc.
+			float sunAngle = length(direction - vSunDirection);
+			float sunCore = exp(-sunAngle * sunAngle / (0.0085 * 0.0085));
+			float sunInner = exp(-sunAngle * sunAngle / (0.026 * 0.026));
+			float sunCorona = exp(-sunAngle / 0.06);
+			float sunWash = exp(-sunAngle / 0.26) * mix(0.5, 1.0, lowSun);
+			vec3 sunHot = mix(vec3(1.0, 0.98, 0.94), vec3(1.0, 0.8, 0.55), lowSun);
+			vec3 sunWarm = mix(vec3(1.0, 0.86, 0.62), vec3(1.0, 0.5, 0.3), lowSun) * mix(vec3(1.0), sunExtinction, 0.35);
+			// The halos fade softly below the horizon, so the haze under them shows no edge. The core sets sharply.
+			float sunAbove = smoothstep(-0.02, 0.0, direction.y);
+			dayColor += ((sunCore * 9.0 + sunInner * 1.6) * sunHot * sunAbove + (sunCorona * 0.55 + sunWash * 0.12) * sunWarm)
+				* smoothstep(-0.12, 0.02, direction.y) * smoothstep(-0.14, 0.02, vSunDirection.y);
 			float skyHorizon = pow(1.0 - clamp(direction.y, 0.0, 1.0), 3.0);
 			vec3 nightColor = vec3(0.004, 0.007, 0.026) + vec3(0.018, 0.026, 0.048) * skyHorizon;
 			// The painted keys carry their own darkening, so night only takes over as the gradient fades out.
@@ -447,13 +455,11 @@ function flareTexture(size: number, stops: [number, string][]): THREE.CanvasText
   ctx.fillRect(0, 0, size, size);
   return new THREE.CanvasTexture(canvas);
 }
-const flareGlow = flareTexture(256, [[0, 'rgba(255,246,222,0.85)'], [0.4, 'rgba(255,228,180,0.3)'], [1, 'rgba(255,228,180,0)']]);
-const flareRing = flareTexture(128, [[0, 'rgba(210,225,255,0)'], [0.55, 'rgba(210,225,255,0.14)'], [0.75, 'rgba(210,225,255,0)'], [1, 'rgba(210,225,255,0)']]);
+// The sky draws the sun as a soft glow, so the flare is only a faint veil that can bleed over a ridge.
+const flareVeil = flareTexture(256, [[0, 'rgba(255,246,226,0.5)'], [0.35, 'rgba(255,232,196,0.12)'], [1, 'rgba(255,232,196,0)']]);
 const lensflare = new Lensflare();
-const flareGlowElement = new LensflareElement(flareGlow, 220, 0);
-const flareRingElement = new LensflareElement(flareRing, 60, 0.6);
-lensflare.addElement(flareGlowElement);
-lensflare.addElement(flareRingElement);
+const flareVeilElement = new LensflareElement(flareVeil, 90, 0);
+lensflare.addElement(flareVeilElement);
 // The flare used to be a child of the shadow light. That light sits ~900 m from the camera so the
 // shadow frustum stays small, and the flare parallaxed across the sky as the camera orbited.
 // An anchor at camera + sunDirection stays on the same infinite direction as the sky disc.
@@ -908,6 +914,15 @@ function applyTwilight(sunY: number): void {
   });
 }
 
+// Air mass (Kasten and Young) and per-channel extinction relative to a zenith sun, scaled to the red channel.
+const sunTransmit = new THREE.Vector3();
+function sunExtinction(sunHeight: number): THREE.Vector3 {
+  const elevation = Math.max(0, THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(sunHeight, -1, 1))));
+  const airMass = 1 / (Math.sin(THREE.MathUtils.degToRad(elevation)) + 0.50572 * (elevation + 6.07995) ** -1.6364);
+  sunTransmit.set(Math.exp(-0.028 * (airMass - 1)), Math.exp(-0.068 * (airMass - 1)), Math.exp(-0.17 * (airMass - 1)));
+  return sunTransmit.divideScalar(Math.max(sunTransmit.x, 0.0001));
+}
+
 function applyDaylight(body: Daylight, delta: number): void {
   sunDir.set(body.sun.x, body.sun.y, body.sun.z);
   moonDir.set(body.moon.x, body.moon.y, body.moon.z);
@@ -930,6 +945,7 @@ function applyDaylight(body: Daylight, delta: number): void {
   sky.material.uniforms.sunTint!.value.setRGB(body.sunColor.r, body.sunColor.g, body.sunColor.b);
   // FWM's low-sun weights by sun height: a horizon sun, the sun-side glow band, and the rose belt.
   sky.material.uniforms.lowSun!.value = Math.exp(-((body.sun.y / 0.14) ** 2));
+  sky.material.uniforms.sunExtinction!.value.copy(sunExtinction(body.sun.y));
   sky.material.uniforms.glowAmount!.value = smooth01(-0.22, -0.04, body.sun.y) * (1 - smooth01(0.12, 0.32, body.sun.y));
   sky.material.uniforms.venusAmount!.value = Math.exp(-(((body.sun.y + 0.03) / 0.09) ** 2));
   applyTwilight(body.sun.y);
@@ -968,11 +984,7 @@ function applyDaylight(body: Daylight, delta: number): void {
     .lerp(puffNightLight, body.night);
 
   const flare = smooth01(0, 0.12, body.sun.y);
-  const low = 1 - high;
-  flareGlowElement.size = 42 + low * 16;
-  flareRingElement.size = 36;
-  flareGlowElement.color.setRGB(flare, flare * (0.72 + high * 0.22), flare * (0.38 + high * 0.4));
-  flareRingElement.color.setRGB(flare * 0.55, flare * 0.62, flare * 0.8);
+  flareVeilElement.color.setRGB(flare * 0.6, flare * 0.6 * (0.8 + high * 0.15), flare * 0.6 * (0.6 + high * 0.3));
   sunFlareAnchor.visible = flare > 0.01;
   if (sunFlareAnchor.visible) {
     sunFlareAnchor.position.copy(cameraPosition).addScaledVector(sunDir, camera.far * 0.82);
