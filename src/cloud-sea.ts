@@ -110,7 +110,7 @@ export class CloudSea {
         cloudAbove: this.fogUniforms.above, cloudWhiteout: this.fogUniforms.whiteout,
         sunDirection: this.sunDirection, moonDirection: this.moonDirection, sunColor: this.sunColor,
         horizonColor: this.horizonColor, lowSun: this.lowSun, moonLight: this.moonLight,
-        cloudWhite: this.cloudWhite, hollowColor: this.hollowColor,
+        hollowColor: this.hollowColor,
       },
       vertexShader: /* glsl */`
         uniform vec2 noiseOrigin;
@@ -135,35 +135,81 @@ export class CloudSea {
         uniform vec3 moonDirection;
         uniform vec3 sunColor;
         uniform vec3 horizonColor;
-        uniform vec3 cloudWhite;
         uniform vec3 hollowColor;
         uniform float lowSun;
         uniform float moonLight;
         varying vec2 vWorldXZ;
         varying vec3 vRender;
         ${NOISE_GLSL}
+        // Shading-only billows. The mesh keeps the broad folds, so placement does not crawl.
+        float billow(vec2 worldXZ) {
+          vec2 p = worldXZ / ${CLOUD_HEIGHT_SCALE};
+          float broad = mistNoise(p * 0.0072 + mistTime * 0.0016) * 2.0 - 1.0;
+          float mid = mistNoise(p * 0.0155 - mistTime * 0.0022 + 13.7) * 2.0 - 1.0;
+          float fine = mistNoise(p * 0.034 + mistTime * 0.003 + 41.3) * 2.0 - 1.0;
+          return broad * 0.62 + mid * 0.27 + fine * 0.11;
+        }
         void main() {
           float heap = cloudHeap(vWorldXZ);
           float span = ${10 * CLOUD_HEIGHT_SCALE};
           float slopeX = (cloudHeap(vWorldXZ + vec2(span, 0.0)) - heap) / span;
           float slopeZ = (cloudHeap(vWorldXZ + vec2(0.0, span)) - heap) / span;
-          vec3 normal = normalize(vec3(-3.5 * slopeX, 1.0, -3.5 * slopeZ));
-          float sunUp = smoothstep(-0.04, 0.06, sunDirection.y);
-          float lit = smoothstep(sunDirection.y - 0.6, sunDirection.y + 0.3, dot(normal, sunDirection)) * sunUp;
+          float dist = length(vRender - cameraPosition);
+          // Far billows are smaller than a pixel. Flatten them there, so they do not shimmer.
+          float near = 1.0 - smoothstep(${1200 * CLOUD_HEIGHT_SCALE}, ${3400 * CLOUD_HEIGHT_SCALE}, dist);
+          float billowSpan = ${8 * CLOUD_HEIGHT_SCALE};
+          float lobe = billow(vWorldXZ);
+          float lobeX = (billow(vWorldXZ + vec2(billowSpan, 0.0)) - lobe) / billowSpan;
+          float lobeZ = (billow(vWorldXZ + vec2(0.0, billowSpan)) - lobe) / billowSpan;
+          // Crests carry more lobe tilt than the soft floors between rolls.
+          float crest = smoothstep(-18.0, 22.0, heap / ${CLOUD_HEIGHT_SCALE});
+          float lobeTilt = mix(50.0, 90.0, crest) * near;
+          vec3 normal = normalize(vec3(-4.2 * slopeX - lobeTilt * lobeX, 1.0, -4.2 * slopeZ - lobeTilt * lobeZ));
+          float sunUp = smoothstep(-0.06, 0.12, sunDirection.y);
+          float highSun = smoothstep(0.1, 0.62, sunDirection.y);
+          float golden = (1.0 - highSun) * sunUp;
+          float ndotl = dot(normal, sunDirection);
+          // Light scatters through cloud past the terminator, so the falloff is broad and a moving sun draws no line.
+          float diffuse = smoothstep(-0.25, 0.95, ndotl);
           float hollow = 1.0 - smoothstep(-32.0, 26.0, heap / ${CLOUD_HEIGHT_SCALE});
+          // Less sky light reaches the gaps between billows, so they stay blue-grey even at noon.
+          float pocket = smoothstep(0.3, -0.7, lobe * near);
+          float occlusion = clamp(hollow * 0.55 + pocket * 0.75, 0.0, 1.0);
+          vec2 sunFlat = sunDirection.xz;
+          float sunFlatLen = length(sunFlat);
+          vec2 sunStep = sunFlat / max(sunFlatLen, 0.0001);
+          // A low sun leaves the lee of a high roll in its shadow.
+          float reach = mix(${26 * CLOUD_HEIGHT_SCALE}, ${80 * CLOUD_HEIGHT_SCALE}, 1.0 - highSun);
+          float ahead = cloudHeap(vWorldXZ + sunStep * reach);
+          float blocked = smoothstep(${2.0 * CLOUD_HEIGHT_SCALE}, ${18 * CLOUD_HEIGHT_SCALE}, ahead - heap)
+            * smoothstep(0.04, 0.22, sunFlatLen) * (1.0 - highSun);
+          float form = diffuse * (1.0 - occlusion * 0.85) * (1.0 - blocked * 0.5) * sunUp;
+          // Noon tops go white. A low sun stays under the tone curve so the gold is not crushed to white.
+          vec3 sunlit = mix(vec3(2.1, 2.05, 1.98), sunColor * vec3(1.2, 0.92, 0.62), golden);
+          sunlit *= mix(0.58, 1.0, highSun) * mix(0.75, 1.0, sunUp);
+          // Soft blue-grey in the shade. Linear values sit under the tone map so the hollows stay pale, not black.
+          vec3 shade = vec3(0.4, 0.48, 0.63) * mix(vec3(1.0), vec3(0.74, 0.8, 0.9), occlusion);
+          shade = mix(shade, vec3(0.42, 0.34, 0.32), golden * 0.22);
+          float night = smoothstep(-0.02, -0.22, sunDirection.y);
+          shade = mix(shade, hollowColor, night);
+          vec3 tops = mix(shade, sunlit, form);
           vec3 viewDir = normalize(vRender - cameraPosition);
           float align = dot(viewDir.xz, sunDirection.xz) / max(length(viewDir.xz) * length(sunDirection.xz), 0.0001);
-          vec3 shade = mix(hollowColor * 0.6, cloudWhite, 0.2) * (1.0 - hollow * 0.3);
-          float sunFacing = max(dot(viewDir, sunDirection), 0.0) * sunUp;
-          vec3 light = mix(cloudWhite, sunColor, lowSun * 0.7 + pow(sunFacing, 4.0) * 0.3);
-          light = mix(light, sunColor, lowSun * pow(max(align, 0.0), 1.5) * 0.65);
+          tops = mix(tops, mix(tops, sunColor, 0.45), lowSun * pow(max(align, 0.0), 1.5) * 0.4);
           // Rose counterlight uses the existing sky's sunset palette, not terrain colour.
           float venus = exp(-pow((sunDirection.y + 0.03) / 0.09, 2.0));
-          light = mix(light, mix(light, vec3(0.52, 0.36, 0.3), 0.5), venus * pow(max(-align, 0.0), 1.5) * 0.45);
-          vec3 tops = mix(shade, light, lit * (1.0 - hollow * 0.55));
+          tops = mix(tops, mix(tops, vec3(0.52, 0.36, 0.3), 0.5), venus * pow(max(-align, 0.0), 1.5) * 0.4);
+          // Thin glow where the sun shines through a crest: billow tops turned away from the sun,
+          // seen in a broad cone around it so the glow never collapses into one glint.
+          float intoSun = pow(max(dot(viewDir, sunDirection), 0.0), 1.6);
+          float ridge = smoothstep(-0.1, 0.45, lobe) * (1.0 - hollow * 0.5) * near;
+          float backlit = 1.0 - smoothstep(0.2, 0.75, ndotl);
+          float edge = mix(0.4, 1.0, pow(1.0 - clamp(dot(normal, -viewDir), 0.0, 1.0), 1.2));
+          float silver = intoSun * ridge * backlit * edge * sunUp;
+          vec3 rimColor = mix(vec3(1.25, 1.16, 1.05), sunColor, 0.35 + lowSun * 0.45);
+          tops += rimColor * silver * 0.55;
           float moonRamp = smoothstep(moonDirection.y - 0.6, moonDirection.y + 0.3, dot(normal, moonDirection));
           tops += vec3(0.42, 0.5, 0.72) * 0.1 * moonRamp * moonLight;
-          float dist = length(vRender - cameraPosition);
           float farFade = smoothstep(${2000 * CLOUD_HEIGHT_SCALE}, ${4300 * CLOUD_HEIGHT_SCALE}, dist);
           vec3 color = mix(tops, horizonColor, max(farFade, cloudWhiteout));
           gl_FragColor = vec4(color, cloudAbove * 0.94);
