@@ -40,7 +40,7 @@ Near the eagle, the landscape shows individual leaf-card trees, rocks and hedger
 
 ## Day and night
 
-A full day lasts 15 minutes. The sky shifts from blue at noon to golden dawn and dusk, then to a dark blue, starry night. The moon rises later each night and goes through its phases over eight days. Some nights show an aurora. Horizon fog follows the sky colour. A cloud deck sits at 600 m above sea level. Below it, the deck's upper surface is hidden and puff clouds float overhead. Above it, no puff clouds show. Inside it, white fog hides even the nearby eagle. From above, cloud folds and height fog hide low ground, while high mountains can protrude. Over low ground, each thermal climb passes up through the deck, and the dive takes the eagle back below it. The first flight in a world begins just before sunrise. Later reloads begin in the morning.
+A full day lasts 30 minutes. The sky shifts from blue at noon to golden dawn and dusk, then to a dark blue, starry night. The moon rises later each night and goes through its phases over eight days. Some nights show an aurora. Horizon fog follows the sky colour. A cloud deck sits at 600 m above sea level. Below it, the deck's upper surface is hidden and puff clouds float overhead. Above it, no puff clouds show. Inside it, white fog hides even the nearby eagle. From above, cloud folds and height fog hide low ground, while high mountains can protrude. Over low ground, each thermal climb passes up through the deck, and the dive takes the eagle back below it. The first flight in a world begins just before sunrise. Later reloads begin in the morning.
 
 ## More information
 

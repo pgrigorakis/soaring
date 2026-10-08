@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
 // frames; zoom shows nothing while the new raster paints; M opens the map while typing; the
 // export is half painted, the wrong size, or badly named; biomes drift back to small mixed specks.
 const SEED = 80231;
-const DAY_SECONDS = 900;
+const DAY_SECONDS = 1800;
 const evidence = 'test-results/minimap';
 
 type StoredTrail = { seed: number; clock: number; points: number[] };
@@ -53,8 +53,8 @@ test('minimap shows four days of trail, survives a reload, and exports the biome
   expect({ right: viewport.width - box.x - box.width, bottom: viewport.height - box.y - box.height, size: box.width })
     .toEqual({ right: 18, bottom: 18, size: 184 });
 
-  // Fly four days (4 × 15 minutes of flight) through the real navigator, five minutes per call.
-  for (let call = 0; call < 12; call += 1) await page.evaluate(() => window.__SOARING__.advanceSimulation!(300));
+  // Fly four days (4 × 30 minutes of flight) through the real navigator, five minutes per call.
+  for (let call = 0; call < 24; call += 1) await page.evaluate(() => window.__SOARING__.advanceSimulation!(300));
   await page.evaluate(() => window.__SOARING__.advanceSimulation!(20));
   const flown = await storedTrail(page);
   expect(flown.seed).toBe(SEED);
@@ -63,7 +63,7 @@ test('minimap shows four days of trail, survives a reload, and exports the biome
   // Older points fall off: the kept span is four days, not the whole flight.
   expect(flown.clock - times[0]!).toBeLessThanOrEqual(4 * DAY_SECONDS + 1);
   expect(flown.clock - times[0]!).toBeGreaterThan(4 * DAY_SECONDS - 10);
-  expect(times.length).toBeGreaterThan(850);
+  expect(times.length).toBeGreaterThan(1700);
 
   await minimapSettled(page);
   const near = await minimapPixels(page);

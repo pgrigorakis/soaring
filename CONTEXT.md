@@ -63,5 +63,5 @@ Environmental sounds such as wind and wing flaps, separate from music.
 _Avoid_: Music
 
 **Time of day**:
-The landscape's shared cycle of daylight and night. A full cycle lasts fifteen minutes. The sun and moon do not follow the camera. The moon falls behind the sun by a full turn every eight cycles, so it rises later and changes phase each night.
+The landscape's shared cycle of daylight and night. A full cycle lasts thirty minutes. The sun and moon do not follow the camera. The moon falls behind the sun by a full turn every eight cycles, so it rises later and changes phase each night.
 _Avoid_: Fixed sun, camera sun

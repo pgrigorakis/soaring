@@ -38,8 +38,8 @@ describe('seeded aurora schedule', () => {
 });
 
 describe('world clock sun and moon', () => {
-  it('maps a 15-minute day onto world-fixed bodies', () => {
-    expect(DAY_SECONDS).toBe(15 * 60);
+  it('maps a 30-minute day onto world-fixed bodies', () => {
+    expect(DAY_SECONDS).toBe(30 * 60);
     const midnight = daylight(0);
     const dawn = daylight(DAY_SECONDS * 0.25);
     const noon = daylight(DAY_SECONDS * 0.5);

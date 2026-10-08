@@ -863,7 +863,7 @@ document.addEventListener('visibilitychange', () => {
   if (soundWasEnabledBeforeHidden) soundscape.resumeForPageShow();
   soundWasEnabledBeforeHidden = false;
 });
-// Real time, not the flight time scale, so a 15-minute day stays 15 minutes during accelerated tests.
+// Real time, not the flight time scale, so a 30-minute day stays 30 minutes during accelerated tests.
 let skySeconds = visit === 1 ? 0.25 * DAY_SECONDS - 15 : 0.36 * DAY_SECONDS;
 let skyPaused = false;
 let skyLook: 'sun' | 'moon' | 'horizon' | null = null;

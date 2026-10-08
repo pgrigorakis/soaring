@@ -12,7 +12,7 @@ type Stored = { seed: number; clock: number; points: number[] };
 
 /**
  * World-space flight history for the minimap and the biome map. The clock is flight time,
- * and a day is one sky day (15 minutes) of it. The trail survives reloads in localStorage;
+ * and a day is one sky day (30 minutes) of it. The trail survives reloads in localStorage;
  * a different world seed starts a fresh trail.
  */
 export class Trail {
