@@ -16,6 +16,7 @@ import { PuffClouds, type PuffCloudSnapshot } from './puff-clouds';
 import { Trail } from './trail';
 import { Minimap } from './minimap';
 import { MapPanel } from './map-panel';
+import { FlightHud } from './flight-hud';
 
 type StoredSettings = { ambienceVolume: number; musicVolume: number; muted: boolean; cameraDistance: number; showThermal: boolean };
 const CAMERA_DISTANCE = { min: 6, max: 60, default: 16 } as const;
@@ -115,6 +116,8 @@ renderer.shadowMap.enabled = !smokeMode;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.domElement.setAttribute('aria-label', 'Autonomous golden eagle flying above a temperate wilderness');
 app.append(renderer.domElement);
+const flightHud = new FlightHud();
+app.append(flightHud.element);
 
 const hemisphere = new THREE.HemisphereLight(0xcfe3f0, 0x5e7a3a, 2.25);
 worldRoot.add(hemisphere);
@@ -1067,6 +1070,7 @@ function frame(now: number): void {
   // Keep the starting view fixed while its terrain fills behind the white screen.
   updateFlight(startScreen?.holding ? 0 : delta, now);
   const state = navigator.state;
+  flightHud.update(state.heading, state.y - flightSurface(), rawDelta);
   if (Math.hypot(state.x - renderOrigin.x, state.y - renderOrigin.y, state.z - renderOrigin.z) > RENDER_ORIGIN_DISTANCE) {
     renderOrigin.set(state.x, state.y, state.z);
     // One parent translation rebases every world object together; the camera is rebased below.

@@ -58,8 +58,14 @@ test('production bundle serves from its base path and renders without dev hooks 
   expect(productionState.seed).toBe('0');
   expect(productionState.hasDevelopmentHooks).toBe(false);
   expect(productionState.diagnosticsVisible).toBe(false);
+  await page.locator('.start-screen').click();
+  await expect(page.locator('.start-screen')).toHaveCount(0, { timeout: 15_000 });
+  const hud = page.getByRole('region', { name: 'Flight height and bearing' });
+  await expect(hud).toBeVisible();
+  await expect(hud.getByLabel('Flight height', { exact: true })).toHaveText(/^\d+ m$/);
+  await expect(hud.getByLabel('Eagle bearing')).toHaveText(/^\d{3}°$/);
   expect(errors).toEqual([]);
-  await page.screenshot({ path: 'test-results/production-bundle.png' });
+  await page.screenshot({ path: testInfo.outputPath('production-bundle.png') });
 });
 
 declare global {

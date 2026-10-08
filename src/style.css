@@ -127,6 +127,54 @@ body.cursor-hidden, body.cursor-hidden * { cursor: none !important; }
   .settings-panel { width: min(245px, calc(100vw - 70px)); max-height: calc(100dvh - 24px); }
 }
 
+/* Field compass: brass ink, curved bark strip and a height medallion.
+   Each prototype alpha is multiplied by 0.7: ink 1 → .7, bark 222/255 → .6094,
+   strip border .6 → .42, medallion border 119/255 → .3267, pointer shadow 1 → .7. */
+.flight-hud {
+  position: fixed; z-index: 3;
+  top: calc(20px + env(safe-area-inset-top, 0px)); left: 50%;
+  transform: translateX(-50%); width: 30vw;
+  color: rgba(242, 211, 153, .7); text-align: center;
+  pointer-events: none;
+}
+.flight-compass {
+  position: relative; height: 56px;
+  border-top: 1px solid rgba(217, 185, 124, .42);
+  border-bottom: 1px solid rgba(217, 185, 124, .42);
+  border-radius: 50% / 15%;
+  background: linear-gradient(90deg, transparent, rgba(37, 37, 31, .6094) 15%, rgba(37, 37, 31, .6094) 85%, transparent);
+}
+.flight-compass svg {
+  display: block; width: 100%; overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  /* A dark halo keeps the more transparent fine ticks readable over bright cloud. */
+  filter: drop-shadow(0 1px 1px rgba(23, 29, 22, .7));
+}
+.flight-compass line { stroke: currentColor; stroke-width: 1; }
+.flight-compass text { fill: currentColor; font: italic 17px Georgia, serif; letter-spacing: .05em; }
+.flight-compass .minor { opacity: .65; }
+.flight-centre {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  font: 20px Georgia, serif; text-shadow: 0 1px 3px rgba(23, 29, 22, .7);
+}
+.flight-height-medallion {
+  display: inline-flex; flex-direction: column; gap: 3px;
+  margin-top: 5px; padding: 4px 12px 7px;
+  background: rgba(37, 37, 31, .6094); border-radius: 50% / 20%;
+  border-top: 1px solid rgba(217, 185, 124, .3267);
+  border-bottom: 1px solid rgba(217, 185, 124, .3267);
+  text-shadow: 0 1px 1px rgba(23, 29, 22, .7);
+}
+.flight-height { font: italic 21px Georgia, serif; font-variant-numeric: tabular-nums; }
+.flight-height-medallion span { font: 11px Georgia, serif; letter-spacing: .08em; }
+/* Keep the course available to screen readers without adding another visible instrument. */
+.flight-bearing { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 700px) {
+  .flight-hud { top: calc(18px + env(safe-area-inset-top, 0px)); width: 33.333vw; }
+  .flight-height-medallion { padding-left: 4px; padding-right: 4px; }
+  .flight-height-medallion span { font-size: 10px; letter-spacing: .01em; }
+}
+
 /* Arrow-key nudge hint. */
 .nudge-hint {
   position: fixed;

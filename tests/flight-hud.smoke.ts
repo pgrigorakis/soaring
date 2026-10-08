@@ -1,0 +1,119 @@
+import { expect, test } from '@playwright/test';
+
+// UI seam: real navigation review poses, visible compass ticks, accessible bearing/height,
+// and the existing pointer/nudge/map controls. Save repeatable screenshots and a bearing trace.
+// Failure cases: +z mistaken for north; inverted east/west; long rotation at north;
+// height measured from seabed; whole-degree tick jumps; phone crowding; overlay overlap.
+test('the field compass follows the eagle and shows flight height above land and water', async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    localStorage.setItem('soaring.world-seed.v1', '42');
+    localStorage.setItem('soaring.scenic-visit.v1', '0');
+  });
+  await page.goto('/?smoke');
+  const hud = page.getByRole('region', { name: 'Flight height and bearing' });
+  await expect(hud).toBeVisible();
+  const spots = await page.evaluate(() => {
+    const api = window.__SOARING__, lake = api.reviewSpots().lake;
+    let wet: { x: number; z: number; surface: number } | undefined;
+    let dry: { x: number; z: number; surface: number } | undefined;
+    for (let dx = -2000; dx <= 2000 && (!wet || !dry); dx += 100) {
+      for (let dz = -2000; dz <= 2000; dz += 100) {
+        const x = lake.x + dx, z = lake.z + dz, sample = api.sample(x, z);
+        if (sample.water && sample.surface - sample.height > 5) wet = { x, z, surface: sample.surface };
+        if (!sample.water) dry = { x, z, surface: sample.height };
+      }
+    }
+    if (!wet || !dry) throw new Error('Need submerged seabed and dry land');
+    return { wet, dry };
+  });
+  const evidence: unknown[] = [];
+  for (const [label, spot] of Object.entries(spots)) {
+    await page.evaluate((pose) => window.__SOARING__.reviewFlight!({ ...pose, y: pose.surface + 57, heading: 0 }), spot);
+    await expect(hud.getByLabel('Flight height', { exact: true })).toHaveText('57 m');
+    await expect(hud.getByLabel('Eagle bearing')).toHaveText('180°');
+    await page.keyboard.press('d');
+    await expect(page.locator('#diagnostics')).toContainText('clearance    57 m');
+    await page.keyboard.press('d');
+    evidence.push({ label, spot, height: await hud.getByLabel('Flight height', { exact: true }).textContent() });
+  }
+
+  // Worked map convention: heading 0 points south; positive pi/2 points east.
+  const headings = [Math.PI, 3 * Math.PI / 4, Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2, -3 * Math.PI / 4];
+  const cardinals = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  for (const [index, heading] of headings.entries()) {
+    await page.evaluate(({ pose, heading }) => window.__SOARING__.reviewFlight!({ ...pose, y: pose.surface + 57, heading }), { pose: spots.dry, heading });
+    await expect(hud.getByLabel('Eagle bearing')).toHaveText(`${String(index * 45).padStart(3, '0')}°`);
+    await expect.poll(() => hud.locator('svg').evaluate((svg, cardinal) => {
+      const text = [...svg.querySelectorAll('text')].find((node) => node.textContent === cardinal)!;
+      const group = text.parentNode as SVGGElement;
+      return Math.abs(group.transform.baseVal.getItem(0).matrix.e - svg.clientWidth / 2);
+    }, cardinals[index]!)).toBeLessThan(2);
+    evidence.push({ cardinal: cardinals[index], heading });
+  }
+
+  // A narrow change through north must not turn the tape all the way around.
+  await page.evaluate((pose) => window.__SOARING__.reviewFlight!({ ...pose, y: pose.surface + 57, heading: -179 * Math.PI / 180 }), spots.dry);
+  await expect(hud.getByLabel('Eagle bearing')).toHaveText('359°');
+  await page.waitForTimeout(700);
+  const trace = await page.evaluate(async (pose) => {
+    window.__SOARING__.reviewFlight!({ ...pose, y: pose.surface + 57, heading: 179 * Math.PI / 180 });
+    const frames: { bearing: number; tickX: number }[] = [];
+    for (let index = 0; index < 40; index++) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const hud = document.querySelector<HTMLElement>('.flight-hud')!;
+      const text = [...hud.querySelectorAll('svg text')].find((node) => node.textContent === 'N')!;
+      const group = text.parentNode as SVGGElement;
+      frames.push({ bearing: Number(hud.dataset.bearing), tickX: group.transform.baseVal.getItem(0).matrix.e });
+    }
+    return frames;
+  }, spots.dry);
+  for (const [index, frame] of trace.slice(1).entries()) {
+    const previous = trace[index]!;
+    const step = (frame.bearing - previous.bearing + 540) % 360 - 180;
+    expect(step).toBeGreaterThanOrEqual(-0.001);
+    // Slow CI frames may cover the whole 2° input, but never a long rotation or a 5° tick jump.
+    expect(step).toBeLessThan(2.01);
+    expect(Math.abs(frame.tickX - previous.tickX)).toBeLessThan(7.3);
+  }
+  await expect(hud.getByLabel('Eagle bearing')).toHaveText('001°');
+  evidence.push({ northCrossing: trace });
+
+  // Orbit changes the view, not the eagle bearing.
+  await page.mouse.move(300, 350);
+  await page.mouse.down();
+  await page.mouse.move(650, 370, { steps: 10 });
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => window.__SOARING__.snapshot().orbitYaw)).not.toBe(0);
+  await expect(hud.getByLabel('Eagle bearing')).toHaveText('001°');
+
+  await page.keyboard.down('ArrowLeft');
+  await page.evaluate(() => window.__SOARING__.advanceSimulation!(0.2));
+  await expect(page.locator('#nudge-hint')).toHaveClass(/visible/);
+  const hudBox = (await hud.boundingBox())!, hintBox = (await page.locator('#nudge-hint').boundingBox())!;
+  expect(hudBox.y + hudBox.height).toBeLessThan(hintBox.y);
+  await page.keyboard.up('ArrowLeft');
+  await page.screenshot({ path: testInfo.outputPath('field-compass-nudge.png') });
+
+  await page.keyboard.press('m');
+  await expect(page.locator('.map-panel')).toHaveClass(/open/);
+  expect(await hud.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return Boolean(document.elementFromPoint(rect.x + rect.width / 2, rect.y + 20)?.closest('.map-panel'));
+  })).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('field-compass-map.png') });
+  await page.keyboard.press('m');
+
+  for (const width of [390, 2560]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1440 });
+    await expect.poll(() => hud.evaluate((element) => element.getBoundingClientRect().width / innerWidth)).toBeGreaterThanOrEqual(.249);
+    expect(await hud.evaluate((element) => element.getBoundingClientRect().width / innerWidth)).toBeLessThanOrEqual(.334);
+    expect(await hud.getByLabel('Flight height', { exact: true }).evaluate((element) => parseFloat(getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(19);
+    expect(await hud.locator('svg').evaluate((element) => parseFloat(getComputedStyle(element.querySelector('text')!).fontSize))).toBeGreaterThanOrEqual(14);
+    await page.screenshot({ path: testInfo.outputPath(`field-compass-${width}.png`) });
+  }
+  await testInfo.attach('field-compass-evidence', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' });
+  expect(errors).toEqual([]);
+});
