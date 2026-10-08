@@ -135,6 +135,43 @@ test('the field compass follows the eagle and shows flight height above land and
   });
   await testInfo.attach('held-hud-writes', { body: JSON.stringify({ frames: 20, writes }), contentType: 'application/json' });
   expect(writes).toBe(0);
+
+  await hud.evaluate((element) => {
+    let writes = 0;
+    const observer = new MutationObserver((records) => { writes += records.length; });
+    observer.observe(element, { attributes: true, childList: true, characterData: true, subtree: true });
+    (element as HTMLElement & { finishResizeAudit: () => number }).finishResizeAudit = () => {
+      writes += observer.takeRecords().length;
+      observer.disconnect();
+      return writes;
+    };
+  });
+  const cdp = await page.context().newCDPSession(page);
+  const metrics = [
+    { width: 1000, height: 700, deviceScaleFactor: 2 },
+    { width: 1512, height: 982, deviceScaleFactor: 2 },
+    { width: 1512, height: 982, deviceScaleFactor: 1 },
+    { width: 390, height: 844, deviceScaleFactor: 1 },
+    { width: 790, height: 844, deviceScaleFactor: 1 },
+    { width: 800, height: 844, deviceScaleFactor: 1 },
+  ];
+  for (const metric of metrics) {
+    await cdp.send('Emulation.setDeviceMetricsOverride', { ...metric, mobile: false });
+    await expect.poll(() => hud.locator('svg').evaluate((svg) => {
+      const text = [...svg.querySelectorAll('text')].find((node) => node.textContent === 'E')!;
+      return Math.abs((text.parentNode as SVGGElement).getCTM()!.e - svg.clientWidth / 2);
+    })).toBeLessThan(2);
+    await expect.poll(() => hud.locator('svg').evaluate((svg) => {
+      const lines = [...svg.querySelectorAll('line')];
+      const spacing = (lines[1]!.parentNode as SVGGElement).getCTM()!.e - (lines[0]!.parentNode as SVGGElement).getCTM()!.e;
+      const width = svg.getBoundingClientRect().width;
+      return Math.abs(spacing - (width < 240 ? 11 : width / 24));
+    })).toBeLessThan(0.05);
+  }
+  const resizeWrites = await hud.evaluate((element) => (element as HTMLElement & { finishResizeAudit: () => number }).finishResizeAudit());
+  await testInfo.attach('hud-resize-writes', { body: JSON.stringify({ metrics, writes: resizeWrites }), contentType: 'application/json' });
+  expect(resizeWrites).toBe(0);
+  await cdp.detach();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect.poll(() => hud.locator('svg').evaluate((svg) => {
     const text = [...svg.querySelectorAll('text')].find((node) => node.textContent === 'E')!;

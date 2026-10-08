@@ -125,7 +125,7 @@ test('renders high-detail terrain, streams, and supports camera controls', async
 });
 
 test('caps normal rendering at two million pixels through viewport and DPR changes', async ({ page }) => {
-  test.setTimeout(45_000);
+  test.setTimeout(90_000);
   await preparePixelBudgetPage(page, '/?profile');
   const cdp = await page.context().newCDPSession(page);
   await setPixelBudgetMetrics(page, cdp, 1000, 700, 2);

@@ -5,14 +5,11 @@ const normalise = (degrees: number): number => ((degrees % 360) + 360) % 360;
 /** A field compass and local flight height. Navigation stays in world coordinates. */
 export class FlightHud {
   readonly element = document.createElement('section');
-  private readonly svg: SVGSVGElement;
   private readonly track = document.createElementNS(SVG_NS, 'g');
   private readonly bearingOutput: HTMLOutputElement;
   private readonly heightOutput: HTMLOutputElement;
   private readonly ticks: { group: SVGGElement; line: SVGLineElement; text: SVGTextElement }[];
   private bearing: number | null = null;
-  private width = 0;
-  private drawnWidth = 0;
   private drawnBearing: number | null = null;
   private drawnBase: number | null = null;
   private heightAge = 0;
@@ -31,15 +28,14 @@ export class FlightHud {
         <output class="flight-height" aria-label="Flight height" aria-live="off"></output>
         <span>above ground</span>
       </div>`;
-    this.svg = this.element.querySelector('svg')!;
-    this.svg.append(this.track);
-    // Width changes with the viewport, not the course. Avoid a forced layout on every frame.
-    new ResizeObserver(([entry]) => { this.width = entry!.contentRect.width; }).observe(this.svg);
+    this.track.classList.add('flight-compass-track');
+    this.element.querySelector('svg')!.append(this.track);
     this.bearingOutput = this.element.querySelector('.flight-bearing')!;
     this.heightOutput = this.element.querySelector('.flight-height')!;
-    // Recycle a fixed set of ticks; only their fractional positions and labels change.
-    this.ticks = Array.from({ length: 37 }, () => {
+    // CSS places fixed ticks responsively; only their labels change at 5° crossings.
+    this.ticks = Array.from({ length: 37 }, (_, index) => {
       const group = document.createElementNS(SVG_NS, 'g');
+      group.style.setProperty('--compass-tick-angle', String((index - 18) * 5));
       const line = document.createElementNS(SVG_NS, 'line');
       const text = document.createElementNS(SVG_NS, 'text');
       line.setAttribute('y1', '31');
@@ -59,28 +55,23 @@ export class FlightHud {
     const turn = ((target - this.bearing) % 360 + 540) % 360 - 180;
     // Finish imperceptible easing, so a held view can stop repainting the instrument.
     this.bearing = Math.abs(turn) < 0.0001 ? target : normalise(this.bearing + turn * (1 - Math.exp(-delta * 12)));
-    if (this.width > 0 && (this.bearing !== this.drawnBearing || this.width !== this.drawnWidth)) {
-      // Preserve phone lettering and tick spacing; show a narrower arc instead of scaling text.
-      const pixelsPerDegree = this.width < 240 ? 2.2 : this.width / 120;
+    if (this.bearing !== this.drawnBearing) {
       const base = Math.floor(this.bearing / 5) * 5;
-      // Scroll one shared track; relabel its recycled ticks only at a 5° crossing or resize.
-      if (base !== this.drawnBase || this.width !== this.drawnWidth) {
+      // Resize and DPR changes need no JavaScript work or relabelling.
+      if (base !== this.drawnBase) {
         for (const [index, { group, line, text }] of this.ticks.entries()) {
-          const offset = (index - 18) * 5;
-          const bearing = normalise(base + offset);
+          const bearing = normalise(base + (index - 18) * 5);
           const cardinal = bearing % 45 === 0;
-          group.setAttribute('transform', `translate(${offset * pixelsPerDegree},0)`);
           group.setAttribute('class', cardinal ? 'major' : bearing % 15 === 0 ? 'medium' : 'minor');
           line.setAttribute('y2', String(cardinal ? 49 : bearing % 15 === 0 ? 44 : 38));
           text.textContent = cardinal ? CARDINALS[bearing / 45]! : '';
         }
       }
-      this.track.setAttribute('transform', `translate(${this.width / 2 + (base - this.bearing) * pixelsPerDegree},0)`);
+      this.track.style.setProperty('--compass-course-offset', String(base - this.bearing));
       const label = `${String(Math.round(this.bearing) % 360).padStart(3, '0')}°`;
       if (this.bearingOutput.value !== label) this.bearingOutput.value = label;
       this.element.dataset.bearing = String(this.bearing);
       this.drawnBearing = this.bearing;
-      this.drawnWidth = this.width;
       this.drawnBase = base;
     }
 

@@ -130,7 +130,11 @@ body.cursor-hidden, body.cursor-hidden * { cursor: none !important; }
 /* Field compass: brass ink, curved bark strip and a height medallion.
    Each prototype alpha is multiplied by 0.7: ink 1 → .7, bark 222/255 → .6094,
    strip border .6 → .42, medallion border 119/255 → .3267, pointer shadow 1 → .7. */
+/* Non-inherited angles keep a course update from invalidating every tick's style. */
+@property --compass-course-offset { syntax: '<number>'; inherits: false; initial-value: 0; }
+@property --compass-tick-angle { syntax: '<number>'; inherits: false; initial-value: 0; }
 .flight-hud {
+  container: flight-hud / inline-size;
   position: fixed; z-index: 3;
   top: calc(20px + env(safe-area-inset-top, 0px)); left: 50%;
   transform: translateX(-50%); width: 30vw;
@@ -149,6 +153,15 @@ body.cursor-hidden, body.cursor-hidden * { cursor: none !important; }
   mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
   /* A dark halo keeps the more transparent fine ticks readable over bright cloud. */
   filter: drop-shadow(0 1px 1px rgba(23, 29, 22, .7));
+}
+/* Percentages follow the SVG viewport without JavaScript measuring or redrawing on resize. */
+.flight-compass-track, .flight-compass-track > g { transform-box: view-box; transform-origin: 0 0; }
+.flight-compass-track { transform: translateX(calc(50% + var(--compass-course-offset) * 100% / 120)); }
+.flight-compass-track > g { transform: translateX(calc(var(--compass-tick-angle) * 100% / 120)); }
+@container flight-hud (width < 240px) {
+  /* Keep phone text unscaled and preserve its original 2.2 px per degree spacing. */
+  .flight-compass-track { transform: translateX(calc(50% + var(--compass-course-offset) * 2.2px)); }
+  .flight-compass-track > g { transform: translateX(calc(var(--compass-tick-angle) * 2.2px)); }
 }
 .flight-compass line { stroke: currentColor; stroke-width: 1; }
 .flight-compass text { fill: currentColor; font: italic 17px Georgia, serif; letter-spacing: .05em; }
