@@ -5,7 +5,7 @@ import { captureScreen } from './screen-pixels';
 // 1280 × 800 at a 48° vertical field of view.
 const FOCAL = 400 / Math.tan(24 * Math.PI / 180);
 
-test('dusk warmth follows the sun, a rose belt faces it, and the low sun is wide', async ({ page }, testInfo) => {
+test('dusk warmth follows the sun, a rose belt faces it, and the low sun glows softly', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   await page.addInitScript(() => {
     localStorage.setItem('soaring.world-seed.v1', '1406157560');
@@ -65,7 +65,7 @@ test('dusk warmth follows the sun, a rose belt faces it, and the low sun is wide
     const { data, width } = window.__screen!;
     let count = 0;
     for (let x = 0; x < width; x += 1) {
-      // The orange glow keeps green low; the pale disc lifts it.
+      // The orange glow keeps green low; the white-hot core lifts it.
       if (data[(row * width + x) * 4 + 1]! >= 205) count += 1;
     }
     return count;
@@ -84,14 +84,15 @@ test('dusk warmth follows the sun, a rose belt faces it, and the low sun is wide
   const path = testInfo.outputPath('sky-dusk.json');
   await writeFile(path, JSON.stringify(measures, null, 2));
   await testInfo.attach('sky-dusk', { path, contentType: 'application/json' });
-  // Old values (one warm band everywhere, a 1.1 degree core) in brackets.
-  // The sun reads about 3 degrees across (37 px).
-  expect(sunWidth).toBeGreaterThanOrEqual(45);
+  // Old values (the 3 degree disc with a broad halo) in brackets.
+  // The soft glow's hot core reads about 2.4 degrees across (48 px), with no hard disc edge.
+  expect(sunWidth).toBeGreaterThanOrEqual(25);
+  expect(sunWidth).toBeLessThan(40);
   // Warmth is directional: the sun side is far warmer than the far side (3).
   expect(warmth(sunSide[0]!) - warmth(antiSide[0]!)).toBeGreaterThan(40);
   expect(warmth(sunSide[1]!) - warmth(antiSide[1]!)).toBeGreaterThan(40);
-  // A broad low-sun glow lights the sky 12 degrees above the sun (red 183).
-  expect(sunGlow[0]).toBeGreaterThan(215);
+  // A broad low-sun glow lights the sky 12 degrees above the sun (red 238).
+  expect(sunGlow[0]).toBeGreaterThan(205);
   // Opposite the sun the belt is rose, not brown: blue holds up against red (0.52).
   expect(belt[2]! / belt[0]!).toBeGreaterThan(0.6);
   // Painted clouds burn toward the sun and stay cool opposite it (-3).
