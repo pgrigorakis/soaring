@@ -1,0 +1,122 @@
+[
+  {
+    "build": "before",
+    "shot": "sunrise-toward",
+    "file": "before-sunrise-toward.png",
+    "phase": 0.2591871171657523,
+    "pitch": 2,
+    "heading": 1.8485206863860888,
+    "sunElevation": 2.9999999999999916,
+    "drawCalls": 93
+  },
+  {
+    "build": "before",
+    "shot": "golden-toward",
+    "file": "before-golden-toward.png",
+    "phase": 0.7129378783414215,
+    "pitch": 4,
+    "heading": -1.5836645050529787,
+    "sunElevation": 11.99999999999999,
+    "drawCalls": 78
+  },
+  {
+    "build": "before",
+    "shot": "sunset-toward",
+    "file": "before-sunset-toward.png",
+    "phase": 0.7408128828342477,
+    "pitch": 2,
+    "heading": -1.4085206863860886,
+    "sunElevation": 2.9999999999999813,
+    "drawCalls": 78
+  },
+  {
+    "build": "before",
+    "shot": "morning-toward",
+    "file": "before-morning-toward.png",
+    "phase": 0.3478733832905033,
+    "pitch": 12,
+    "heading": 2.405752930649743,
+    "sunElevation": 30.00000000000001,
+    "drawCalls": 89
+  },
+  {
+    "build": "before",
+    "shot": "noon-toward",
+    "file": "before-noon-toward.png",
+    "phase": 0.5,
+    "pitch": 34,
+    "heading": 3.3615926535897933,
+    "sunElevation": 52.000000000000014,
+    "drawCalls": 54
+  },
+  {
+    "build": "before",
+    "shot": "morning-away",
+    "file": "before-morning-away.png",
+    "phase": 0.3478733832905033,
+    "pitch": null,
+    "heading": 5.327345584239537,
+    "sunElevation": 30.00000000000001,
+    "drawCalls": 76
+  },
+  {
+    "build": "after",
+    "shot": "sunrise-toward",
+    "file": "after-sunrise-toward.png",
+    "phase": 0.2591871171657523,
+    "pitch": 2,
+    "heading": 1.8485206863860888,
+    "sunElevation": 2.9999999999999916,
+    "drawCalls": 92
+  },
+  {
+    "build": "after",
+    "shot": "golden-toward",
+    "file": "after-golden-toward.png",
+    "phase": 0.7129378783414215,
+    "pitch": 4,
+    "heading": -1.5836645050529787,
+    "sunElevation": 11.99999999999999,
+    "drawCalls": 77
+  },
+  {
+    "build": "after",
+    "shot": "sunset-toward",
+    "file": "after-sunset-toward.png",
+    "phase": 0.7408128828342477,
+    "pitch": 2,
+    "heading": -1.4085206863860886,
+    "sunElevation": 2.9999999999999813,
+    "drawCalls": 77
+  },
+  {
+    "build": "after",
+    "shot": "morning-toward",
+    "file": "after-morning-toward.png",
+    "phase": 0.3478733832905033,
+    "pitch": 12,
+    "heading": 2.405752930649743,
+    "sunElevation": 30.00000000000001,
+    "drawCalls": 88
+  },
+  {
+    "build": "after",
+    "shot": "noon-toward",
+    "file": "after-noon-toward.png",
+    "phase": 0.5,
+    "pitch": 34,
+    "heading": 3.3615926535897933,
+    "sunElevation": 52.000000000000014,
+    "drawCalls": 53
+  },
+  {
+    "build": "after",
+    "shot": "morning-away",
+    "file": "after-morning-away.png",
+    "phase": 0.3478733832905033,
+    "pitch": null,
+    "heading": 5.327345584239537,
+    "sunElevation": 30.00000000000001,
+    "drawCalls": 76
+  }
+]
