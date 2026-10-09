@@ -58,6 +58,7 @@ test('puffs never show through the cloud deck from above, and still show below i
     document.querySelector('#intro')?.classList.add('hidden');
     document.querySelector<HTMLElement>('#controls')!.style.visibility = 'hidden';
     document.querySelector<HTMLElement>('.minimap')!.style.visibility = 'hidden';
+    document.querySelector<HTMLElement>('.flight-hud')!.style.visibility = 'hidden';
   });
   await mkdir('test-results/cloud-puff-deck', { recursive: true });
   const results: Array<Record<string, unknown>> = [];
