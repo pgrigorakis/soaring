@@ -35,6 +35,10 @@ _Avoid_: Loop, routine
 **Flight height**:
 The eagle's height above the local terrain, kept in a fixed 50–800 m band. Near the bottom the eagle flaps to climb. The top caps thermal and ridge climbs.
 
+**Height above sea level**:
+The eagle's world y in metres, shown in the flight HUD. It is distinct from **flight height**, which is measured from the local terrain.
+_Avoid_: Altitude, flight height (for the readout)
+
 **Gliding**:
 Flight without flapping outside a thermal; the eagle trades height for distance and slowly sinks.
 _Avoid_: Soaring (unless in a thermal)

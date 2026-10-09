@@ -60,9 +60,9 @@ test('production bundle serves from its base path and renders without dev hooks 
   expect(productionState.diagnosticsVisible).toBe(false);
   await page.locator('.start-screen').click();
   await expect(page.locator('.start-screen')).toHaveCount(0, { timeout: 15_000 });
-  const hud = page.getByRole('region', { name: 'Flight height and bearing' });
+  const hud = page.getByRole('region', { name: 'Height above sea level and bearing' });
   await expect(hud).toBeVisible();
-  await expect(hud.getByLabel('Flight height', { exact: true })).toHaveText(/^\d+ m$/);
+  await expect(hud.getByLabel('Height above sea level', { exact: true })).toHaveText(/^\d+ m$/);
   await expect(hud.getByLabel('Eagle bearing')).toHaveText(/^\d{3}°$/);
   expect(errors).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath('production-bundle.png') });

@@ -2,7 +2,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const CARDINALS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 const normalise = (degrees: number): number => ((degrees % 360) + 360) % 360;
 
-/** A field compass and local flight height. Navigation stays in world coordinates. */
+/** A field compass and height above sea level. Navigation stays in world coordinates. */
 export class FlightHud {
   readonly element = document.createElement('section');
   private readonly track = document.createElementNS(SVG_NS, 'g');
@@ -17,7 +17,7 @@ export class FlightHud {
 
   constructor() {
     this.element.className = 'flight-hud';
-    this.element.setAttribute('aria-label', 'Flight height and bearing');
+    this.element.setAttribute('aria-label', 'Height above sea level and bearing');
     this.element.innerHTML = `
       <div class="flight-compass">
         <svg height="53" aria-hidden="true"></svg>
@@ -25,8 +25,8 @@ export class FlightHud {
       </div>
       <output class="flight-bearing" aria-label="Eagle bearing" aria-live="off"></output>
       <div class="flight-height-medallion">
-        <output class="flight-height" aria-label="Flight height" aria-live="off"></output>
-        <span>above ground</span>
+        <output class="flight-height" aria-label="Height above sea level" aria-live="off"></output>
+        <span>above sea level</span>
       </div>`;
     this.track.classList.add('flight-compass-track');
     this.element.querySelector('svg')!.append(this.track);
@@ -47,7 +47,7 @@ export class FlightHud {
     });
   }
 
-  /** Height is above terrain on land and above the surface over water. Delta is real time. */
+  /** Height is metres above sea level, the world y. Delta is real time. */
   update(heading: number, height: number, delta: number): void {
     // The north-up map draws heading 0 (+z) south; positive pi/2 (+x) is east.
     const target = normalise(180 - heading * 180 / Math.PI);

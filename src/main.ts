@@ -11,7 +11,7 @@ import { THERMAL_MARKER_RANGE, ThermalMarker } from './thermal-marker';
 import { CloudSea, bindCloudFog } from './cloud-sea';
 import { AuroraSchedule, auroraAmount, DAY_SECONDS, daylight, nightCycle, type Daylight } from './sky-cycle';
 import { FrameProfiler, type ProfileReport } from './profile';
-import { WORLD_CACHE_LIMIT, WorldModel } from './world';
+import { SEA_LEVEL, WORLD_CACHE_LIMIT, WorldModel } from './world';
 import { PuffClouds, type PuffCloudSnapshot } from './puff-clouds';
 import { Trail } from './trail';
 import { Minimap } from './minimap';
@@ -1082,7 +1082,7 @@ function frame(now: number): void {
   // Keep the starting view fixed while its terrain fills behind the white screen.
   updateFlight(startScreen?.holding ? 0 : delta, now);
   const state = navigator.state;
-  flightHud.update(state.heading, state.y - flightSurface(), rawDelta);
+  flightHud.update(state.heading, state.y - SEA_LEVEL, rawDelta);
   if (Math.hypot(state.x - renderOrigin.x, state.y - renderOrigin.y, state.z - renderOrigin.z) > RENDER_ORIGIN_DISTANCE) {
     renderOrigin.set(state.x, state.y, state.z);
     // One parent translation rebases every world object together; the camera is rebased below.

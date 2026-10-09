@@ -3,8 +3,8 @@ import { expect, test } from '@playwright/test';
 // UI seam: real navigation review poses, visible compass ticks, accessible bearing/height,
 // and the existing pointer/nudge/map controls. Save repeatable screenshots and a bearing trace.
 // Failure cases: +z mistaken for north; inverted east/west; long rotation at north;
-// height measured from seabed; whole-degree tick jumps; phone crowding; overlay overlap.
-test('the field compass follows the eagle and shows flight height above land and water', async ({ page }, testInfo) => {
+// height measured from terrain or seabed instead of sea level; whole-degree tick jumps; phone crowding; overlay overlap.
+test('the field compass follows the eagle and shows height above sea level over land and water', async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -13,7 +13,7 @@ test('the field compass follows the eagle and shows flight height above land and
     localStorage.setItem('soaring.scenic-visit.v1', '0');
   });
   await page.goto('/?smoke');
-  const hud = page.getByRole('region', { name: 'Flight height and bearing' });
+  const hud = page.getByRole('region', { name: 'Height above sea level and bearing' });
   await expect(hud).toBeVisible();
   const spots = await page.evaluate(() => {
     const api = window.__SOARING__, lake = api.reviewSpots().lake;
@@ -32,12 +32,12 @@ test('the field compass follows the eagle and shows flight height above land and
   const evidence: unknown[] = [];
   for (const [label, spot] of Object.entries(spots)) {
     await page.evaluate((pose) => window.__SOARING__.reviewFlight!({ ...pose, y: pose.surface + 57, heading: 0 }), spot);
-    await expect(hud.getByLabel('Flight height', { exact: true })).toHaveText('57 m');
+    await expect(hud.getByLabel('Height above sea level', { exact: true })).toHaveText(`${Math.round(spot.surface + 57)} m`);
     await expect(hud.getByLabel('Eagle bearing')).toHaveText('180°');
     await page.keyboard.press('d');
     await expect(page.locator('#diagnostics')).toContainText('clearance    57 m');
     await page.keyboard.press('d');
-    evidence.push({ label, spot, height: await hud.getByLabel('Flight height', { exact: true }).textContent() });
+    evidence.push({ label, spot, height: await hud.getByLabel('Height above sea level', { exact: true }).textContent() });
   }
 
   // Worked map convention: heading 0 points south; positive pi/2 points east.
@@ -110,7 +110,7 @@ test('the field compass follows the eagle and shows flight height above land and
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1440 });
     await expect.poll(() => hud.evaluate((element) => element.getBoundingClientRect().width / innerWidth)).toBeGreaterThanOrEqual(.249);
     expect(await hud.evaluate((element) => element.getBoundingClientRect().width / innerWidth)).toBeLessThanOrEqual(.334);
-    expect(await hud.getByLabel('Flight height', { exact: true }).evaluate((element) => parseFloat(getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(19);
+    expect(await hud.getByLabel('Height above sea level', { exact: true }).evaluate((element) => parseFloat(getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(19);
     expect(await hud.locator('svg').evaluate((element) => parseFloat(getComputedStyle(element.querySelector('text')!).fontSize))).toBeGreaterThanOrEqual(14);
     await page.screenshot({ path: testInfo.outputPath(`field-compass-${width}.png`) });
   }
